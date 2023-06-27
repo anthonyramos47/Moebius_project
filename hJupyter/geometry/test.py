@@ -1,6 +1,4 @@
-from geometry.testFolder import testmesh
+from geometry.testFolder import *
 
-
-testmesh.test_mesh_dimensions()
 
 

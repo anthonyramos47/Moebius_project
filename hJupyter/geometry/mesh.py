@@ -33,13 +33,14 @@ class Mesh():
         self._E = 0
 
         # Half-Edge Data Structure
-        self._halfedges = None
+        self.halfedges = None
 
         # Vertices
         self._vertices = None
 
         # Boundary Half-Edges
-        self._boundary_halfedges = None
+        self._boundaryhalfedges = None
+
 
     # Properties: ------------------------------------------------------------------
 
@@ -57,7 +58,7 @@ class Mesh():
     
     @property
     def BH(self):
-        return self._boundary_halfedges
+        return self._boundaryhalfedges
     
     @property
     def vertices(self):
@@ -76,7 +77,7 @@ class Mesh():
 
     @property
     def H(self):
-        return self._halfedges
+        return self.halfedges
     
     @H.setter
     def H(self, halfedges):
@@ -86,16 +87,16 @@ class Mesh():
         assert halfedges.shape[1] == 6, "halfedges must be an array of shape (n,6)"
         
         # Set the halfedges
-        self._halfedges = halfedges
+        self.halfedges = halfedges
         self.update_dimensions()
 
 
     # Updates Functions: ------------------------------------------------------------------ 
 
     def update_dimensions(self):
-        self._V =  np.amax(self._halfedges[:,0]) + 1
-        self._F =  np.amax(self._halfedges[:,2]) + 1
-        self._E =  np.amax(self._halfedges[:,5]) + 1
+        self._V =  np.amax(self.halfedges[:,0]) + 1
+        self._F =  np.amax(self.halfedges[:,2]) + 1
+        self._E =  np.amax(self.halfedges[:,5]) + 1
 
     # Methods: ------------------------------------------------------------------
 
@@ -260,7 +261,7 @@ class Mesh():
         H[:, 5] = imap[m]
 
         # Set half-edges data structure
-        self._halfedges = H
+        self.halfedges = H
         self._E = int(H.shape[0]/2)
         self.update_dimensions()
 
@@ -347,10 +348,115 @@ class Mesh():
                 except:
                     return  # All faces have been oriented, so return
             
+    # Local Mesh operations ----------------------------------------------------------
 
+    def vertex_star(self, v):
+        """ Returns the star of a vertex """
+        # Get halfedges
+        H = self.halfedges
+        # Get the halfedges that start at vertex v
+        hv = np.where(H[:, 0] == v)
 
+        # Get the origin of the twin halfedges
+        vs = H[H[hv, 1], 0][0]
+        
+        return vs
 
+    def face_ring(self, f):
+        """
+            Returns the first ring of neighbor faces of a face
+        """
+
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the halfedges of the face f
+        hf = np.where(H[:, 2] == f)
+
+        # Get the origin of the twin halfedges
+        fs = H[H[hf, 1], 2][0]
+
+        # Clear -1 values
+        fs = fs[fs != -1]
+
+        return fs
+    
+    def vertex_degree(self, v):
+        """ Returns the degree of a vertex """
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the halfedges that start at vertex v
+        valence = len(np.where(H[:, 0] == v))
+        return valence
 
     
-    
-    
+    # Topological properties of the Mesh ----------------------------------------------------------
+
+    def faces(self):
+        """ Returns the faces list of the mesh """
+
+        # Initialize the faces list
+       
+
+        # Get halfedges
+        H = self.halfedges
+
+        # indices with faces != -1
+        idx = np.where(H[:, 2] != -1)
+      
+        # Get the faces idxs
+        f = H[idx, 2][0]
+        
+        # Get the origin of the halfedges
+        vs = H[idx, 0][0]
+        
+        faces = [[] for f in range(self.F)]
+        # Append the origin of the halfedges to the faces list
+        for i in range(len(f)):
+            faces[f[i]].append(vs[i])
+
+        return faces
+
+    def vertex_adjacency_list(self):
+        """
+            Returns the adjacency list of the mesh
+        """
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the origin of the halfedges
+        vs = H[:, 0]
+
+        # Get the destination of the halfedges
+        vd = H[H[:, 1], 0]
+
+        adjacency = [[] for i in range(self.V)]
+        
+        # Store the destination of the halfedges in the adjacency list
+        for i in range(len(vs)):
+            adjacency[vs[i]].append(vd[i])
+
+        return adjacency
+
+    def vertex_face_adjacency_list(self):
+        """
+            Returns the vertex-face adjacency list of the mesh
+        """
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the origin of the halfedges
+        vs = H[:, 0]
+
+        # Get the faces of the halfedges
+        fs = H[:, 2]
+
+        adjacency = [[] for i in range(self.V)]
+        
+        # Store the faces of the halfedges in the adjacency list
+        for i in range(len(vs)):
+            if fs[i] != -1:
+                adjacency[vs[i]].append(fs[i])
+
+        return adjacency
