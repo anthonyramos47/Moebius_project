@@ -208,8 +208,6 @@ class Mesh():
         boundary[:, 2] = -1
         boundary[:, 1] = b
 
-        print("H: ", H)
-
         B = len(boundary)
         if B > 0:
             # Indices for the boundary half-edges
@@ -396,9 +394,6 @@ class Mesh():
     def faces(self):
         """ Returns the faces list of the mesh """
 
-        # Initialize the faces list
-       
-
         # Get halfedges
         H = self.halfedges
 
@@ -411,12 +406,13 @@ class Mesh():
         # Get the origin of the halfedges
         vs = H[idx, 0][0]
         
+        # Initialize the faces list
         faces = [[] for f in range(self.F)]
         # Append the origin of the halfedges to the faces list
         for i in range(len(f)):
             faces[f[i]].append(vs[i])
 
-        return faces
+        return np.array(faces)
 
     def vertex_adjacency_list(self):
         """
@@ -460,3 +456,117 @@ class Mesh():
                 adjacency[vs[i]].append(fs[i])
 
         return adjacency
+    
+
+    def face_face_adjacency_list(self):
+        """
+            Returns the face-face adjacency list of the mesh 
+        """
+
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the faces of the halfedges
+        fs = H[H[:, 2] != -1, :]
+
+        # Sort indices
+        idx = np.argsort(fs[:, 2])
+
+        # Get Neighbors of each face
+        fs_n = H[fs[idx, 1], 2]
+
+        # Order faces
+        fs = fs[idx, 2]
+
+        # Init adjacency list
+        adjacency = [[] for i in range(self.F)]
+
+        # Store the neighbors of each face in the adjacency list
+        for i in range(len(fs)):
+            if fs_n[i] != -1:
+                adjacency[fs[i]].append(fs_n[i])
+
+        return adjacency
+
+        
+    # Boundary and interior functions ----------------------------------------------------------
+
+    def boundary_faces(self):
+        """
+            Returns the boundary faces of the mesh
+        """
+
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the faces of the halfedges
+        fs = H[H[:, 2] != -1, :]
+
+        # Sort indices
+        idx = np.argsort(fs[:, 2])
+
+        # Get Neighbors of each face
+        fs_n = H[fs[idx, 1], 2]
+
+        # Order faces
+        fs = fs[idx, 2]
+
+        # Indicex with -1 faces
+        idx = np.where(fs_n == -1)
+
+        # Get values with neighors = -1
+        fs = fs[idx]
+
+        # Get unique values of fs
+        boundary_faces = np.unique(fs)
+            
+        return boundary_faces
+
+
+    def boundary_vertices(self):
+        """
+            Returns the boundary halfedges of the mesh
+        """
+        # Get halfedges
+        H = self.halfedges
+
+        # Get the boundary edges
+        idx = np.where(H[:, 2] == -1)
+
+        # Get the origin of the halfedges
+        vs = H[idx, 0][0]
+
+        # Eliminate duplicates
+        vs = np.unique(vs)
+
+        return vs
+
+    def inner_vertices(self):
+        """
+            Returns the inner vertices of the mesh
+        """
+        # Get the boundary vertices
+        bd = self.boundary_vertices()
+
+        # Enumerate vertices
+        vs = np.arange(self.V)
+
+        # Eliminate boundary vertices
+        vs = np.delete(vs, bd)
+
+        return vs
+    
+    def inner_faces(self):
+        """
+            Returns the inner faces the mesh 
+        """
+        # Get the boundary faces
+        bd_f = self.boundary_faces()
+
+        # Enumerate faces
+        fs = np.arange(self.F)
+
+        # Eliminate boundary faces
+        fs = np.delete(fs, bd_f)
+
+        return fs
