@@ -570,3 +570,63 @@ class Mesh():
         fs = np.delete(fs, bd_f)
 
         return fs
+    
+    # Dual Connectivity ----------------------------------------------------------
+    
+
+    def vertex_ring_ordered_halfedges(self):
+        # Get halfedges
+        H = np.copy(self.halfedges)
+        # Sort halfedges by vertex
+        i = np.argsort(H[:,0])
+        v = H[i,0]
+        index = np.arange(H.shape[0])
+        _, j = np.unique(v, True)
+        v = np.delete(v,j)
+        index = np.delete(index,j)
+        while v.shape[0] > 0:
+            _, j = np.unique(v, True)
+            i[index[j]] = H[H[i[index[j] - 1],4],1]
+            v = np.delete(v,j)
+            index = np.delete(index,j)
+        return i
+
+    #Half-Edge r-th row : | Origin | Twin | Face | Next | Previous | Edge |
+    #                         0        1     2      3       4          5
+    #Half-Davider-th row : | Origin | Face | Next | Prev | Twin | Edge |
+    #                         0        1     2      3       4          5
+    def vertex_ring_faces_iterators(self, sort=False, order=False):
+        H = self.halfedges
+
+        print(f"ordered I :{self.vertex_ring_ordered_halfedges()}")
+
+        if order:
+            i  = self.vertex_ring_ordered_halfedges()
+            v  = H[i,0]
+            fj = H[i,2]
+        else:
+            i  = np.where(H[:,2] >= 0)[0]
+            v  = H[i,0]
+            fj = H[i,2]
+            if sort:
+                i  = np.argsort(v)
+                v  = v[i]
+                fj = fj[i]
+        return v, fj
+
+    def vertex_ring_faces_list(self):
+        ring_list = [[] for i in range(self.V)]
+        v, fj = self.vertex_ring_faces_iterators(order=True)
+        print(f"v : {v} \n fj: {fj}")
+        for i in range(len(v)):
+            if v[i]==3:
+                print(f" inside vertex_ring: {ring_list[v[i]]}")
+            ring_list[v[i]].append(fj[i])
+        return ring_list
+
+    def dual_top(self):
+        """
+            Returns a list of faces for dual connectivity
+        """
+
+        return self.vertex_ring_faces_list()

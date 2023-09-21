@@ -41,15 +41,13 @@ def circle_3pts(p1, p2, p3):
 
     # h 
     # h = ( (cx - bx/2)**2 + cy**2 - (bx/2)**2 )/(2*cy)
-    h = (cx**2 + cy**2 - (bx/2)**2 )/(2*cy)
+    h = ((cx-bx/2)**2 + cy**2 - (bx/2)**2 )/(2*cy)
     
-    print(f"h: {h}")
-    print(f"bx: {bx}")
+    bx /= 2
 
-    radius = np.sum(((bx*0.5)**2) * h , axis= 1)
+    radius = np.linalg.norm(np.vstack((bx,h)),axis=0)
 
-    print(f"bx: {bx}\n u1: {u1}\n bx/2*u1: {(bx*0.5)[:,None]*u1}")
 
-    center = p1 + (bx*0.5)[:,None]*u1 + h[:,None]*u3 
+    center = p1 + (bx)[:,None]*u1 + h[:,None]*u3 
     
     return center, radius, u2

@@ -11,7 +11,6 @@ class Optimizer():
         self.r = None # Residual vector
         self.x = None # Solution vector
         self.H = None # Hessian matrix
-        self.constraints = {} # Dictionary of constraints
         self.energy = [] # Energy vector
 
     def add_constraint(self, name, constraint, mesh) -> None:
@@ -24,20 +23,16 @@ class Optimizer():
         constraint.compute(mesh)
         J, r = constraint.J, constraint.r
 
-        # Add constraint
-        if name not in self.constraints.keys() or self.constraints:
-            self.constraints[name] = []
-            self.constraints[name].append(r@r)
-        else:
-            self.constraints[name].append(r@r)
 
         # Add Jacobian and residual
         if self.J is None:
             self.J = J
+            # Get number of rows of the Jacobian
             self.r = r
         else:
             self.J = np.vstack((self.J, J))
             self.r = np.vstack((self.r, r))
+ 
 
     def optimize(self, name_solv):
         if name_solv == 'LM': # Levenberg-Marquardt
@@ -102,9 +97,6 @@ class Optimizer():
 
 
     def clear_constraints(self):
-        # Clear constraints
-        self.constraints = {}
-
         # Clear Jacobian and residual
         self.J = None
         self.r = None
