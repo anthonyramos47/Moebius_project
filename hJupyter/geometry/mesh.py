@@ -598,7 +598,6 @@ class Mesh():
     def vertex_ring_faces_iterators(self, sort=False, order=False):
         H = self.halfedges
 
-        print(f"ordered I :{self.vertex_ring_ordered_halfedges()}")
 
         if order:
             i  = self.vertex_ring_ordered_halfedges()
@@ -617,10 +616,7 @@ class Mesh():
     def vertex_ring_faces_list(self):
         ring_list = [[] for i in range(self.V)]
         v, fj = self.vertex_ring_faces_iterators(order=True)
-        print(f"v : {v} \n fj: {fj}")
         for i in range(len(v)):
-            if v[i]==3:
-                print(f" inside vertex_ring: {ring_list[v[i]]}")
             ring_list[v[i]].append(fj[i])
         return ring_list
 
@@ -628,5 +624,4 @@ class Mesh():
         """
             Returns a list of faces for dual connectivity
         """
-
         return self.vertex_ring_faces_list()

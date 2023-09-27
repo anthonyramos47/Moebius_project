@@ -9,29 +9,40 @@ class Optimizer():
     def __init__(self) -> None:
         self.J = None # Jacobian matrix
         self.r = None # Residual vector
-        self.x = None # Solution vector
+        self.X = None # Variable
         self.H = None # Hessian matrix
         self.energy = [] # Energy vector
 
-    def add_constraint(self, name, constraint, mesh) -> None:
+    def fix_vertices(self, fix_vertices) -> None:
+        # The structure of our Jacobian is J = [ V | aux variables]
+        # If we want to fix a vertex, we need to set the corresponding column of the Jacobian to zero
+
+        self.J[:, fix_vertices*3    ] = 0
+        self.J[:, fix_vertices*3 + 1] = 0
+        self.J[:, fix_vertices*3 + 2] = 0
+
+
+
+    def initialize_optimizer(self, X) -> None:
+        # Initialize variables
+        self.X = X
+
+    def add_constraint(self, constraint) -> None:
         ## Add constraint to the dictionary
         # Input:
         #   name: name of the constraint
         #   constraint: Constraint class
-
-        # Compute constraint and get Jacobian and residual
-        constraint.compute(mesh)
-        J, r = constraint.J, constraint.r
-
+        #  mesh: mesh class
+        #  X: variables
 
         # Add Jacobian and residual
         if self.J is None:
-            self.J = J
+            self.J = constraint.J
             # Get number of rows of the Jacobian
-            self.r = r
+            self.r = constraint.r
         else:
-            self.J = np.vstack((self.J, J))
-            self.r = np.vstack((self.r, r))
+            self.J = np.vstack((self.J, constraint.J))
+            self.r = np.vstack((self.r, constraint.r))
  
 
     def optimize(self, name_solv):
@@ -58,6 +69,9 @@ class Optimizer():
         # Sparse matrix H
         H = csc_matrix(H)
         
+        # print(f"Shape of H: {H.shape}")
+        # print(f"Shape of J: {self.J.shape}")
+        # print(f"Shape of r: {self.r.shape}")
     
         # Solve for dx
         dx = linalg.spsolve(H, -self.J.T@self.r)
@@ -68,7 +82,11 @@ class Optimizer():
         energy = self.r.T@self.r
         self.energy.append(energy)
 
-        return dx
+        # Update variables
+        self.update_variables("LM", dx)
+
+        # Clear constraints
+        self.clear_constraints()
         
     def PG(self):
         # To be implemented
@@ -86,15 +104,23 @@ class Optimizer():
         
         log_file.close()
 
-    def log_complete(self, filename) -> None:
-        # Create a log file with the energy of each constraint
 
-        # create data frame with dictionary of constraints
-        df = pd.DataFrame.from_dict(self.constraints)
+    def print_log(self) -> None:
 
-        # Write to csv
-        df.to_csv(filename, index=False)
+        # Print energy
+        df = pd.DataFrame(self.energy)
 
+        df.columns = ["Energy"]
+        
+        print(df)
+    
+    def update_variables(self, name, arg) -> None:
+        # Update variables
+        if name == "LM":
+            self.X += 0.8*arg
+        elif name == "PG":
+            pass
+        
 
     def clear_constraints(self):
         # Clear Jacobian and residual

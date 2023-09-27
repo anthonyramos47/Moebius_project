@@ -7,6 +7,7 @@ import geometry as geo
 
 class Constraint():
     def __init__(self) -> None:
+        self.X = None # Variables
         self.J = None # Jacobian matrix
         self.J0 = None # Constant Jacobian
         self.r = None # Residual vector

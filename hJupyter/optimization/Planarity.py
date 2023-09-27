@@ -10,12 +10,10 @@ class Planarity(Constraint):
         super().__init__()
         self.normals = None
 
-
-    def initialize_constraint(self, mesh) -> None:
+    def initialize_constraint(self, mesh, X) -> None:
         # Init normals
         m = mesh
-        v = m.vertices
-
+        v = X[:3*mesh.V].reshape(m.V, 3)
 
         # Get list of indices 
         iv0, iv1, iv2, iv3 = m.faces()[:,0], m.faces()[:,1], m.faces()[:,2], m.faces()[:,3]
@@ -25,21 +23,19 @@ class Planarity(Constraint):
         diag2 = v[iv3] - v[iv1]
 
         # # Compute normals
+        X[3*mesh.V:] = np.cross(diag1, diag2).flatten()
+
         self.normals = np.cross(diag1, diag2)
         
 
-    def compute(self, mesh) -> None:
+    def compute(self, mesh, X) -> None:
 
         # Get mesh
         m = mesh
         
-        v = m.vertices
-        # new_v 
-        new_v = m.vertices.copy()
+        v = X[:3*mesh.V].reshape(m.V, 3)
 
-        normals = self.normals
-
-
+        normals = X[3*mesh.V:].reshape(m.F, 3)
         # Planarity
         # Constraint  n . (vi - vj) per each edge (vi, vj) in F, so we have 4 constraints per each face
         # Our variarles are the vertices of the mesh, so we have 3n variables plus the auxiliary variable
@@ -53,7 +49,7 @@ class Planarity(Constraint):
 
             iv0, iv1, iv2, iv3 = m.faces()[f]    
 
-            v0, v1, v2, v3 = new_v[iv0], new_v[iv1], new_v[iv2], new_v[iv3]
+            v0, v1, v2, v3 = v[iv0], v[iv1], v[iv2], v[iv3]
 
             # Edge constraint nf(v1 - v0) = 0
             J[        f, 3*iv0: 3*iv0 + 3] = - normals[f]
