@@ -36,6 +36,9 @@ class LineCong(Constraint):
 
         r = np.zeros(count + 3*len(ei), dtype=np.float64)
 
+        print(f"ei : {len(ei)}")
+        print(f"cf : {len(cf)}")
+
         # Compute Jacobian
         i = 0
         for f in range(len(cf)):

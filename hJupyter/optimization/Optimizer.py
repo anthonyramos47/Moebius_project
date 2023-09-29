@@ -117,7 +117,7 @@ class Optimizer():
     def update_variables(self, name, arg) -> None:
         # Update variables
         if name == "LM":
-            self.X += 0.8*arg
+            self.X += 0.6*arg
         elif name == "PG":
             pass
         
