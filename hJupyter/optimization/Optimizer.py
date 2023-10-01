@@ -11,6 +11,8 @@ class Optimizer():
         self.r = None # Residual vector
         self.X = None # Variable
         self.H = None # Hessian matrix
+        self.it = 0
+        self.step = 0.8 
         self.energy = [] # Energy vector
 
     def fix_vertices(self, fix_vertices) -> None:
@@ -54,6 +56,8 @@ class Optimizer():
             print("Error: Solver not implemented")
             sol = -1 
 
+
+
         return sol
 
     def LM(self):
@@ -84,6 +88,8 @@ class Optimizer():
 
         # Update variables
         self.update_variables("LM", dx)
+
+        self.it +=1
 
         # Clear constraints
         self.clear_constraints()
@@ -116,8 +122,12 @@ class Optimizer():
     
     def update_variables(self, name, arg) -> None:
         # Update variables
+
+        if self.it % 5 == 0:
+            self.step *= 0.8
+
         if name == "LM":
-            self.X += 0.6*arg
+            self.X += self.step*arg
         elif name == "PG":
             pass
         
