@@ -13,7 +13,7 @@ Install [conda](https://docs.conda.io/projects/conda/en/stable/user-guide/instal
 
 Go to the repository folder and you will find the file environment.yml. Go to the terminal and install the environment
 
-''' conda env create -f enviroment.yml '''
+``` conda env create -f enviroment.yml ```
 
 ### Running notebook
 
