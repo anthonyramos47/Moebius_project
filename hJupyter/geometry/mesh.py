@@ -624,4 +624,52 @@ class Mesh():
         """
             Returns a list of faces for dual connectivity
         """
-        return self.vertex_ring_faces_list()
+        # inner vertices
+        in_v = self.inner_vertices()
+        face_neighbors = self.vertex_ring_faces_list()
+        dual = [face_neighbors[i] for i in in_v]
+        return dual
+
+    # Reading
+    def read_obj_file(self, file_name):
+        file_name = str(file_name)
+        self.name = file_name.split('.')[0]
+        obj_file = open(file_name, encoding='utf-8')
+        vertices_list = []
+        uv_list = []
+        faces_list = []
+        for l in obj_file:
+            splited_line = l.split(' ')
+            if splited_line[0] == 'v':
+                split_x = splited_line[1].split('\n')
+                x = float(split_x[0])
+                split_y = splited_line[2].split('\n')
+                y = float(split_y[0])
+                split_z = splited_line[3].split('\n')
+                try:
+                    z = float(split_z[0])
+                except ValueError:
+                    print('WARNING: disable line wrap when saving .obj')
+                vertices_list.append([x, y ,z])
+            elif splited_line[0] == 'f':
+                v_list = []
+                L = len(splited_line)
+                try:
+                    for i in range(1, L):
+                        splited_face_data = splited_line[i].split('/')
+                        v_list.append(int(splited_face_data[0]) - 1 )
+                    faces_list.append(v_list)
+                except ValueError:
+                    v_list = []
+                    for i in range(1, L-1):
+                        v_list.append(int(splited_line[i]) - 1 )
+                    faces_list.append(v_list)
+            if splited_line[0] == 'vt':
+                split_u = splited_line[1].split('\n')
+                u = float(split_u[0])
+                split_v = splited_line[2].split('\n')
+                v = float(split_v[0])
+                vertices_list.append([u,v])
+            if len(uv_list) > 0:
+                self._uv = np.array(uv_list)
+        self.make_mesh(vertices_list, faces_list)
