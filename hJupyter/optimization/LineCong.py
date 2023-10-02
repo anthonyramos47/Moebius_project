@@ -25,18 +25,18 @@ class LineCong(Constraint):
         self.ei_dim = ei_dim
 
         # Get number of edges per face
-        count = 0
+        edge_num = 0
         for f in range(len(cf)):
-            count += len(cf[f])
+            edge_num += len(cf[f])
 
-        self.num_edge_const = count
+        self.num_edge_const = edge_num
 
         # Get directions
         ei = X.reshape(self.ei_dim, 3)
 
         # Init Jacobian and residual vector
-        J = np.zeros((count + 3*len(ei), len(X)), dtype=np.float64)
-        r = np.zeros(count + 3*len(ei), dtype=np.float64)
+        J = np.zeros((edge_num + len(ei), len(X)), dtype=np.float64)
+        r = np.zeros( edge_num + len(ei), dtype=np.float64)
 
         # Compute Jacobian
         # Row index
@@ -57,10 +57,10 @@ class LineCong(Constraint):
             J[i:i + len(face), 3*f:3*f + 3] = cicj
 
             # Store cicj because it is a constant value
-            self.cij.extend(cicj)
+            self.cij.append(cicj)
 
             # Define residual
-            r[i:i + len(face)] = np.dot(cicj, ei[f])
+            r[i:i + len(face)] = np.dot(self.cij[f], ei[f])
 
             # Update row index
             i += len(face)
@@ -68,9 +68,10 @@ class LineCong(Constraint):
 
         # Define Jacobian for the auxiliary variable
         for f in range(len(cf)):
-            J[count+f, f*3:f*3+3 ] = ei[f]
+            J[edge_num + f, f*3:f*3+3 ] = ei[f]
 
-            r[count+f] = ei[f]@ei[f] - 1
+        
+        r[edge_num:] =np.sum ( ei*ei,  axis=1) - 1
 
         self.J = J
         self.r = r
@@ -84,17 +85,19 @@ class LineCong(Constraint):
         # Compute Jacobian
         i = 0
         for f in range(len(cf)):
-
+            # Get face
             face = cf[f]
-            for id in range(len(face)):
-               
-                # Define residual
-                self.r[i] = self.cij[i]@ei[f]
 
-                i += 1
+            # Define residual
+            self.r[i:i + len(face)] = np.dot(self.cij[f], ei[f])
 
-        # Define Jacobian for the auxiliary variable
+            # Update row index
+            i += len(face)
+
+        
+        # Update Jacobian
         for f in range(len(cf)):
             self.J[self.num_edge_const+f, f*3:f*3+3 ] = ei[f]
 
-            self.r[self.num_edge_const+f] = ei[f]@ei[f] - 1
+        # Update residual
+        self.r[self.num_edge_const:] = np.sum ( ei*ei,  axis=1) - 1
