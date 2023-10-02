@@ -15,6 +15,10 @@ Go to the repository folder and you will find the file environment.yml. Go to th
 
 ``` conda env create -f enviroment.yml ```
 
+To activate the enviroment 
+
+``` conda activate hananJ```
+
 ### Running notebook
 
 In the repository folder you will find hJupyter. The main notebook is **hananJup.ipynb** but you can create another notebook for your purposes. 
