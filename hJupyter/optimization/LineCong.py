@@ -19,6 +19,9 @@ class LineCong(Constraint):
         # cf: list of faces of central mesh
         # X: variables
 
+        # Initialize constraint \sum_{f \in F} \sum_{cj,ci \in E(f)} || e_f (cj - ci)  ||^2
+
+        # Vector dimension
         self.ei_dim = ei_dim
 
         # Get number of edges per face
@@ -31,36 +34,57 @@ class LineCong(Constraint):
         # Get directions
         ei = X.reshape(self.ei_dim, 3)
 
-        # Comppute constant Jacobian
+        # Init Jacobian and residual vector
         J = np.zeros((count + 3*len(ei), len(X)), dtype=np.float64)
-
         r = np.zeros(count + 3*len(ei), dtype=np.float64)
 
-        print(f"ei : {len(ei)}")
-        print(f"cf : {len(cf)}")
-
         # Compute Jacobian
+        # Row index
         i = 0
+        # Loop over faces
         for f in range(len(cf)):
-
+            # Get face
             face = cf[f]
 
-            for id in range(len(face)):
-                # Get vertices
-                v0 = ct[face[id]]
-                v1 = ct[face[(id+1)%len(face)]]
+            # Get vertices
+            v0 = ct[face]
+            v1 = np.roll(ct[face], -1, axis=0)
 
-                # Define direction
-                cicj = (v1 - v0)/ np.linalg.norm(v1 - v0)
+            # Define direction
+            cicj = (v1 - v0) / np.linalg.norm(v1 - v0, axis=1)[:, None]
 
-                # Define Jacobian
-                J[i, 3*f: 3*f + 3] = cicj
-                
-                self.cij.append(cicj)
-                # Define residual
-                r[i] = cicj@ei[f]
+            # Define Jacobian
+            J[i:i + len(face), 3*f:3*f + 3] = cicj
 
-                i += 1
+            # Store cicj because it is a constant value
+            self.cij.extend(cicj)
+
+            # Define residual
+            r[i:i + len(face)] = np.dot(cicj, ei[f])
+
+            # Update row index
+            i += len(face)
+
+            # # Loop over edges
+            # for id in range(len(face)):
+            #     # Get vertices
+            #     v0 = ct[face[id]]
+            #     v1 = ct[face[(id+1)%len(face)]]
+
+            #     # Define direction
+            #     cicj = (v1 - v0)/ np.linalg.norm(v1 - v0)
+
+            #     # Define Jacobian
+            #     J[i, 3*f: 3*f + 3] = cicj
+
+            #     # Store cicj because it is a constant value
+            #     self.cij.append(cicj)
+
+            #     # Define residual
+            #     r[i] = cicj@ei[f]
+
+            #     # Update row index
+            #     i += 1
 
         # Define Jacobian for the auxiliary variable
         for f in range(len(cf)):
@@ -74,9 +98,6 @@ class LineCong(Constraint):
             
 
     def compute(self, ct, cf, X) -> None:
-        # Get center mesh 
-        
-
         # Get directions
         ei = X.reshape(self.ei_dim, 3)
 
