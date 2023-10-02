@@ -65,26 +65,6 @@ class LineCong(Constraint):
             # Update row index
             i += len(face)
 
-            # # Loop over edges
-            # for id in range(len(face)):
-            #     # Get vertices
-            #     v0 = ct[face[id]]
-            #     v1 = ct[face[(id+1)%len(face)]]
-
-            #     # Define direction
-            #     cicj = (v1 - v0)/ np.linalg.norm(v1 - v0)
-
-            #     # Define Jacobian
-            #     J[i, 3*f: 3*f + 3] = cicj
-
-            #     # Store cicj because it is a constant value
-            #     self.cij.append(cicj)
-
-            #     # Define residual
-            #     r[i] = cicj@ei[f]
-
-            #     # Update row index
-            #     i += 1
 
         # Define Jacobian for the auxiliary variable
         for f in range(len(cf)):
