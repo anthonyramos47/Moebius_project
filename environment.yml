@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - polyscope=1.3.4
   - asttokens=2.2.1
   - backcall=0.2.0
   - backports=1.0
