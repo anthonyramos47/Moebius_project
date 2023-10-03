@@ -13,7 +13,7 @@ class LineCong(Constraint):
         self.cij = []
         
 
-    def initialize_constraint(self, ct, cf, ei_dim, X) -> None:
+    def initialize_constraint(self, ct, dual_faces, inner_vertices, ei_dim, X) -> None:
         # Input
         # ct: list of vertices of central mesh
         # cf: list of faces of central mesh
@@ -26,8 +26,8 @@ class LineCong(Constraint):
 
         # Get number of edges per face
         edge_num = 0
-        for f in range(len(cf)):
-            edge_num += len(cf[f])
+        for f in inner_vertices:
+            edge_num += len(dual_faces[f])
 
         self.num_edge_const = edge_num
 
@@ -42,9 +42,13 @@ class LineCong(Constraint):
         # Row index
         i = 0
         # Loop over faces
-        for f in range(len(cf)):
+        for idx_f in range(len(inner_vertices)):
+            
+            # Face 
+            f = inner_vertices[idx_f]
+
             # Get face
-            face = cf[f]
+            face = dual_faces[f]
 
             # Get vertices
             v0 = ct[face]
@@ -60,14 +64,14 @@ class LineCong(Constraint):
             self.cij.append(cicj)
 
             # Define residual
-            r[i:i + len(face)] = np.dot(self.cij[f], ei[f])
+            r[i:i + len(face)] = np.dot(self.cij[idx_f], ei[f])
 
             # Update row index
             i += len(face)
 
 
         # Define Jacobian for the auxiliary variable
-        for f in range(len(cf)):
+        for f in range(len(dual_faces)):
             J[edge_num + f, f*3:f*3+3 ] = ei[f]
 
         
@@ -78,19 +82,23 @@ class LineCong(Constraint):
 
             
 
-    def compute(self, ct, cf, X) -> None:
+    def compute(self, inner_vertices, cf, X) -> None:
+        
+        
         # Get directions
         ei = X.reshape(self.ei_dim, 3)
 
         # Compute Jacobian
         i = 0
-        for f in range(len(cf)):
+        for idx_f in range(len(inner_vertices)):
+
+            f = inner_vertices[idx_f]
             # Get face
             face = cf[f]
 
             # Define residual
-            self.r[i:i + len(face)] = np.dot(self.cij[f], ei[f])
-
+            self.r[i:i + len(face)] = np.dot(self.cij[idx_f], ei[f])
+            
             # Update row index
             i += len(face)
 
