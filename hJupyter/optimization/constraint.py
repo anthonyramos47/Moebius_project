@@ -11,6 +11,8 @@ class Constraint():
         self.J = None # Jacobian matrix
         self.J0 = None # Constant Jacobian
         self.r = None # Residual vector
+        self.const = None # Num Constraints
+        self.var = None # Num Variables
 
     def initialize_constraint(self, mesh) -> None:
         """
