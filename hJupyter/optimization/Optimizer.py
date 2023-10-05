@@ -44,7 +44,7 @@ class Optimizer():
             self.r = constraint.r
         else:
             self.J = np.vstack((self.J, constraint.J))
-            self.r = np.vstack((self.r, constraint.r))
+            self.r = np.concatenate((self.r, constraint.r))
  
 
     def optimize(self, name_solv):

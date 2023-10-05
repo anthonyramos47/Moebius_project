@@ -13,7 +13,7 @@ class LineCong(Constraint):
         self.cij = []
         
 
-    def initialize_constraint(self, ct, dual_faces, inner_vertices, ei_dim, X) -> None:
+    def initialize_constraint(self, X, ei_dim, ct, dual_faces, inner_vertices) -> None:
         # Input
         # ct: list of vertices of central mesh
         # cf: list of faces of central mesh
@@ -32,7 +32,7 @@ class LineCong(Constraint):
         self.num_edge_const = edge_num
 
         # Get directions
-        ei = X.reshape(self.ei_dim, 3)
+        ei = X[:3*self.ei_dim].reshape(self.ei_dim, 3)
 
         # Init Jacobian and residual vector
         J = np.zeros((edge_num + len(ei), len(X)), dtype=np.float64)
@@ -86,7 +86,7 @@ class LineCong(Constraint):
         
         
         # Get directions
-        ei = X.reshape(self.ei_dim, 3)
+        ei = X[:3*self.ei_dim].reshape(self.ei_dim, 3)
 
         # Compute Jacobian
         i = 0
