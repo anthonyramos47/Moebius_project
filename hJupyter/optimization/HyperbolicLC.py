@@ -50,7 +50,7 @@ class HyperbolicLC(Constraint):
         
         
 
-    def initialize_constraint(self, X, V, F, e_i ) -> np.array:
+    def initialize_constraint(self, X, V, F, e_i, delta ) -> np.array:
         # Input
         # X: variables [ e| A | delta]
         # V: Vertices
@@ -74,10 +74,10 @@ class HyperbolicLC(Constraint):
         self.e = e_i 
 
         # Compute the directions at the barycenters
-        ec = np.sum( e_i[F], axis = 1)
+        ec = np.sum( e_i[F], axis = 1)/3
 
         # Compute the norms of ec
-        self.nc = np.linalg.norm(ec, axis=1)
+        #self.nc = np.linalg.norm(ec, axis=1)
 
         # Compute the edge vectors per each face
         vi, vj, vk = V[F[:,0]], V[F[:,1]], V[F[:,2]]
@@ -116,7 +116,7 @@ class HyperbolicLC(Constraint):
         X[3*self.nV: 3*self.nV + self.nF] = det1 + det2 
 
         # Set up delta
-        X[3*self.nV + self.nF:] = 5
+        X[3*self.nV + self.nF:] = delta
 
         return X 
 
@@ -140,7 +140,7 @@ class HyperbolicLC(Constraint):
         delta = X[3*self.nV + self.nF:]
 
         # Compute e_c
-        ec = np.sum( e[F], axis = 1)
+        ec = np.sum( e[F], axis = 1)/3
 
     
         # Compute the edge vectors per each face
@@ -152,7 +152,9 @@ class HyperbolicLC(Constraint):
         eik = e[F[:,2]] - e[F[:,0]]
 
         # Compute the norms of ec
-        nc = self.nc
+        #nc = self.nc
+        # Unnormalized
+        nc = np.ones(self.nF)
 
         # eik x ec
         eikXec = np.cross(eik, ec)
@@ -230,10 +232,10 @@ class HyperbolicLC(Constraint):
 
 
         # d A
-        J[:self.nF, 3*self.nV: 3*self.nV + self.nF] = A  
+        J[:self.nF, 3*self.nV: 3*self.nV + self.nF] = 2 * A  
 
         # d delta
-        J[:self.nF, 3*self.nV + self.nF : 3*self.nV + 2*self.nF] = -delta 
+        J[:self.nF, 3*self.nV + self.nF : 3*self.nV + 2*self.nF] = - 2 * delta 
 
 
         # A = [vij, eik, ec] + [eij, vik, ec]
@@ -269,7 +271,7 @@ class HyperbolicLC(Constraint):
         # d A
         J[self.nF: 2*self.nF, 3*self.nV : 3*self.nV + self.nF] = 1
 
-        self.nc = np.linalg.norm(ec, axis=1)
+        #self.nc = np.linalg.norm(ec, axis=1)
         
         # Update J
         self.J = J
