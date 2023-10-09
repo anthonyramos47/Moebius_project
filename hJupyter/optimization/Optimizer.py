@@ -123,8 +123,8 @@ class Optimizer():
     def update_variables(self, name, arg) -> None:
         # Update variables
 
-        if self.it % 5 == 0:
-            self.step *= 0.8
+        # if self.it % 5 == 0:
+        #     self.step *= 0.8
 
         if name == "LM":
             self.X += self.step*arg
