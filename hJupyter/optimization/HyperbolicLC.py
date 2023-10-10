@@ -92,7 +92,6 @@ class HyperbolicLC(Constraint):
 
         # Set up X 
         #X[:3*self.nV] = V.flatten()
-
         eij = e_i[F[:,1]] - e_i[F[:,0]]
         eik = e_i[F[:,2]] - e_i[F[:,0]]
     
@@ -103,15 +102,6 @@ class HyperbolicLC(Constraint):
 
         det1 = np.sum(self.fvij[:,0]*eikXec, axis=1)
         det2 = np.sum(eij*vikXec, axis=1)
-
-        # Define matrix derivatives
-        self.derx = np.zeros_like(eik)
-        self.dery = np.zeros_like(eik)
-        self.derz = np.zeros_like(eik)
-
-        self.derx[:, 0] = 1 
-        self.dery[:, 1] = 1
-        self.derz[:, 2] = 1
         
         # Set up A
         X[3*self.nV: 3*self.nV + self.nF] = det1 + det2 
@@ -143,7 +133,6 @@ class HyperbolicLC(Constraint):
         # Compute e_c
         ec = np.sum( e[F], axis = 1)/3
 
-
         # Compute the edge vectors per each face
         vij = self.fvij[:, 0]
         vik = self.fvij[:, 1]
@@ -151,11 +140,6 @@ class HyperbolicLC(Constraint):
         # Compute the directions per vertex in the faces       
         eij = e[F[:,1]] - e[F[:,0]]
         eik = e[F[:,2]] - e[F[:,0]]
-
-        # Compute the norms of ec
-        #nc = self.nc
-        # Unnormalized
-        #nc = np.ones(self.nF)
 
         # eik x ec
         eikXec = np.cross(eik, ec)
@@ -167,29 +151,22 @@ class HyperbolicLC(Constraint):
         idXec_y = self.cross_id(ec, 'y', 1)
         idXec_z = self.cross_id(ec, 'z', 1)
 
-
-        # eik x dec x      
-        eikXdec_x = self.cross_id(eik, 'x')
-        
-
-        # eik x dec y
-        eikXdec_y = self.cross_id(eik, 'y')
-        
-
-        # eik x dec z
-        eikXdec_z = self.cross_id(eik, 'z')
+        # eik x dec = eik x (1, 0, 0)/3
+        eikXdec_x = self.cross_id(eik/3, 'x')
+        eikXdec_y = self.cross_id(eik/3, 'y')
+        eikXdec_z = self.cross_id(eik/3, 'z')
         
         # eij x dec 
-        eijXdec_x = self.cross_id(eij, 'x')
-        eijXdec_y = self.cross_id(eij, 'y')
-        eijXdec_z = self.cross_id(eij, 'z')
+        eijXdec_x = self.cross_id(eij/3, 'x')
+        eijXdec_y = self.cross_id(eij/3, 'y')
+        eijXdec_z = self.cross_id(eij/3, 'z')
 
         # vik x dec 
-        vikXdec_x = self.cross_id(vik, 'x')
-        vikXdec_y = self.cross_id(vik, 'y')
-        vikXdec_z = self.cross_id(vik, 'z')
+        vikXdec_x = self.cross_id(vik/3, 'x')
+        vikXdec_y = self.cross_id(vik/3, 'y')
+        vikXdec_z = self.cross_id(vik/3, 'z')
 
-
+    
         # [vij, vik, ec] = det1 
         vikXec = np.cross(vik, ec)
         det1 = np.sum(vij*vikXec, axis=1)
@@ -202,109 +179,49 @@ class HyperbolicLC(Constraint):
         sc_term_x = ( np.sum(vij*vikXdec_x, axis=1))*det2
         sc_term_y = ( np.sum(vij*vikXdec_y, axis=1))*det2
         sc_term_z = ( np.sum(vij*vikXdec_z, axis=1))*det2
-
-        # for i_f in range(self.nF):
-
-        #     # d ei x
-        #     J[i_f, 3*F[i_f,0]    ] = -4* ((-eikXec[i_f][0] + eij[i_f]@(- idXec_x[i_f] + eikXdec_x[i_f]))*det1[i_f] + sc_term_x[i_f])
-        #     # d ei y
-        #     J[i_f, 3*F[i_f,0] + 1] = -4* ((-eikXec[i_f][1] + eij[i_f]@(- idXec_y[i_f] + eikXdec_y[i_f]))*det1[i_f] + sc_term_y[i_f])
-        #     # d ei z
-        #     J[i_f, 3*F[i_f,0] + 2] = -4* ((-eikXec[i_f][2] + eij[i_f]@(- idXec_z[i_f] + eikXdec_z[i_f]))*det1[i_f] + sc_term_z[i_f])
-
-        #     # d ej x
-        #     J[i_f, 3*F[i_f,1]    ] = -4* (( eikXec[i_f][0] + eij[i_f]@( eikXdec_x[i_f]))*det1[i_f] + sc_term_x[i_f])
-        #     # d ej y
-        #     J[i_f, 3*F[i_f,1] + 1] = -4* (( eikXec[i_f][1] + eij[i_f]@( eikXdec_y[i_f]))*det1[i_f] + sc_term_y[i_f])
-        #     # d ej z
-        #     J[i_f, 3*F[i_f,1] + 2] = -4* (( eikXec[i_f][2] + eij[i_f]@( eikXdec_z[i_f]))*det1[i_f] + sc_term_z[i_f])
-
-        #     # d ek x
-        #     J[i_f, 3*F[i_f,2]    ] = -4* (  eij[i_f]@(idXec_x[i_f] + eikXdec_x[i_f])*det1[i_f] + sc_term_x[i_f])
-        #     # d ek y
-        #     J[i_f, 3*F[i_f,2] + 1] = -4* (  eij[i_f]@(idXec_y[i_f] + eikXdec_y[i_f])*det1[i_f] + sc_term_y[i_f])
-        #     # d ek z
-        #     J[i_f, 3*F[i_f,2] + 2] = -4* (  eij[i_f]@(idXec_z[i_f] + eikXdec_z[i_f])*det1[i_f] + sc_term_z[i_f])
-
-        #     # r
-        #     r[i_f] = A[i_f]**2 - 4*det1[i_f]*det2[i_f] - delta[i_f]**2 
-
-        # [vij, vik, ec] det1 [eij, eik, ec] = det2
+        
         # d ei
-        J[:self.nF, 3*F[:,0]    ] = -4* ((-eikXec[:,0] + np.sum( eij*(- idXec_x + eikXdec_x), axis=1) )*det1 + sc_term_x)
-        J[:self.nF, 3*F[:,0] + 1] = -4* ((-eikXec[:,1] + np.sum( eij*(- idXec_y + eikXdec_y), axis=1) )*det1 + sc_term_y)
-        J[:self.nF, 3*F[:,0] + 2] = -4* ((-eikXec[:,2] + np.sum( eij*(- idXec_z + eikXdec_z), axis=1) )*det1 + sc_term_z)
+        J[range(self.nF), 3*F[:,0]    ] = -4* ((-eikXec[:,0] + np.sum( eij*(- idXec_x + eikXdec_x), axis=1) )*det1 + sc_term_x)
+        J[range(self.nF), 3*F[:,0] + 1] = -4* ((-eikXec[:,1] + np.sum( eij*(- idXec_y + eikXdec_y), axis=1) )*det1 + sc_term_y)
+        J[range(self.nF), 3*F[:,0] + 2] = -4* ((-eikXec[:,2] + np.sum( eij*(- idXec_z + eikXdec_z), axis=1) )*det1 + sc_term_z)
 
         # d ej
-        J[:self.nF, 3*F[:,1]    ] = -4* (( eikXec[:,0] + np.sum( eij*( eikXdec_x), axis=1) )*det1 + sc_term_x)
-        J[:self.nF, 3*F[:,1] + 1] = -4* (( eikXec[:,1] + np.sum( eij*( eikXdec_y), axis=1) )*det1 + sc_term_y)
-        J[:self.nF, 3*F[:,1] + 2] = -4* (( eikXec[:,2] + np.sum( eij*( eikXdec_z), axis=1) )*det1 + sc_term_z)
+        J[range(self.nF), 3*F[:,1]    ] = -4* (( eikXec[:,0] + np.sum( eij*( eikXdec_x), axis=1) )*det1 + sc_term_x)
+        J[range(self.nF), 3*F[:,1] + 1] = -4* (( eikXec[:,1] + np.sum( eij*( eikXdec_y), axis=1) )*det1 + sc_term_y)
+        J[range(self.nF), 3*F[:,1] + 2] = -4* (( eikXec[:,2] + np.sum( eij*( eikXdec_z), axis=1) )*det1 + sc_term_z)
 
         # d ek
-        J[:self.nF, 3*F[:,2]    ] = -4* (  np.sum( eij*(idXec_x + eikXdec_x), axis=1 )*det1 + sc_term_x)
-        J[:self.nF, 3*F[:,2] + 1] = -4* (  np.sum( eij*(idXec_y + eikXdec_y), axis=1 )*det1 + sc_term_y)
-        J[:self.nF, 3*F[:,2] + 2] = -4* (  np.sum( eij*(idXec_z + eikXdec_z), axis=1 )*det1 + sc_term_z)
+        J[range(self.nF), 3*F[:,2]    ] = -4* (  np.sum( eij*(idXec_x + eikXdec_x), axis=1 )*det1 + sc_term_x)
+        J[range(self.nF), 3*F[:,2] + 1] = -4* (  np.sum( eij*(idXec_y + eikXdec_y), axis=1 )*det1 + sc_term_y)
+        J[range(self.nF), 3*F[:,2] + 2] = -4* (  np.sum( eij*(idXec_z + eikXdec_z), axis=1 )*det1 + sc_term_z)
         
         # d A
-        # J[:self.nF, 3*self.nV: 3*self.nV + self.nF] = np.diag(2 * A)
+        J[:self.nF, 3*self.nV: 3*self.nV + self.nF] = np.diag(2 * A)
 
-        # d delta
+        # # d delta
         J[:self.nF, 3*self.nV + self.nF : 3*self.nV + 2*self.nF] = np.diag(-2*delta)
-    
+        
         # r 
         r[:self.nF] = A**2 - 4*det1*det2 - delta**2 
-
-    
-        # A = [vij, eik, ec] + [eij, vik, ec] = [vij, eik, ec] - [vik, eij, ec]
-        # for i_f in range(self.nF):
-
-        #     jidx = i_f + self.nF
-
-        #     # d ei x
-        #     J[jidx, 3*F[i_f, 0]    ] = -(vij[i_f]@( - idXec_x[i_f] + eikXdec_x[i_f])  - vik[i_f]@(-idXec_x[i_f] + eijXdec_x[i_f]))
-        #     # d ei y
-        #     J[jidx, 3*F[i_f, 0] + 1] = -(vij[i_f]@( - idXec_y[i_f] + eikXdec_y[i_f])  - vik[i_f]@(-idXec_y[i_f] + eijXdec_y[i_f])) 
-        #     # d ei z
-        #     J[jidx, 3*F[i_f, 0] + 2] = -(vij[i_f]@( - idXec_z[i_f] + eikXdec_z[i_f])  - vik[i_f]@(-idXec_z[i_f] + eijXdec_z[i_f]))
-
-        #     # d eij x
-        #     J[jidx, 3*F[i_f, 1]    ] = -(vij[i_f]@( eikXdec_x[i_f])  - vik[i_f]@(idXec_x[i_f] + eijXdec_x[i_f]))
-        #     # d eij y
-        #     J[jidx, 3*F[i_f, 1] + 1] = -(vij[i_f]@( eikXdec_y[i_f])  - vik[i_f]@(idXec_y[i_f] + eijXdec_y[i_f]))
-        #     # d eij z
-        #     J[jidx, 3*F[i_f, 1] + 2] = -(vij[i_f]@( eikXdec_z[i_f])  - vik[i_f]@(idXec_z[i_f] + eijXdec_z[i_f]))
-
-
-        #     # d eik x
-        #     J[jidx, 3*F[i_f, 2]    ] = -(vij[i_f]@( idXec_x[i_f] + eikXdec_x[i_f])  - vik[i_f]@(eijXdec_x[i_f]))
-        #     # d eik y
-        #     J[jidx, 3*F[i_f, 2] + 1] = -(vij[i_f]@( idXec_y[i_f] + eikXdec_y[i_f])  - vik[i_f]@(eijXdec_y[i_f]))
-        #     # d eik z
-        #     J[jidx, 3*F[i_f, 2] + 2] = -(vij[i_f]@( idXec_z[i_f] + eikXdec_z[i_f])  - vik[i_f]@(eijXdec_z[i_f]))
-
-        #     # r 
-        #     r[jidx] = A[i_f] - vij[i_f]@eikXec[i_f] - eij[i_f]@vikXec[i_f]
         
-        # # # d ei 
-        # J[self.nF: 2*self.nF, 3*F[:, 0]    ] = -(np.sum(vij*( - idXec_x + eikXdec_x), axis=1)  - np.sum(vik*(-idXec_x + eijXdec_x), axis=1 ))
-        # J[self.nF: 2*self.nF, 3*F[:, 0] + 1] = -(np.sum(vij*( - idXec_y + eikXdec_y), axis=1)  - np.sum(vik*(-idXec_y + eijXdec_y), axis=1 ))
-        # J[self.nF: 2*self.nF, 3*F[:, 0] + 2] = -(np.sum(vij*( - idXec_z + eikXdec_z), axis=1)  - np.sum(vik*(-idXec_z + eijXdec_z), axis=1 ))
+        # d ei 
+        J[range(self.nF, 2*self.nF), 3*F[:, 0]    ] = -( np.sum(vij*( - idXec_x + eikXdec_x), axis=1)  - np.sum(vik*(-idXec_x + eijXdec_x), axis=1 ))
+        J[range(self.nF, 2*self.nF), 3*F[:, 0] + 1] = -(np.sum(vij*( - idXec_y + eikXdec_y), axis=1)  - np.sum(vik*(-idXec_y + eijXdec_y), axis=1 ))
+        J[range(self.nF, 2*self.nF), 3*F[:, 0] + 2] = -(np.sum(vij*( - idXec_z + eikXdec_z), axis=1)  - np.sum(vik*(-idXec_z + eijXdec_z), axis=1 ))
 
-        # # d eij
-        # J[self.nF: 2*self.nF, 3*F[:, 1]    ] = -(np.sum(vij*( eikXdec_x), axis=1)  - np.sum(vik*(idXec_x + eijXdec_x), axis=1 ))
-        # J[self.nF: 2*self.nF, 3*F[:, 1] + 1] = -(np.sum(vij*( eikXdec_y), axis=1)  - np.sum(vik*(idXec_y + eijXdec_y), axis=1 ))
-        # J[self.nF: 2*self.nF, 3*F[:, 1] + 2] = -(np.sum(vij*( eikXdec_z), axis=1)  - np.sum(vik*(idXec_z + eijXdec_z), axis=1 ))
+        # d eij
+        J[range(self.nF, 2*self.nF), 3*F[:, 1]    ] = -(np.sum(vij*( eikXdec_x), axis=1)  - np.sum(vik*(idXec_x + eijXdec_x), axis=1 ))
+        J[range(self.nF, 2*self.nF), 3*F[:, 1] + 1] = -(np.sum(vij*( eikXdec_y), axis=1)  - np.sum(vik*(idXec_y + eijXdec_y), axis=1 ))
+        J[range(self.nF, 2*self.nF), 3*F[:, 1] + 2] = -(np.sum(vij*( eikXdec_z), axis=1)  - np.sum(vik*(idXec_z + eijXdec_z), axis=1 ))
 
-        # # d eik
-        # J[self.nF: 2*self.nF, 3*F[:, 2]    ] = -(np.sum(vij*( idXec_x + eikXdec_x), axis=1)  - np.sum(vik*(eijXdec_x), axis=1 ))
-        # J[self.nF: 2*self.nF, 3*F[:, 2] + 1] = -(np.sum(vij*( idXec_y + eikXdec_y), axis=1)  - np.sum(vik*(eijXdec_y), axis=1 ))
-        # J[self.nF: 2*self.nF, 3*F[:, 2] + 2] = -(np.sum(vij*( idXec_z + eikXdec_z), axis=1)  - np.sum(vik*(eijXdec_z), axis=1 ))
+        # d eik
+        J[range(self.nF, 2*self.nF), 3*F[:, 2]    ] = -(np.sum(vij*( idXec_x + eikXdec_x), axis=1)  - np.sum(vik*(eijXdec_x), axis=1 ))
+        J[range(self.nF, 2*self.nF), 3*F[:, 2] + 1] = -(np.sum(vij*( idXec_y + eikXdec_y), axis=1)  - np.sum(vik*(eijXdec_y), axis=1 ))
+        J[range(self.nF, 2*self.nF), 3*F[:, 2] + 2] = -(np.sum(vij*( idXec_z + eikXdec_z), axis=1)  - np.sum(vik*(eijXdec_z), axis=1 ))
 
-        r[self.nF: 2*self.nF] = A - np.sum(vij*eikXec, axis=1) - np.sum(eij*vikXec, axis=1)
-
-        # D A
+        # # dA 
         J[self.nF: 2*self.nF, 3*self.nV : 3*self.nV + self.nF] = np.eye(self.nF)
-
+        r[self.nF: 2*self.nF] = A - np.sum(vij*eikXec, axis=1) - np.sum(eij*vikXec, axis=1) 
 
         # Update J
         self.J =  J

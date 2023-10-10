@@ -84,6 +84,8 @@ class Optimizer():
         # self.r = self.r + self.J@dx
         # Compute energy
         energy = self.r.T@self.r
+
+        print(f" E: {energy}")
         self.energy.append(energy)
 
         # Update variables
