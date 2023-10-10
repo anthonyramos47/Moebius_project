@@ -39,12 +39,12 @@ class Optimizer():
 
         # Add Jacobian and residual
         if self.J is None:
-            self.J = constraint.J
+            self.J =  np.sqrt(constraint.w) * constraint.J
             # Get number of rows of the Jacobian
-            self.r = constraint.r
+            self.r =  np.sqrt(constraint.w) * constraint.r
         else:
-            self.J = np.vstack((self.J, constraint.J))
-            self.r = np.concatenate((self.r, constraint.r))
+            self.J = np.vstack((self.J, np.sqrt(constraint.w) * constraint.J))
+            self.r = np.concatenate((self.r, np.sqrt(constraint.w) * constraint.r))
  
 
     def optimize(self, name_solv):
@@ -55,9 +55,6 @@ class Optimizer():
         else:
             print("Error: Solver not implemented")
             sol = -1 
-
-
-
         return sol
 
     def LM(self):
@@ -72,10 +69,6 @@ class Optimizer():
 
         # Sparse matrix H
         H = csc_matrix(H)
-        
-        # print(f"Shape of H: {H.shape}")
-        # print(f"Shape of J: {self.J.shape}")
-        # print(f"Shape of r: {self.r.shape}")
     
         # Solve for dx
         dx = linalg.spsolve(H, -self.J.T@self.r)

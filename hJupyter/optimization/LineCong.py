@@ -8,18 +8,22 @@ class LineCong(Constraint):
 
     def __init__(self) -> None:
         super().__init__()
+        self.w = None # Weight
         self.ei_dim = None
         self.num_edge_const = None
         self.cij = []
         
 
-    def initialize_constraint(self, X, ei_dim, ct, dual_faces, inner_vertices) -> None:
+    def initialize_constraint(self, X, ei_dim, ct, dual_faces, inner_vertices, w=1) -> None:
         # Input
         # ct: list of vertices of central mesh
         # cf: list of faces of central mesh
         # X: variables
 
         # Initialize constraint \sum_{f \in F} \sum_{cj,ci \in E(f)} || e_f (cj - ci)  ||^2
+
+        # Weight
+        self.w = w
 
         # Vector dimension
         self.ei_dim = ei_dim
@@ -82,7 +86,7 @@ class LineCong(Constraint):
 
             
 
-    def compute(self, inner_vertices, cf, X) -> None:
+    def compute(self ,X, inner_vertices, cf) -> None:
         
         
         # Get directions

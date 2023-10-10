@@ -51,7 +51,7 @@ class HyperbolicLC(Constraint):
         
         
 
-    def initialize_constraint(self, X, V, F, e_i, delta, w ) -> np.array:
+    def initialize_constraint(self, X, V, F, e_i, delta, w=1 ) -> np.array:
         # Input
         # X: variables [ e| A | delta]
         # V: Vertices
@@ -202,7 +202,7 @@ class HyperbolicLC(Constraint):
         J[:self.nF, 3*self.nV + self.nF : 3*self.nV + 2*self.nF] = np.diag(-2*delta)
         
         # r 
-        r[:self.nF] = A**2 - 4*det1*det2 - delta**2 
+        r[:self.nF] = A**2 - 4*det1*det2 - delta**2 - 0.001
         
         # d ei 
         J[range(self.nF, 2*self.nF), 3*F[:, 0]    ] = -( np.sum(vij*( - idXec_x + eikXdec_x), axis=1)  - np.sum(vik*(-idXec_x + eijXdec_x), axis=1 ))
