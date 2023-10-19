@@ -12,7 +12,7 @@ class Optimizer():
         self.X = None # Variable
         self.H = None # Hessian matrix
         self.it = 0
-        self.step = 0.8 
+        self.step = 0.5
         self.energy = [] # Energy vector
 
     def fix_vertices(self, fix_vertices) -> None:
@@ -65,11 +65,12 @@ class Optimizer():
         
         # Compute pseudo Hessian
         H = self.J.T@self.J
-        H[np.diag_indices_from(H)] += np.diag(H).max()*1e-6
+        
+        H[np.diag_indices_from(H)] += np.diag(H).max()*1e-8
 
         # Sparse matrix H
         H = csc_matrix(H)
-    
+        
         # Solve for dx
         dx = linalg.spsolve(H, -self.J.T@self.r)
 
@@ -78,14 +79,14 @@ class Optimizer():
         # Compute energy
         energy = self.r.T@self.r
 
-        print(f" E: {energy}")
+        
         self.energy.append(energy)
 
         # Update variables
         self.update_variables("LM", dx)
 
         self.it +=1
-
+        print(f" E {self.it}: {energy}")
         # Clear constraints
         self.clear_constraints()
         
@@ -117,10 +118,7 @@ class Optimizer():
     
     def update_variables(self, name, arg) -> None:
         # Update variables
-
-        # if self.it % 5 == 0:
-        #     self.step *= 0.8
-
+        
         if name == "LM":
             self.X += self.step*arg
         elif name == "PG":

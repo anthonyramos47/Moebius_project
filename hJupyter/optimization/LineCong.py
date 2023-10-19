@@ -8,7 +8,6 @@ class LineCong(Constraint):
 
     def __init__(self) -> None:
         super().__init__()
-        self.w = None # Weight
         self.ei_dim = None
         self.num_edge_const = None
         self.cij = []
@@ -86,8 +85,7 @@ class LineCong(Constraint):
 
             
 
-    def compute(self ,X, inner_vertices, cf) -> None:
-        
+    def _compute(self ,X, inner_vertices, cf) -> None:
         
         # Get directions
         ei = X[:3*self.ei_dim].reshape(self.ei_dim, 3)

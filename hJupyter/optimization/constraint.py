@@ -8,20 +8,33 @@ import geometry as geo
 class Constraint():
     def __init__(self) -> None:
         self.X = None # Variables
+        self.w = None # Weight
         self.J = None # Jacobian matrix
         self.J0 = None # Constant Jacobian
         self.r = None # Residual vector
         self.const = None # Num Constraints
         self.var = None # Num Variables
 
-    def initialize_constraint(self, mesh) -> None:
+    def initialize_constraint(self) -> None:
         """
         Method to initialize the all initial data for the constraint
         """
         pass
 
-    def compute(self, mesh) -> None:
+    def _compute(self, X, *args) -> None:
         pass
+
+    def compute(self, X, *args) -> None:
+        
+        if self.w != 0:
+            self._compute(X, *args)
+        else: 
+            pass
+
+
+
+
+        
 
     
 
