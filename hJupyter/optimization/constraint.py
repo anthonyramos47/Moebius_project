@@ -21,15 +21,9 @@ class Constraint():
         """
         pass
 
-    def _compute(self, X, *args) -> None:
+    def compute(self, X, *args) -> None:
         pass
 
-    def compute(self, X, *args) -> None:
-        
-        if self.w != 0:
-            self._compute(X, *args)
-        else: 
-            pass
 
 
 

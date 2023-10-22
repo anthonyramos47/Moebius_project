@@ -101,7 +101,7 @@ class HyperbolicLC(Constraint):
         return X 
 
         
-    def _compute(self, X, F) -> None:
+    def compute(self, X, F) -> None:
 
         # Init J
         J = np.zeros((self.const, self.var), dtype=np.float64)

@@ -85,7 +85,7 @@ class LineCong(Constraint):
 
             
 
-    def _compute(self ,X, inner_vertices, cf) -> None:
+    def compute(self, X, inner_vertices, cf) -> None:
         
         # Get directions
         ei = X[:3*self.ei_dim].reshape(self.ei_dim, 3)
