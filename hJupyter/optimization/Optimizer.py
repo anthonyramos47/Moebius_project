@@ -157,6 +157,9 @@ class Optimizer():
     
     def update_variables(self, arg) -> None:
         # Update variables
+
+        if self.it%10 ==0:
+            self.step *= 0.9
         
         if self.method == "LM":
             self.X += self.step*arg

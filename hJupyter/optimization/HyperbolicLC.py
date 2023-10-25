@@ -96,7 +96,7 @@ class HyperbolicLC(Constraint):
         X[3*self.nV: 3*self.nV + self.nF] = det1 + det2 
 
         # Set up delta
-        X[3*self.nV + self.nF:] = delta
+        X[3*self.nV + self.nF: 3*self.nV + 2*self.nF] = delta
 
         return X 
 
@@ -116,7 +116,7 @@ class HyperbolicLC(Constraint):
         A = X[3*self.nV:3*self.nV + self.nF]
 
         # Get delta
-        delta = X[3*self.nV + self.nF:]
+        delta = X[3*self.nV + self.nF: 3*self.nV + 2*self.nF]
 
         # Compute e_c
         ec = np.sum( e[F], axis = 1)/3
