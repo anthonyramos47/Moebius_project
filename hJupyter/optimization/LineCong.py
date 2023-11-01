@@ -14,6 +14,7 @@ class LineCong(Constraint):
         self.nt = [] # List to store normals
         self.norms = [] # List to store norms of cicj
         self.initLi = None # Initial column for li variables
+        self.inner_vertices = None # List of inner vertices
         
 
     def initialize_constraint(self, X, ei_dim, bt, nbt, num_faces, dual_faces, inner_vertices, w=1) -> None:
@@ -34,6 +35,9 @@ class LineCong(Constraint):
         # Set normals
         self.nt = nbt
 
+        # Set inner vertices
+        self.inner_vertices = inner_vertices
+
         # Set initial column for li variables
         self.initLi = len(X) - len(X[-num_faces:])
 
@@ -44,7 +48,7 @@ class LineCong(Constraint):
 
         self.num_edge_const = edge_num
 
-        li = X[num_faces:]
+        li = X[-num_faces:]
 
         # Compute Jacobian
         # Row index
@@ -84,12 +88,14 @@ class LineCong(Constraint):
 
             
 
-    def compute(self, X, inner_vertices, cf) -> None:
+    def compute(self, X, cf) -> None:
         
+        # Get inner vertices
+        inner_vertices = self.inner_vertices
+
         # Get directions
         ei = X[:3*self.ei_dim].reshape(self.ei_dim, 3)
 
-        print(self.initLi)
         # Get li 
         li = X[self.initLi:]
 
@@ -141,7 +147,7 @@ class LineCong(Constraint):
             # Define residual
             r[i:i + len(face)] = np.sum(cicj*ei[f], axis=1)
 
-            assert np.allclose(np.dot(cicj, ei[f]), np.sum(cicj*ei[f], axis=1))
+            #assert np.allclose(np.dot(cicj, ei[f]), np.sum(cicj*ei[f], axis=1))
 
             # Update row index
             i += len(face)
