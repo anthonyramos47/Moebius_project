@@ -2,7 +2,8 @@
 import numpy as np
 import time as tm
 import pandas as pd
-from scipy.sparse import csr_matrix, csc_matrix, coo_matrix, linalg
+from scipy.sparse import csc_matrix,diags
+from scipy.sparse.linalg import splu, spsolve
 
 
 class Optimizer():
@@ -78,7 +79,6 @@ class Optimizer():
         
 
  
-
     def optimize(self):
         
 
@@ -94,31 +94,38 @@ class Optimizer():
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares
         # https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm
-        # Solve for (J^TJ + lambda*I) dx = -J^Tr, lambda = max(diag(J^TJ))*1e-6
+        # Solve for (J^TJ + lambda*I) dx = -J^Tr, lambda = max(diag(J^TJ))*1e-8
 
-    
+        # Get J 
+        J = csc_matrix(self.J)
+
         # Compute pseudo Hessian
-        H = self.J.T@self.J
+        H = (J.T * J).tocsc()
         
-        H[np.diag_indices_from(H)] += np.diag(H).max()*1e-8
+        # Calculate the value to add to the diagonal
+        add_value = H.max() * 1e-8
 
-        # Sparse matrix H
-        H = csc_matrix(H)
-        
-        # Solve for dx
-        dx = linalg.spsolve(H, -self.J.T@self.r)
+        # Create a diagonal matrix with the values to add
+        diagonal_values = np.array([add_value] * H.shape[0])
+        diagonal_matrix = diags(diagonal_values, 0, format='csc')
 
-        # Update r
-        # self.r = self.r + self.J@dx
+        # Add the diagonal_matrix to H
+        H = H + diagonal_matrix
+       
+        b = -J.T@self.r
+
+        dx = spsolve(H, b)
 
         # Compute energy
         energy = self.r.T@self.r
+        
 
         # Append energy
         self.energy.append(energy)
 
         # Update variables
         self.update_variables(dx)
+        
 
         # Update iteration
         self.it +=1
@@ -128,6 +135,7 @@ class Optimizer():
 
         # Clear constraints
         self.clear_constraints()
+
         
     def PG(self):
         # To be implemented
