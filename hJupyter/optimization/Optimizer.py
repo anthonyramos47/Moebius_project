@@ -2,7 +2,7 @@
 import numpy as np
 import time as tm
 import pandas as pd
-from scipy.sparse import csc_matrix,diags
+from scipy.sparse import csc_matrix,diags, vstack
 from scipy.sparse.linalg import splu, spsolve
 
 
@@ -74,7 +74,7 @@ class Optimizer():
                 self.J =  np.sqrt(constraint.w) * constraint.J
                 self.r =  np.sqrt(constraint.w) * constraint.r
             else:
-                self.J = np.vstack((self.J, np.sqrt(constraint.w) * constraint.J))
+                self.J = vstack((self.J, np.sqrt(constraint.w) * constraint.J))
                 self.r = np.concatenate((self.r, np.sqrt(constraint.w) * constraint.r))
         
 
@@ -97,7 +97,7 @@ class Optimizer():
         # Solve for (J^TJ + lambda*I) dx = -J^Tr, lambda = max(diag(J^TJ))*1e-8
 
         # Get J 
-        J = csc_matrix(self.J)
+        J = self.J
 
         # Compute pseudo Hessian
         H = (J.T * J).tocsc()
