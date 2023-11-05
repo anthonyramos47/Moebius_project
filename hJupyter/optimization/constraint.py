@@ -3,6 +3,7 @@
 # The main idea is to pass a mesh and return a residual and a Jacobian
 import numpy as np
 import geometry as geo
+from scipy.sparse import csc_matrix
 
 
 class Constraint():
@@ -25,7 +26,25 @@ class Constraint():
         """
         pass
 
+    def _compute(self, X, *args) -> None:
+        
+        # Reset Jacobian
+        self.reset()
+
+        # Compute residual and Jacobian
+        self.compute(X, *args)
+
+        # Set Jacobian
+        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
+
+        pass
+
     def compute(self, X, *args) -> None:
+        """ Function to compute the residual and the Jacobian of the constraint
+            Input:
+                X: Variables
+                args: Arguments of the constraint
+        """
         pass
 
     def add_derivatives(self, c_idx, v_idx, values):

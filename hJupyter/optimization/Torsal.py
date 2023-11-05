@@ -2,7 +2,6 @@
 
 import numpy as np
 import geometry as geo
-from scipy.sparse import csc_matrix
 from optimization.constraint import Constraint
 
 class Torsal(Constraint):
@@ -129,20 +128,52 @@ class Torsal(Constraint):
         return X
 
     def compute(self, X, F) -> None:
-        # Reset values of J, r
-        self.reset()
+        """ Compute the residual and the Jacobian of the constraint
+            Input:
+                X: Variables
+                F: Faces
+        """
+        e, a1, b1, nt1, a2, b2, nt2, df = self.uncurry_X(X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
 
-        # Get J and r
-        self.fill_J(X, F)
+        e   = e.reshape(-1, 3)
+        nt1 = nt1.reshape(-1, 3)
+        nt2 = nt2.reshape(-1, 3)
 
-        # set J
-        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
+        # Get vertices of second envelope
+        vvi, vvj, vvk, dcvi, dcvj, dcvk = self.compute_second_env(df, e, F)
+
+        # Compute ec
+        ec = self.compute_ec(df, e, F)
+
+        # Get vij, vik
+        vij = self.fvij[:,0]
+        vik = self.fvij[:,1]
+
+        # Init indices for sparse J matrix
+        self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 1)
+        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 2) 
         
-        
-
         
 
     def fill_J_t(self, e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, torsal=1):
+        """  Function to fill the Jacobian of the constraint per each torsal plane
+        Input:
+            e: directions
+            ec: direction of the line congruence at the barycenter of the face.
+            a1: a1 variable of t1 = a1 vij + b1 vik
+            b1: b1 variable of t1 = a1 vij + b1 vik
+            nt1: normal of the torsal plane
+            vij: edge vector
+            vik: edge vector
+            vvi: vertices of the second envelope
+            vvj: vertices of the second envelope
+            vvk: vertices of the second envelope
+            dcvi: distance from vi to center of sphere
+            dcvj: distance from vj to center of sphere
+            dcvk: distance from vk to center of sphere
+            F: Faces
+            torsal: torsal plane index
+        """
 
         if torsal == 1:
             nt_ec = "nt1.ec"
@@ -299,30 +330,6 @@ class Torsal(Constraint):
             self.tt2norms = np.linalg.norm(tt, axis=1)
 
 
-    def fill_J(self, X, F):
-
-        e, a1, b1, nt1, a2, b2, nt2, df = self.uncurry_X(X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
-
-        e = e.reshape(-1, 3)
-        nt1 = nt1.reshape(-1, 3)
-        nt2 = nt2.reshape(-1, 3)
-
-        # Get vertices of second envelope
-        vvi, vvj, vvk, dcvi, dcvj, dcvk = self.compute_second_env(df, e, F)
-
-        # Compute ec
-        ec = self.compute_ec(df, e, F)
-
-        # Get vij, vik
-        vij = self.fvij[:,0]
-        vik = self.fvij[:,1]
-
-        # Init indices for sparse J matrix
-
-        self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 1)
-        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 2)
-
-
 
     def compute_second_env(self, df, ei, F):
         """ Compute the second envelope of the mesh
@@ -348,7 +355,6 @@ class Torsal(Constraint):
 
         ei /= np.linalg.norm(ei, axis=1)[:, None]
 
-
         # compute the second envelope as vi + (dcv.ei) ei 
         vvi = 2*np.sum(dcvi*ei[F[:,0]], axis=1)[:, None] * ei[F[:,0]] + vi
         vvj = 2*np.sum(dcvj*ei[F[:,1]], axis=1)[:, None] * ei[F[:,1]] + vj
@@ -367,6 +373,15 @@ class Torsal(Constraint):
         return self.bf + df[:, None] * self.ncf
     
     def compute_ec(self, df, e_i, F):
+        """ Compute the direction of the line congruence at the barycenters
+        Input:
+            df  .- Distance to center
+            e_i .- Directions of the vertices
+            F   .- Faces
+        Output:
+            ec  .- Direction of the line congruence at the barycenters
+        """
+
 
         # Get first envelope
         vc = self.vc
@@ -377,6 +392,7 @@ class Torsal(Constraint):
         # Compute varycenter in second envelope
         vvc = (vvi + vvj + vvk)/3
 
+        # Compute ec diferece between first and second envelope
         ec = vvc - vc
 
         if len(ec.shape) == 1:
@@ -399,8 +415,7 @@ class Torsal(Constraint):
         ej = e[F[:,1]]
         ek = e[F[:,2]]  
 
-   
-
+        # Compute derivatives of de (nt.ec)
         deix = self.vec_dot( ( dcvi[:,0][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
         deiy = self.vec_dot( ( dcvi[:,1][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
         deiz = self.vec_dot( ( dcvi[:,2][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([0,0,1]) ), nt)

@@ -2,7 +2,6 @@
 
 import numpy as np
 import geometry as geo
-from scipy.sparse import csc_matrix
 from optimization.constraint import Constraint
 
 class LineCong(Constraint):
@@ -98,19 +97,21 @@ class LineCong(Constraint):
             
 
     def compute(self, X, cf) -> None:
+        """ Compute the residual and the Jacobian of the constraint
+            Input:
+                X: Variables
+                cf: Faces of the central mesh
+        """
         
         # Get inner vertices
         inner_vertices = self.inner_vertices
 
+        # Get variables
         ei, df = self.uncurry_X(X, "e", "df")
 
         ei = ei.reshape(-1, 3)
 
         e_idx = self.var_idx["e"]
-
-        en = self.num_edge_const
-
-        self.reset()
 
         # Compute Jacobian for || e_f (cj - ci)/|| cj - ci||  ||^2 ; ci = bi + df * nbi
         for idx_f in range(len(inner_vertices)):
@@ -169,6 +170,4 @@ class LineCong(Constraint):
 
         # Update residual  
         self.set_r(self.const_idx["e.e"], np.sum ( ei*ei,  axis=1) - 1)
-
-        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
 

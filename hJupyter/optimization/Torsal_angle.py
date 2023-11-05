@@ -2,7 +2,6 @@
 
 import numpy as np
 import geometry as geo
-from scipy.sparse import csc_matrix
 from optimization.constraint import Constraint
 
 class Torsal_angle(Constraint):
@@ -57,13 +56,12 @@ class Torsal_angle(Constraint):
        
 
     def compute(self, X, F) -> None:
-
-        self.reset()
-        self.fill_J(X)
-
-  
-    def fill_J(self, X):
-
+        """ Compute the residual and the Jacobian of the constraint
+            Input:
+                X: Variables
+                F: Faces
+        """
+        
         # indices vars
         v_idx = self.var_idx
         c_idx = self.const_idx
@@ -93,15 +91,8 @@ class Torsal_angle(Constraint):
         #           J[c_idx["E2"].repeat(3), v_idx["nt2"]] = -nt1.flatten()
         self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1.flatten())
 
-        # Fill J
-        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
-        
         # r of E1 
         self.set_r(c_idx["E1"], c0**2 - 0.5 + u**2)
 
         # r of E2
         self.set_r(c_idx["E2"], c0 - np.sum(nt1*nt2, axis=1))
-
-
-        
-       

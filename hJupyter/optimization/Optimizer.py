@@ -67,7 +67,7 @@ class Optimizer():
         if constraint.w != 0:
             
             # Compute J, r for the constraint
-            constraint.compute(self.X, *args)
+            constraint._compute(self.X, *args)
 
             # Add J, r to the optimizer
             if self.J is None:
