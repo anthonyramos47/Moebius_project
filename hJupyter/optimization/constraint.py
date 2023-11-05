@@ -87,6 +87,11 @@ class Constraint():
         else:
             return [X[self.var_idx[k]] for k in v_idx]
         
+    def set_X(self, X, var, values):
+
+        X[self.var_idx[var]] = values
+
+        
 
     def reset(self):
         """ Function to clear the Jacobian

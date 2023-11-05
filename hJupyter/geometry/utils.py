@@ -8,7 +8,10 @@ def unit(v):
 
     
 
-
+def vec_dot(v1, v2):
+    """dot product between two lists of vectors v1, v2
+    """
+    return np.sum(v1*v2, axis=1)
 
 def circle_3pts(p1, p2, p3):
     """

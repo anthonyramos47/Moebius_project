@@ -2,6 +2,7 @@
 
 import numpy as np
 import geometry as geo
+from geometry.utils import vec_dot
 from optimization.constraint import Constraint
 
 class Torsal(Constraint):
@@ -124,8 +125,6 @@ class Torsal(Constraint):
 
         self.tt1norms = np.linalg.norm(tt1, axis=1)
         self.tt2norms = np.linalg.norm(tt2, axis=1)
-
-        return X
 
     def compute(self, X, F) -> None:
         """ Compute the residual and the Jacobian of the constraint
@@ -256,12 +255,12 @@ class Torsal(Constraint):
         self.add_derivatives(c_idx[nt_t].repeat(3), v_idx[nt], tnor.flatten())
         
         # Set derivatives da (nt.t)
-        # J[c_idx[nt_t], v_idx[va]] = self.vec_dot(vij, nt1)/tnorms 
-        self.add_derivatives(c_idx[nt_t], v_idx[va], self.vec_dot(vij, nt1)/tnorms)
+        # J[c_idx[nt_t], v_idx[va]] = vec_dot(vij, nt1)/tnorms 
+        self.add_derivatives(c_idx[nt_t], v_idx[va], vec_dot(vij, nt1)/tnorms)
 
         # Set derivatives db (nt.t)
-        #J[c_idx[nt_t], v_idx[vb]] = self.vec_dot(vik, nt1)/tnorms
-        self.add_derivatives(c_idx[nt_t], v_idx[vb], self.vec_dot(vik, nt1)/tnorms)
+        #J[c_idx[nt_t], v_idx[vb]] = vec_dot(vik, nt1)/tnorms
+        self.add_derivatives(c_idx[nt_t], v_idx[vb], vec_dot(vik, nt1)/tnorms)
 
         # Set r 
         #self.r[c_idx[nt_t]] = np.sum(tnor*nt1, axis=1)
@@ -275,12 +274,12 @@ class Torsal(Constraint):
         self.add_derivatives(c_idx[nt_tt].repeat(3), v_idx[nt], ttnor.flatten())
 
         # Set derivatives da (nt1.tt1)
-        # J[c_idx[nt_tt], v_idx[va]] = self.vec_dot(vvij, nt1)/ttnorms
-        self.add_derivatives(c_idx[nt_tt], v_idx[va], self.vec_dot(vvij, nt1)/ttnorms)
+        # J[c_idx[nt_tt], v_idx[va]] = vec_dot(vvij, nt1)/ttnorms
+        self.add_derivatives(c_idx[nt_tt], v_idx[va], vec_dot(vvij, nt1)/ttnorms)
 
         # Set derivatives db (nt1.tt1)
-        # J[c_idx[nt_tt], v_idx[vb]] = self.vec_dot(vvik, nt1)/ttnorms
-        self.add_derivatives(c_idx[nt_tt], v_idx[vb], self.vec_dot(vvik, nt1)/ttnorms)
+        # J[c_idx[nt_tt], v_idx[vb]] = vec_dot(vvik, nt1)/ttnorms
+        self.add_derivatives(c_idx[nt_tt], v_idx[vb], vec_dot(vvik, nt1)/ttnorms)
 
         # Set derivatives d e (nt.tt)
         #J[c_idx[nt_tt], 3*F[:,0] ]   = -2*(a1+b1)*deix/ttnorms
@@ -305,8 +304,8 @@ class Torsal(Constraint):
         self.add_derivatives(c_idx[nt_tt], 3*F[:,2]+2, 2*b1*dekz/ttnorms)
 
         # Set derivatives d df (nt.tt)
-        # J[c_idx[nt_tt], v_idx["df"]] = self.vec_dot((2*a1[:,None]*(ejcf_ej - eicf_ei) + 2*b1[:,None]*(ekcf_ek - eicf_ei)), nt1)/ttnorms
-        self.add_derivatives(c_idx[nt_tt], v_idx["df"], self.vec_dot((2*a1[:,None]*(ejcf_ej - eicf_ei) + 2*b1[:,None]*(ekcf_ek - eicf_ei)), nt1)/ttnorms)
+        # J[c_idx[nt_tt], v_idx["df"]] = vec_dot((2*a1[:,None]*(ejcf_ej - eicf_ei) + 2*b1[:,None]*(ekcf_ek - eicf_ei)), nt1)/ttnorms
+        self.add_derivatives(c_idx[nt_tt], v_idx["df"], vec_dot((2*a1[:,None]*(ejcf_ej - eicf_ei) + 2*b1[:,None]*(ekcf_ek - eicf_ei)), nt1)/ttnorms)
         
         # Set r
         # r[c_idx[nt_tt]] = np.sum(ttnor*nt1, axis=1)
@@ -399,10 +398,6 @@ class Torsal(Constraint):
             ec = np.array([ec])
 
         return ec
-
-   
-    def vec_dot(self, a, b):
-        return np.sum(a*b, axis=1)
     
     def compute_decnt(self, dcvi, dcvj, dcvk, e, nt, F):
         """ Function to compute the derivative of nt.ec with respect to e_i
@@ -416,15 +411,15 @@ class Torsal(Constraint):
         ek = e[F[:,2]]  
 
         # Compute derivatives of de (nt.ec)
-        deix = self.vec_dot( ( dcvi[:,0][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
-        deiy = self.vec_dot( ( dcvi[:,1][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
-        deiz = self.vec_dot( ( dcvi[:,2][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([0,0,1]) ), nt)
-        dejx = self.vec_dot( ( dcvj[:,0][:, None]*ej +  self.vec_dot(ej, dcvj)[:, None]*np.array([1,0,0]) ), nt)
-        dejy = self.vec_dot( ( dcvj[:,1][:, None]*ej +  self.vec_dot(ej, dcvj)[:, None]*np.array([0,1,0]) ), nt)
-        dejz = self.vec_dot( ( dcvj[:,2][:, None]*ej +  self.vec_dot(ej, dcvj)[:, None]*np.array([0,0,1]) ), nt)
-        dekx = self.vec_dot( ( dcvk[:,0][:, None]*ek +  self.vec_dot(ek, dcvk)[:, None]*np.array([1,0,0]) ), nt)
-        deky = self.vec_dot( ( dcvk[:,1][:, None]*ek +  self.vec_dot(ek, dcvk)[:, None]*np.array([0,1,0]) ), nt)
-        dekz = self.vec_dot( ( dcvk[:,2][:, None]*ek +  self.vec_dot(ek, dcvk)[:, None]*np.array([0,0,1]) ), nt)
+        deix = vec_dot( ( dcvi[:,0][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
+        deiy = vec_dot( ( dcvi[:,1][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
+        deiz = vec_dot( ( dcvi[:,2][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,0,1]) ), nt)
+        dejx = vec_dot( ( dcvj[:,0][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([1,0,0]) ), nt)
+        dejy = vec_dot( ( dcvj[:,1][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([0,1,0]) ), nt)
+        dejz = vec_dot( ( dcvj[:,2][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([0,0,1]) ), nt)
+        dekx = vec_dot( ( dcvk[:,0][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([1,0,0]) ), nt)
+        deky = vec_dot( ( dcvk[:,1][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,1,0]) ), nt)
+        dekz = vec_dot( ( dcvk[:,2][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,0,1]) ), nt)
 
         return deix, deiy, deiz, dejx, dejy, dejz, dekx, deky, dekz
 
@@ -447,16 +442,16 @@ class Torsal(Constraint):
         ncf = self.ncf 
 
         # Compute dot produts
-        eicf = self.vec_dot(ei, ncf)
-        ejcf = self.vec_dot(ej, ncf)
-        ekcf = self.vec_dot(ek, ncf)
+        eicf = vec_dot(ei, ncf)
+        ejcf = vec_dot(ej, ncf)
+        ekcf = vec_dot(ek, ncf)
 
         eicf_ei = eicf[:,None]*ei
         ejcf_ej = ejcf[:,None]*ej
         ekcf_ek = ekcf[:,None]*ek
 
         # Compute the derivative of nt.ec with respect to df
-        d_df = 2/3*self.vec_dot( (eicf_ei + ejcf_ej + ekcf_ek ), nt)
+        d_df = 2/3*vec_dot( (eicf_ei + ejcf_ej + ekcf_ek ), nt)
 
         return d_df, eicf_ei, ejcf_ej, ekcf_ek   
 
