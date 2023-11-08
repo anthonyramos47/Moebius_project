@@ -26,8 +26,8 @@ class Torsal_angle(Constraint):
     
     def initialize_constraint(self, X, var_indices, V, F, w=1 ) -> np.array:
         # Input
-        # X: variables [ e   | a | b | n_t  | d_i ] 
-        # X  size      [ 3*V | F | F | 3*F  | F   ]
+        # X: variables 
+        # var_indices: dictionary of indices of variables
         # V: Vertices
         # F: Faces
         # bf: circumcenters of the faces
@@ -44,6 +44,7 @@ class Torsal_angle(Constraint):
 
         # Define indices indices
         self.var_idx = var_indices
+
         # E1 = || c0^2 - 0.7 + u^2 ||^2
         # E2 = || c0 - nt1.nt2 ||^2
         self.const_idx = {  "E1"  : np.arange( 0                  , self.nF),
@@ -64,8 +65,10 @@ class Torsal_angle(Constraint):
         
         # indices vars
         v_idx = self.var_idx
+        # indices constraints
         c_idx = self.const_idx
 
+        # Get variables of interest
         nt1, nt2, c0, u = self.uncurry_X(X, "nt1", "nt2", "c0", "u")
 
         # Unflatten nt1, nt2
@@ -90,8 +93,13 @@ class Torsal_angle(Constraint):
 
         # dnt2( E2) =  dnt2 ( c0 - nt1.nt2 ) = -nt1
         #           J[c_idx["E2"].repeat(3), v_idx["nt2"]] = -nt1.flatten()
+<<<<<<< HEAD:hanan/optimization/Torsal_angle.py
         self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1)
 
+=======
+        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1.flatten())
+        
+>>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal_angle.py
         # r of E1 
         self.set_r(c_idx["E1"], c0**2 - 0.5 + u**2)
 

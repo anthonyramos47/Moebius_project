@@ -25,10 +25,16 @@ class Optimizer():
         self.J = None # Jacobian matrix
         self.r = None # Residual vector
         self.X = None # Variable
+<<<<<<< HEAD:hanan/optimization/Optimizer.py
         self.X0 = None # Initial variable
         self.bestX = None # Best variable
         self.bestit = None # Best iteration
         self.prevdx = None # Previous dx norm
+=======
+        self.bestX = None # Best variable
+        self.bestit = None # Best iteration
+        self.prevdx = None # Previous dx
+>>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
         self.H = None # Hessian matrix
         self.it = None # Iteration 
         self.step = None # Step size
@@ -86,12 +92,22 @@ class Optimizer():
  
     def optimize(self):
         
+<<<<<<< HEAD:hanan/optimization/Optimizer.py
         if self.prevdx is None or self.prevdx > 1e-6:
+=======
+        if self.prevdx is None or self.prevdx > 1e-7:
+>>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
             if self.method == 'LM': # Levenberg-Marquardt
                 self.LM()
             elif self.method == 'PG': # Projected Gauss-Newton
                 self.PG()
+<<<<<<< HEAD:hanan/optimization/Optimizer.py
         
+=======
+            else:
+                print("Error: Solver not implemented or not specified")
+            
+>>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
 
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares
@@ -118,9 +134,11 @@ class Optimizer():
 
         dx = spsolve(H, b)
 
+        # Store previous dx norm
+        self.prevdx = np.linalg.norm(dx)
+
         # Compute energy
         energy = self.r.T@self.r
-        
 
         # Append energy
         self.energy.append(energy)
@@ -128,10 +146,14 @@ class Optimizer():
         # Update variables
         self.update_variables(dx)
 
+<<<<<<< HEAD:hanan/optimization/Optimizer.py
         # Update previous dx
         self.prevdx = np.linalg.norm(dx)
 
         # Update bestX
+=======
+        # Store best X and iteration
+>>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
         if self.it == 0:
             self.bestX = self.X
             self.bestit = self.it
@@ -139,7 +161,10 @@ class Optimizer():
             if energy < self.energy[self.bestit]:
                 self.bestX = self.X
                 self.bestit = self.it
+<<<<<<< HEAD:hanan/optimization/Optimizer.py
 
+=======
+>>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
         
         # Update iteration
         self.it +=1
@@ -192,6 +217,10 @@ class Optimizer():
         elif self.method == "PG":
             pass
         
+    def get_variables(self) -> np.array:
+        # Return best variables
+        print(f"Best iteration: {self.bestit + 1}\t Best energy: {self.energy[self.bestit]}")
+        return self.bestX
 
     def clear_constraints(self):
         # Clear Jacobian and residual

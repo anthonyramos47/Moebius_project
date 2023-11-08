@@ -27,6 +27,7 @@ class Constraint():
         pass
 
     def _compute(self, X, *args) -> None:
+<<<<<<< HEAD:hanan/optimization/constraint.py
         
         # Reset Jacobian
         self.reset()
@@ -37,6 +38,15 @@ class Constraint():
         # Set Jacobian
         self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
 
+=======
+        """
+        Method to compute the residual and the Jacobian
+        """
+
+        self.compute(X, *args)
+
+        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
+>>>>>>> 448edca (Before pull):hJupyter/optimization/constraint.py
         pass
 
     def compute(self, X, *args) -> None:
