@@ -61,7 +61,7 @@ class Optimizer():
         self.step = step
         self.method = method
 
-    def add_constraint(self, constraint, *args) -> None:
+    def get_gradients(self, constraint, *args) -> None:
         """ Add constraint to the optimizer
             Input:
                 constraint: Constraint class
@@ -145,7 +145,7 @@ class Optimizer():
         self.it +=1
         
         # Print energy
-        print(f" E {self.it}: {energy} \t {self.prevdx}")
+        print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
 
         # Clear constraints
         self.clear_constraints()

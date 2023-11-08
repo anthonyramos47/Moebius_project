@@ -55,6 +55,27 @@ class Constraint():
                 values: Values of J
         """
         
+        # # Check if v_idx is a list or a np.array
+        # if isinstance(v_idx, list):
+        #     # Check size of v_idx and c_idx
+        #     assert len(v_idx) == len(c_idx), "Size of v_idx and c_idx must be the same"
+
+        #     # Replicate the corresponding c_idx acoording to the length of the elements in v_idx
+        #     c_idx = [np.array([c_idx[i]] * len(sublist)) for i, sublist in enumerate(v_idx)]
+            
+        #     # flatten v_idx
+        #     v_idx = np.concatenate(v_idx)
+
+        # # Check if v_idx is a np.array
+        # elif isinstance(v_idx, np.ndarray) and len(v_idx.shape) == 2:
+
+        #     # Get shape of v_idx
+        #     shape = v_idx.shape
+
+        #     # Replicate the corresponding c_idx acoording to the length of the elements in v_idx
+        #     c_idx = c_idx.repeat(shape[1])
+        #     v_idx = v_idx.flatten()
+
         # Fill row
         self.i.extend(c_idx)
         self.j.extend(v_idx)

@@ -591,10 +591,7 @@ class Mesh():
             index = np.delete(index,j)
         return i
 
-    #Half-Edge r-th row : | Origin | Twin | Face | Next | Previous | Edge |
-    #                         0        1     2      3       4          5
-    #Half-Davider-th row : | Origin | Face | Next | Prev | Twin | Edge |
-    #                         0        1     2      3       4          5
+
     def vertex_ring_faces_iterators(self, sort=False, order=False):
         H = self.halfedges
 
@@ -629,6 +626,55 @@ class Mesh():
         face_neighbors = self.vertex_ring_faces_list()
         dual = [face_neighbors[i] for i in in_v]
         return dual
+
+
+    def edge_faces(self):
+        """ Returns the faces of each edge 
+        """
+        # Get halfedges
+        H  = self.halfedges
+
+        # Sort edges
+        f  = H[np.argsort(H[:,5]),2]
+        
+        # Get faces
+        # Even indices
+        f1 = f[0::2]
+        # Odd indices
+        f2 = f[1::2]
+
+        return f1, f2
+
+    def edge_vertices(self):
+        """ Returns the vertices of each edge
+        """
+
+        # Get halfedges
+        H  = self.halfedges
+        v  = H[np.argsort(H[:,5]),0]
+        
+        # Get vertices
+        # Even indices
+        v1 = v[0::2]
+        # Odd indices
+        v2 = v[1::2]
+        return v1, v2
+    
+    def inner_edges(self):
+        """ Function to get inner edges
+        """
+        # Get halfedges
+        H = self.halfedges
+        # Get boundary halfedges
+        h = np.where(H[:,1] != -1)[0]
+
+        # Get the edges 
+        e = H[h,5]
+
+        # Get the unique edges
+        e = np.unique(e)
+
+        return e
 
     # Reading
     def read_obj_file(self, file_name):

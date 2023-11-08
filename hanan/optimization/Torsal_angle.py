@@ -68,8 +68,9 @@ class Torsal_angle(Constraint):
 
         nt1, nt2, c0, u = self.uncurry_X(X, "nt1", "nt2", "c0", "u")
 
-        nt1 = nt1.reshape(-1, 3)
-        nt2 = nt2.reshape(-1, 3)
+        # Unflatten nt1, nt2
+        nt1uf = nt1.reshape(-1, 3)
+        nt2uf = nt2.reshape(-1, 3)
 
         # dc0( E1)  =  dc0 ( c0^2 - 0.7 + u^2 ) = 2 c0
         #           J[c_idx["E1"], v_idx["c0"]] = 2*c0
@@ -85,14 +86,14 @@ class Torsal_angle(Constraint):
 
         # dnt1( E2) =  dnt1 ( c0 - nt1.nt2 ) = -nt2
         #           J[c_idx["E2"].repeat(3), v_idx["nt1"]] = -nt2.flatten()
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], -nt2.flatten())
+        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], -nt2)
 
         # dnt2( E2) =  dnt2 ( c0 - nt1.nt2 ) = -nt1
         #           J[c_idx["E2"].repeat(3), v_idx["nt2"]] = -nt1.flatten()
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1.flatten())
+        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1)
 
         # r of E1 
         self.set_r(c_idx["E1"], c0**2 - 0.5 + u**2)
 
         # r of E2
-        self.set_r(c_idx["E2"], c0 - np.sum(nt1*nt2, axis=1))
+        self.set_r(c_idx["E2"], c0 - np.sum(nt1uf*nt2uf, axis=1))
