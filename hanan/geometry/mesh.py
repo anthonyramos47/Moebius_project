@@ -364,15 +364,16 @@ class Mesh():
         """
             Returns the first ring of neighbor faces of a face
         """
-
+#        Half-Edge r-th row : | Origin | Twin | Face | Next | Previous | Edge |
+ #                                0        1     2      3       4          5
         # Get halfedges
         H = self.halfedges
 
         # Get the halfedges of the face f
-        hf = np.where(H[:, 2] == f)
+        hf = np.where(H[:, 2] == f)[0]
 
-        # Get the origin of the twin halfedges
-        fs = H[H[hf, 1], 2][0]
+        # Get the faces of the twin halfedges
+        fs = H[H[hf, 1], 2]
 
         # Clear -1 values
         fs = fs[fs != -1]

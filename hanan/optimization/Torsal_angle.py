@@ -94,7 +94,7 @@ class Torsal_angle(Constraint):
         self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1.flatten())
         
         # r of E1 
-        self.set_r(c_idx["E1"], c0**2 - 0.5 + u**2)
+        self.set_r(c_idx["E1"], c0**2 - np.cos(30*np.pi/180)**2 + u**2)
 
         # r of E2
         self.set_r(c_idx["E2"], c0 - np.sum(nt1uf*nt2uf, axis=1))

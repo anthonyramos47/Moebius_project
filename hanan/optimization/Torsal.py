@@ -26,6 +26,7 @@ class Torsal(Constraint):
         self.fvij = None # List of the edge vectors per each face
         self.v = None # List of the vertices per each face
         self.vc= None # List og the barycenters of the faces
+        self.ecnorms = None # List of the norms of the line congruence directions
         self.t1norms = None # List of the norms of torsal directions
         self.t2norms = None # List of the norms of torsal directions
         self.tt1norms = None # List of the norms of torsal directions second envelope
@@ -74,10 +75,10 @@ class Torsal(Constraint):
         self.var = len(X)
 
         # Get df 
-        df = X[-self.nF:]
+        df = X[var_indices["df"]]
 
         # Get ei
-        e_i = X[:3*self.nV].reshape(self.nV, 3)
+        e_i = X[var_indices["e"]].reshape(-1, 3)
         
         # Get vertices of the faces
         vi, vj, vk = V[F[:,0]], V[F[:,1]], V[F[:,2]]
@@ -93,6 +94,8 @@ class Torsal(Constraint):
 
         # Compute the direction of the line congruence at the barycenters
         ec = self.compute_ec(df, e_i, F)
+
+        self.ecnorms = np.linalg.norm(ec, axis=1)
 
         # Compute initial directions of normals of torsal plane
         nt1 = np.cross(ec, self.fvij[:,0])
@@ -122,7 +125,7 @@ class Torsal(Constraint):
         self.t2norms = np.linalg.norm(t2, axis=1)
 
         tt1, _, _ = self.compute_tt(X[self.var_idx["a1"]], X[self.var_idx["b1"]], vvi, vvj, vvk)
-        tt2, _,_ = self.compute_tt(X[self.var_idx["a2"]], X[self.var_idx["b2"]], vvi, vvj, vvk)
+        tt2, _, _ = self.compute_tt(X[self.var_idx["a2"]], X[self.var_idx["b2"]], vvi, vvj, vvk)
 
         self.tt1norms = np.linalg.norm(tt1, axis=1)
         self.tt2norms = np.linalg.norm(tt2, axis=1)
@@ -135,25 +138,27 @@ class Torsal(Constraint):
         """
         e, a1, b1, nt1, a2, b2, nt2, df = self.uncurry_X(X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
 
-        F = self.F
-
-        e = e.reshape(-1, 3)
+        e   = e.reshape(-1, 3)
         nt1 = nt1.reshape(-1, 3)
         nt2 = nt2.reshape(-1, 3)
 
+        
         # Get vertices of second envelope
-        vvi, vvj, vvk, dcvi, dcvj, dcvk = self.compute_second_env(df, e, F)
+        vvi, vvj, vvk, dcvi, dcvj, dcvk = self.compute_second_env(df, e, self.F)
 
         # Compute ec
-        ec = self.compute_ec(df, e, F)
+        ec = self.compute_ec(df, e, self.F)
+        
 
         # Get vij, vik
         vij = self.fvij[:,0]
         vik = self.fvij[:,1]
 
         # Init indices for sparse J matrix
-        self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 1)
-        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 2)     
+        self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, self.F, 1)
+        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, self.F, 2)     
+
+        self.ecnorms = np.linalg.norm(ec, axis=1)
         
 
     def fill_J_t(self, e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, torsal=1):
@@ -183,6 +188,7 @@ class Torsal(Constraint):
 
         # Compute derivatives of de (nt.ec)
         deix, deiy, deiz, dejx, dejy, dejz, dekx, deky, dekz = self.compute_decnt(dcvi, dcvj, dcvk, e, nt1, F)
+        
         # Compute derivatives of d df (nt.ec)
         d_df, eicf_ei, ejcf_ej, ekcf_ek = self.compute_d_df(e, nt1, F)
 
@@ -207,30 +213,29 @@ class Torsal(Constraint):
         # J[c_idx[nt_ec], 3*F[:,2] ]   = 2/3*dekx
         # J[c_idx[nt_ec], 3*F[:,2]+1 ] = 2/3*deky
         # J[c_idx[nt_ec], 3*F[:,2]+2 ] = 2/3*dekz
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,0], 2/3*deix)
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,0]+1, 2/3*deiy)
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,0]+2, 2/3*deiz)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,0]]  , 2/3*deix/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,0]]+1, 2/3*deiy/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,0]]+2, 2/3*deiz/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,1]]  , 2/3*dejx/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,1]]+1, 2/3*dejy/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,1]]+2, 2/3*dejz/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,2]]  , 2/3*dekx/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,2]]+1, 2/3*deky/self.ecnorms)
+        self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,2]]+2, 2/3*dekz/self.ecnorms)    
 
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,1], 2/3*dejx)
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,1]+1, 2/3*dejy)
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,1]+2, 2/3*dejz)
-
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,2], 2/3*dekx)
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,2]+1, 2/3*deky)
-        self.add_derivatives(c_idx[nt_ec], 3*F[:,2]+2, 2/3*dekz)    
-
-
+        ecnor = (ec/self.ecnorms[:,None])
+        #print(np.linalg.norm(ecnor, axis=1))
         # Set derivateives dnt (nt.ec)
         #J[c_idx[nt_ec].repeat(3), v_idx[nt] ] = ec.flatten()
-        self.add_derivatives(c_idx[nt_ec].repeat(3), v_idx[nt], ec.flatten())
+        self.add_derivatives(c_idx[nt_ec].repeat(3), v_idx[nt], ecnor.flatten())
         
         # Set derivatives d(df) (nt.ec)
         #J[c_idx[nt_ec], v_idx["df"]] = d_df
-        self.add_derivatives(c_idx[nt_ec], v_idx["df"], d_df)
+        self.add_derivatives(c_idx[nt_ec], v_idx["df"], d_df/self.ecnorms)
 
         # Set r
         # r[c_idx[nt_ec]] = np.sum(nt1*ec, axis=1)
-        self.set_r(c_idx[nt_ec], np.sum(nt1*ec, axis=1))
+        self.set_r(c_idx[nt_ec], np.sum(nt1*ecnor, axis=1))
 
         
         # Fill J for || nt.t ||^2; t = a vij + b vik
@@ -315,6 +320,7 @@ class Torsal(Constraint):
             self.tt2norms = np.linalg.norm(tt, axis=1)
 
 
+
     def compute_second_env(self, df, ei, F):
         """ Compute the second envelope of the mesh
         Input:
@@ -337,12 +343,12 @@ class Torsal(Constraint):
         # Direction from vk to cf
         dcvk = cf - vk
 
-        ei /= np.linalg.norm(ei, axis=1)[:, None]
+        ue = ei/np.linalg.norm(ei, axis=1)[:, None]
 
-        # compute the second envelope as vi + (dcv.ei) ei 
-        vvi = 2*np.sum(dcvi*ei[F[:,0]], axis=1)[:, None] * ei[F[:,0]] + vi
-        vvj = 2*np.sum(dcvj*ei[F[:,1]], axis=1)[:, None] * ei[F[:,1]] + vj
-        vvk = 2*np.sum(dcvk*ei[F[:,2]], axis=1)[:, None] * ei[F[:,2]] + vk
+        # compute the second envelope as vi + 2*(dcv.ei) uei; uei = ei/||ei||
+        vvi = 2*np.sum(dcvi*ue[F[:,0]], axis=1)[:, None] * ue[F[:,0]] + vi
+        vvj = 2*np.sum(dcvj*ue[F[:,1]], axis=1)[:, None] * ue[F[:,1]] + vj
+        vvk = 2*np.sum(dcvk*ue[F[:,2]], axis=1)[:, None] * ue[F[:,2]] + vk
 
         return vvi, vvj, vvk, dcvi, dcvj, dcvk
 
@@ -388,7 +394,7 @@ class Torsal(Constraint):
         """ Function to compute the derivative of nt.ec with respect to e_i
             (nt.ec) = (nt.(ei + ej + ek)/3) = (nt).(vvc - vc);
             vc = (vi + vj + vk)/3
-            vvi = vi + (dcv.ei) ei
+            vvi = vi + 2*(dcv.ei) ei
         """
         # Get directions per vertex
         ei = e[F[:,0]]
@@ -399,9 +405,11 @@ class Torsal(Constraint):
         deix = vec_dot( ( dcvi[:,0][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
         deiy = vec_dot( ( dcvi[:,1][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
         deiz = vec_dot( ( dcvi[:,2][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,0,1]) ), nt)
+
         dejx = vec_dot( ( dcvj[:,0][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([1,0,0]) ), nt)
         dejy = vec_dot( ( dcvj[:,1][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([0,1,0]) ), nt)
         dejz = vec_dot( ( dcvj[:,2][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([0,0,1]) ), nt)
+
         dekx = vec_dot( ( dcvk[:,0][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([1,0,0]) ), nt)
         deky = vec_dot( ( dcvk[:,1][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,1,0]) ), nt)
         dekz = vec_dot( ( dcvk[:,2][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,0,1]) ), nt)
@@ -413,9 +421,9 @@ class Torsal(Constraint):
         """ Compute the derivative of nt.ec with respect to df
             (nt.ec) = (nt.(ei + ej + ek)/3) = (nt).(vvc - vc);
             vc = (vi + vj + vk)/3
-            vvi = vi + (dcv.ei) ei; dcv = cf - vi 
+            vvi = vi + 2(dcv.ei)/||enor|| ei/||enor||; dcv = cf - vi 
             cf = bf + df ncf
-            => d df (nt.ec) = 2/3 [nt.( (ei.ncf)* ei + (ej.ncf)*ej   + (ek.ncf)*ek )]
+            => d df (nt.ec) = 2/3 [nt.( (ei.ncf)* ei + (ej.ncf)*ej   + (ek.ncf)*ek )]/||enor||**2
         """
         
         # Get directions per vertex

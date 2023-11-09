@@ -55,7 +55,7 @@ class Optimizer():
         """
         # Initialize variables
         self.X = X
-        self.X0 = X
+        self.X0 = X.copy()
         self.it = 0
         self.step = step
         self.method = method
@@ -85,7 +85,7 @@ class Optimizer():
  
     def optimize(self):
         
-        if self.prevdx is None or self.prevdx > 1e-7:
+        if self.prevdx is None or self.prevdx > 1e-8:
             if self.method == 'LM': # Levenberg-Marquardt
                 self.LM()
             elif self.method == 'PG': # Projected Gauss-Newton
@@ -205,7 +205,7 @@ class Optimizer():
         """ Function that resets the optimizer to the initial state.
         """
 
-        self.X = self.X0
+        self.X = self.X0.copy()
         self.prevdx = None
         self.energy = []
         self.it = 0

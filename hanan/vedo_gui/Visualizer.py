@@ -15,6 +15,11 @@ from hanan.optimization.Optimizer import Optimizer
 class Visualizer():
 
     def __init__(self) -> None:
+        """
+        The constructor for Visualizer class.
+
+        Initializes the plotter, tinker gui, actors, and meshes list.
+        """
         # Create an Optimizer
         self.optimizer = None
         
@@ -32,52 +37,26 @@ class Visualizer():
 
         self.meshes = [] # List of meshes
         self.actors = {} # Dictionary of actors
+        self.initialized = False # Flag to check if the geometry is initialized
 
-    def remove_from_scene(self, name):
-        """ Remove an actor from the scene
-        Input:
-            name of the actor
-        """
-
-        if name in self.actors:
-            self.plotter.remove(self.actors[name])
-        else:
-            print(f"Actor {name} not in scene")
-            return
-        
-        
-
-    def add_to_scene(self, name, act):
-        """ Add an actor to the scene
-        Input:
-            name of the actor
-            actor
-        """
-        if name in self.actors:
-            self.remove_from_scene(name)
-        self.actors[name] = act 
-        self.plotter.add(act)
-
-
-    def setup(self)-> None:
-        """ Here we setup the geometry we are goint to optimize
-        """
-        pass
+    #-------------------------MENU METHODS---------------------------#
 
     def init_Visualizer(self) -> None:
-        #self.constraints = constraints
-        #self.optimizer = optimizer
-        #self.weights = dict(zip(self.constraints.keys(), [0.0]*len(self.constraints)))
+        """
+        Initializes the menu and constraints for the visualizer
+        """
         self._init_menu()
 
 
     def init_menu(self) -> None:
-        """ Here we initialize the menu as convenient
+        """ 
+        Here we initialize the menu as convenient
         """
         pass
 
     def _init_menu(self) -> None:
-        """ Here we setup the basic initial menu buttons in Plotter
+        """ 
+        Setup the basic initial menu buttons in Plotter
         """
 
         # Load mesh button
@@ -97,60 +76,82 @@ class Visualizer():
                                            bc="k",
                                            font="Calco",
                                            )
+        
+        # Reset button
+        self.plotter.add_button(self.reset_scene,
+                                             pos=(0.1, 0.85), 
+                                             states=["Reset"],
+                                             c="w",
+                                             bc="k",
+                                             font="Calco",
+                                             )
 
 
         self.init_menu()
         
         # # Show main plotter
-        self.plotter.show(interactive=True)
-
+        self.plotter.show(interactive=True, axes=1 )
+    
     def display_weights(self) -> None:
-        """ Function that displays the weights in plot window
+        """ 
+        Function that displays the weights in plot window
         """
 
         for i, (name, value) in enumerate(self.weights.items()):
             t_w = vd.Text2D(f"Weight {name}: {value}", 
-                                  pos=(0.05, 0.85-i*0.05),
+                                  pos=(0.04, 0.75-i*0.05),
                                   font="Calco",
                                   s=1.1,
                                   c="k",
                                   )
-            self.plotter.add(t_w)
+            self.add_to_scene("weight_"+name, t_w)
         self.plotter.render()
 
-    def optimization_run(self) -> None:
-        """ Function that runs the optimization
+
+    #-------------------------OPTIMIZATION METHODS---------------------------#
+
+    def setup(self)-> None:
+        """ 
+        Here we setup the geometry we are going to optimize
         """
+        pass
+
+
+    def optimization_run(self) -> None:
+        """ 
+        Function that runs the optimization
+        """
+
+        # Set weights for the constraints
+        for name, constraint in self.constraints.items():
+                constraint.set_weigth(self.weights[name])
 
         for _ in range(self.iterations):
-
-            for name, constraint in self.constraints.items():
-                constraint.set_weigth(self.weights[name])
+            
+            # Per constraint compute the gradients
+            for name, constraint in self.constraints.items():                
                 self.optimizer.get_gradients(constraint)
             
+            # Optimize step
             self.optimizer.optimize()
 
+            # Update the scene
             self.update_scene(self.optimizer.X)
 
-    def reset_scene(self) -> None:
-        """ Function that resets the scene
-        """
-        self.optimizer.reset()
-        self.reset_scene(self.optimizer.X)
-        pass
 
-    def update_scene(self, X):
-        """ Function that updates the scene, i.e. modify the meshes according to the variables X
-        """
-        pass
 
     def optimizations_settings(self) -> None:
+        """ 
+        Function that sets up the optimization settings menu
+        """
         # setup the geometry
-        self.setup()
+        
+        if not self.initialized:
+            self.setup()
+            self.initialized = True
 
         # Function to retrieve and display the entered values
-        def run_opt():
-            print("Entre")
+        def run_opt():  
             # Get the values from the Entry widgets and convert them to float
             entered_values = [float(entry.get()) for entry in entry_widgets]
             self.weights = dict(zip(self.weights.keys(), entered_values[:-1]))
@@ -158,7 +159,7 @@ class Visualizer():
             # Display the values in plotter
             self.display_weights()    
             
-            #self.opt_menu.quit()
+            self.opt_menu.quit()
             self.opt_menu.destroy()
 
             # Run optimization
@@ -172,7 +173,7 @@ class Visualizer():
         entry_widgets = []
         for i, (name, value) in enumerate(self.weights.items()):
             
-            label = Label(self.opt_menu, text=f"Enter {name}:")
+            label = Label(self.opt_menu, text=f"Weight {name}:")
             entry = Entry(self.opt_menu)
             entry.insert(0, str(value))  # Set default value in the Entry widget
             label.grid(row=i, column=0)
@@ -199,21 +200,32 @@ class Visualizer():
 
         self.root.mainloop()
 
+    #-------------------------UPDATE SCENE METHODS---------------------#
 
-    def show_meshes(self) -> None:
-        """ Show the meshes
+    def reset_scene(self) -> None:
+        """ 
+        Function that resets the scene
         """
-        self.plotter.clear()
-        for i, mesh in enumerate(self.meshes):
-            actor = vd.Mesh([mesh[0], mesh[1]])
-            actor.lc("k").lw(0.1).c("r")
-            self.add_to_scene("mesh_"+str(i), actor)
-        
-        self.plotter.render()
+        self.optimizer.reset()
+        self.update_scene(self.optimizer.X)
+        pass
 
+
+    def update_scene(self, X):
+        """ 
+        Function that updates the scene, i.e. modify the meshes according to the variables X
+
+        Args:
+            X (numpy array): array of variables
+        """
+        pass
+
+
+    #-------------------------MESH METHODS---------------------------#
 
     def load_mesh(self) -> None:
-        """ Load a mesh
+        """ 
+        Function that loads a mesh
         """
         file_dialog_options = {
         "title": "Select a File",
@@ -228,4 +240,50 @@ class Visualizer():
             #self.plotter.add(actor)
 
         self.plotter.render()
- 
+
+        
+    def show_meshes(self) -> None:
+        """ 
+        Function that shows the meshes
+        """
+        self.plotter.clear()
+        for i, mesh in enumerate(self.meshes):
+            actor = vd.Mesh([mesh[0], mesh[1]])
+            actor.lc("k").lw(0.1).c("r").alpha(0.5)
+            self.add_to_scene("mesh_"+str(i), actor)
+        
+        self.plotter.render()
+
+  
+    
+
+    #-----------------------ADD/REMOVE METHODS-----------------------#
+
+    def remove_from_scene(self, name):
+        """ 
+        Remove an actor from the scene
+
+        Args:
+            name (str): name of the actor
+        """
+        if name in self.actors:
+            self.plotter.remove(self.actors[name])
+        else:
+            print(f"Actor {name} not in scene")
+            return
+        
+        
+
+    def add_to_scene(self, name, act):
+        """ 
+        Add an actor to the scene
+
+        Args:
+            name (str): name of the actor
+            act (actor): actor to be added
+        """
+        if name in self.actors:
+            self.remove_from_scene(name)
+        self.actors[name] = act 
+        self.plotter.add(act)
+
