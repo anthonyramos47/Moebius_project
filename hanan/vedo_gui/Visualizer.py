@@ -31,6 +31,33 @@ class Visualizer():
         self.iterations = 1 # Number of iterations
 
         self.meshes = [] # List of meshes
+        self.actors = {} # Dictionary of actors
+
+    def remove_from_scene(self, name):
+        """ Remove an actor from the scene
+        Input:
+            name of the actor
+        """
+
+        if name in self.actors:
+            self.plotter.remove(self.actors[name])
+        else:
+            print(f"Actor {name} not in scene")
+            return
+        
+        
+
+    def add_to_scene(self, name, act):
+        """ Add an actor to the scene
+        Input:
+            name of the actor
+            actor
+        """
+        if name in self.actors:
+            self.remove_from_scene(name)
+        self.actors[name] = act 
+        self.plotter.add(act)
+
 
     def setup(self)-> None:
         """ Here we setup the geometry we are goint to optimize
@@ -161,7 +188,7 @@ class Visualizer():
         entry_widgets.append(iterations_entry)
 
         # Create a button to trigger the input retrieval
-        button_show = Button(self.opt_menu, text="Get Weights", command=run_opt)
+        button_show = Button(self.opt_menu, text="Optimize", command=run_opt)
 
         # Create a label to display the result
         label_result = Label(self.opt_menu, text="")
@@ -177,9 +204,10 @@ class Visualizer():
         """ Show the meshes
         """
         self.plotter.clear()
-        for mesh in self.meshes:
+        for i, mesh in enumerate(self.meshes):
             actor = vd.Mesh([mesh[0], mesh[1]])
-            self.plotter.add(actor)
+            actor.lc("k").lw(0.1).c("r")
+            self.add_to_scene("mesh_"+str(i), actor)
         
         self.plotter.render()
 
@@ -196,7 +224,8 @@ class Visualizer():
         if file_path:
             actor = vd.load(file_path)
             self.meshes.append( [actor.points(), actor.faces()])
-            self.plotter.add(actor)
+            self.show_meshes()
+            #self.plotter.add(actor)
 
         self.plotter.render()
  

@@ -56,7 +56,7 @@ class Vis_Approx(Visualizer):
         bf, _, ncf = circle_3pts(p1, p2, p3)
 
         # store barycenters
-        self.bc = bf
+        self.bc = (p1+p2+p3)/3
 
         # Dual topology 
         dual_tf = tmesh.vertex_ring_faces_list()
@@ -89,8 +89,6 @@ class Vis_Approx(Visualizer):
         X[var_idx["c0"]] = np.sum(X[var_idx["nt1"]].reshape(-1,3)*X[var_idx["nt2"]].reshape(-1,3), axis=1)
 
         X[var_idx["u"]] = 1
-
-
 
         # # Init LineCong
         linecong = LineCong()
@@ -140,27 +138,28 @@ class Vis_Approx(Visualizer):
         bc = self.bc
 
         lt1 = vd.Lines(
-                        bc-0.1*t1,
-                        bc+0.1*t1,
+                        bc-0.05*t1,
+                        bc+0.05*t1,
                         res=1,
-                        scale=0.4,
+                        scale=1,
                         lw=1,
                         c='w',
                         alpha=1.0)
 
 
         
-        # lt2 = vd.Lines(
-        #                 bc-0.1*t2,
-        #                 bc+0.1*t2,
-        #                 res=1,
-        #                 scale=0.4,
-        #                 lw=1,
-        #                 c='b',
-        #                 alpha=1.0)
+        lt2 = vd.Lines(
+                        bc-0.05*t2,
+                        bc+0.05*t2,
+                        res=1,
+                        scale=1,
+                        lw=1,
+                        c='b',
+                        alpha=1.0)
         
-        # self.plotter.add(lt1)
-        # self.plotter.add(lt2)
+        self.add_to_scene("lt1", lt1)
+        self.add_to_scene("lt2", lt2)
+        
 
         self.plotter.render()
 
