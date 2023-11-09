@@ -1,8 +1,6 @@
 # Planarity constraint implementation
-
 import numpy as np
-import geometry as geo
-from optimization.constraint import Constraint
+from hanan.optimization.constraint import Constraint
 
 class LineCong(Constraint):
 
@@ -14,14 +12,20 @@ class LineCong(Constraint):
         self.nt = [] # List to store normals
         self.norms = [] # List to store norms of cicj
         self.inner_vertices = None # List of inner vertices
+        self.dual_faces = None # List of dual faces
         
 
     def initialize_constraint(self, X, var_indices, ei_dim, bt, nbt, num_faces, dual_faces, inner_vertices) -> None:
         # Input
-        # bt: list of barycenters
-        # nbt: list of Circum circles axis
-        # cf: list of faces of central mesh
-        # X: variables 
+        # X : Variables
+        # var_indices: Dictionary with the indices of the variables
+        # ei_dim: Number of edges per face
+        # bt: Barycenters
+        # nbt: Normals at barycenters
+        # num_faces: Number of faces
+        # dual_faces: List of dual faces
+        # inner_vertices: List of inner vertices
+
 
         # Initialize constraint \sum_{f \in F} \sum_{cj,ci \in E(f)} || e_f (cj - ci)/|| cj - ci||  ||^2 ; ci = bi + df * nbi
         # 
@@ -56,6 +60,7 @@ class LineCong(Constraint):
                           "e.e" : np.arange(self.num_edge_const, self.num_edge_const + len(e) )
                           }
 
+        self.dual_faces = dual_faces
         # Compute Jacobian
         # Row index
         i = 0
@@ -96,11 +101,10 @@ class LineCong(Constraint):
 
             
 
-    def compute(self, X, cf) -> None:
+    def compute(self, X) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
-                cf: Faces of the central mesh
         """
         
         # Get inner vertices
@@ -118,7 +122,7 @@ class LineCong(Constraint):
 
             f = inner_vertices[idx_f]
             # Get face
-            face = cf[f]
+            face = self.dual_faces[f]
             faceroll = np.roll(face, -1, axis=0) 
 
             # Get normals

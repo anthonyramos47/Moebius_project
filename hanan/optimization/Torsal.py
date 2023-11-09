@@ -1,12 +1,9 @@
 # Planarity constraint implementation
 
 import numpy as np
-import geometry as geo
-<<<<<<< HEAD:hanan/optimization/Torsal.py
-from geometry.utils import vec_dot
-=======
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
-from optimization.constraint import Constraint
+from hanan.geometry.utils import vec_dot
+from hanan.optimization.constraint import Constraint
+
 
 class Torsal(Constraint):
 
@@ -22,6 +19,7 @@ class Torsal(Constraint):
         """
         super().__init__()
         self.nV = None # Number of vertices
+        self.F = None # Faces
         self.nF = None # Number of faces
         self.ncf = None # List of circumcenter axis direction
         self.bf = None # List of circumcenters
@@ -42,7 +40,8 @@ class Torsal(Constraint):
         # F: Faces
         # bf: circumcenters of the faces
         # ncf: normals of the circumcenters
-    
+
+        self.F = F
         # Set circumcenters
         self.bf = bf
 
@@ -104,7 +103,6 @@ class Torsal(Constraint):
 
         vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, F)
         
-
         # Set initial directions of normals of torsal plane
         X[self.var_idx["nt1"]] = nt1.flatten()
         X[self.var_idx["nt2"]] = nt2.flatten()
@@ -129,7 +127,7 @@ class Torsal(Constraint):
         self.tt1norms = np.linalg.norm(tt1, axis=1)
         self.tt2norms = np.linalg.norm(tt2, axis=1)
 
-    def compute(self, X, F) -> None:
+    def compute(self, X) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
@@ -137,8 +135,9 @@ class Torsal(Constraint):
         """
         e, a1, b1, nt1, a2, b2, nt2, df = self.uncurry_X(X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
 
-<<<<<<< HEAD:hanan/optimization/Torsal.py
-        e   = e.reshape(-1, 3)
+        F = self.F
+
+        e = e.reshape(-1, 3)
         nt1 = nt1.reshape(-1, 3)
         nt2 = nt2.reshape(-1, 3)
 
@@ -154,36 +153,11 @@ class Torsal(Constraint):
 
         # Init indices for sparse J matrix
         self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 1)
-        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 2) 
-        
-        
-
-    def fill_J_t(self, e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, torsal=1):
-        """  Function to fill the Jacobian of the constraint per each torsal plane
-        Input:
-            e: directions
-            ec: direction of the line congruence at the barycenter of the face.
-            a1: a1 variable of t1 = a1 vij + b1 vik
-            b1: b1 variable of t1 = a1 vij + b1 vik
-            nt1: normal of the torsal plane
-            vij: edge vector
-            vik: edge vector
-            vvi: vertices of the second envelope
-            vvj: vertices of the second envelope
-            vvk: vertices of the second envelope
-            dcvi: distance from vi to center of sphere
-            dcvj: distance from vj to center of sphere
-            dcvk: distance from vk to center of sphere
-            F: Faces
-            torsal: torsal plane index
-=======
-        # Get J and r
-        self.fill_J(X, F)        
+        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 2)     
         
 
     def fill_J_t(self, e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, torsal=1):
         """ Function to define the values of J per each torsal direction
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
         """
 
         if torsal == 1:
@@ -341,36 +315,6 @@ class Torsal(Constraint):
             self.tt2norms = np.linalg.norm(tt, axis=1)
 
 
-<<<<<<< HEAD:hanan/optimization/Torsal.py
-=======
-    def fill_J(self, X, F):
-        """ Function to define the values of J
-        """
-
-        e, a1, b1, nt1, a2, b2, nt2, df = self.uncurry_X(X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
-
-        e = e.reshape(-1, 3)
-        nt1 = nt1.reshape(-1, 3)
-        nt2 = nt2.reshape(-1, 3)
-
-        # Get vertices of second envelope
-        vvi, vvj, vvk, dcvi, dcvj, dcvk = self.compute_second_env(df, e, F)
-
-        # Compute ec
-        ec = self.compute_ec(df, e, F)
-
-        # Get vij, vik
-        vij = self.fvij[:,0]
-        vik = self.fvij[:,1]
-
-        # Init indices for sparse J matrix
-
-        self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 1)
-        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, 2)
-
-
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
-
     def compute_second_env(self, df, ei, F):
         """ Compute the second envelope of the mesh
         Input:
@@ -412,19 +356,6 @@ class Torsal(Constraint):
         """
         return self.bf + df[:, None] * self.ncf
     
-<<<<<<< HEAD:hanan/optimization/Torsal.py
-    def compute_ec(self, df, e_i, F):
-        """ Compute the direction of the line congruence at the barycenters
-        Input:
-            df  .- Distance to center
-            e_i .- Directions of the vertices
-            F   .- Faces
-        Output:
-            ec  .- Direction of the line congruence at the barycenters
-        """
-
-
-=======
     def compute_ec(self, df, e_i, F) -> np.array:
         """ Compute the direction of the line congruence at the barycenters
         Input:
@@ -434,7 +365,6 @@ class Torsal(Constraint):
         Output:
             ec .- direction of the line congruence at the barycenters
         """
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
         # Get first envelope
         vc = self.vc
 
@@ -444,26 +374,15 @@ class Torsal(Constraint):
         # Compute varycenter in second envelope
         vvc = (vvi + vvj + vvk)/3
 
-<<<<<<< HEAD:hanan/optimization/Torsal.py
-        # Compute ec diferece between first and second envelope
-=======
         # Compute ec as differencen between second and first envelope
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
         ec = vvc - vc
 
         if len(ec.shape) == 1:
             ec = np.array([ec])
 
         return ec
-<<<<<<< HEAD:hanan/optimization/Torsal.py
-=======
 
-   
-    def vec_dot(self, a, b):
-        """ Vectorized dot product
-        """
-        return np.sum(a*b, axis=1)
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
+
     
     def compute_decnt(self, dcvi, dcvj, dcvk, e, nt, F):
         """ Function to compute the derivative of nt.ec with respect to e_i
@@ -476,7 +395,6 @@ class Torsal(Constraint):
         ej = e[F[:,1]]
         ek = e[F[:,2]]  
 
-<<<<<<< HEAD:hanan/optimization/Torsal.py
         # Compute derivatives of de (nt.ec)
         deix = vec_dot( ( dcvi[:,0][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
         deiy = vec_dot( ( dcvi[:,1][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
@@ -487,19 +405,6 @@ class Torsal(Constraint):
         dekx = vec_dot( ( dcvk[:,0][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([1,0,0]) ), nt)
         deky = vec_dot( ( dcvk[:,1][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,1,0]) ), nt)
         dekz = vec_dot( ( dcvk[:,2][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,0,1]) ), nt)
-=======
-   
-        # Derivatives of de (nt.ec)
-        deix = self.vec_dot( ( dcvi[:,0][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
-        deiy = self.vec_dot( ( dcvi[:,1][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
-        deiz = self.vec_dot( ( dcvi[:,2][:, None]*ei +  self.vec_dot(ei, dcvi)[:, None]*np.array([0,0,1]) ), nt)
-        dejx = self.vec_dot( ( dcvj[:,0][:, None]*ej +  self.vec_dot(ej, dcvj)[:, None]*np.array([1,0,0]) ), nt)
-        dejy = self.vec_dot( ( dcvj[:,1][:, None]*ej +  self.vec_dot(ej, dcvj)[:, None]*np.array([0,1,0]) ), nt)
-        dejz = self.vec_dot( ( dcvj[:,2][:, None]*ej +  self.vec_dot(ej, dcvj)[:, None]*np.array([0,0,1]) ), nt)
-        dekx = self.vec_dot( ( dcvk[:,0][:, None]*ek +  self.vec_dot(ek, dcvk)[:, None]*np.array([1,0,0]) ), nt)
-        deky = self.vec_dot( ( dcvk[:,1][:, None]*ek +  self.vec_dot(ek, dcvk)[:, None]*np.array([0,1,0]) ), nt)
-        dekz = self.vec_dot( ( dcvk[:,2][:, None]*ek +  self.vec_dot(ek, dcvk)[:, None]*np.array([0,0,1]) ), nt)
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal.py
 
         return deix, deiy, deiz, dejx, dejy, dejz, dekx, deky, dekz
 

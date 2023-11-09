@@ -1,8 +1,6 @@
 # Planarity constraint implementation
-
 import numpy as np
-import geometry as geo
-from optimization.constraint import Constraint
+from hanan.optimization.constraint import Constraint
 
 class Torsal_angle(Constraint):
 
@@ -56,7 +54,7 @@ class Torsal_angle(Constraint):
 
        
 
-    def compute(self, X, F) -> None:
+    def compute(self, X) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
@@ -93,13 +91,8 @@ class Torsal_angle(Constraint):
 
         # dnt2( E2) =  dnt2 ( c0 - nt1.nt2 ) = -nt1
         #           J[c_idx["E2"].repeat(3), v_idx["nt2"]] = -nt1.flatten()
-<<<<<<< HEAD:hanan/optimization/Torsal_angle.py
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1)
-
-=======
         self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1.flatten())
         
->>>>>>> 448edca (Before pull):hJupyter/optimization/Torsal_angle.py
         # r of E1 
         self.set_r(c_idx["E1"], c0**2 - 0.5 + u**2)
 

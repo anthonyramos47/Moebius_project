@@ -6,7 +6,6 @@ def unit(v):
 
     return v/np.linalg.norm(v, axis=1)[:, None]
 
-    
 
 def vec_dot(v1, v2):
     """dot product between two lists of vectors v1, v2

@@ -25,16 +25,9 @@ class Optimizer():
         self.J = None # Jacobian matrix
         self.r = None # Residual vector
         self.X = None # Variable
-<<<<<<< HEAD:hanan/optimization/Optimizer.py
-        self.X0 = None # Initial variable
-        self.bestX = None # Best variable
-        self.bestit = None # Best iteration
-        self.prevdx = None # Previous dx norm
-=======
         self.bestX = None # Best variable
         self.bestit = None # Best iteration
         self.prevdx = None # Previous dx
->>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
         self.H = None # Hessian matrix
         self.it = None # Iteration 
         self.step = None # Step size
@@ -67,7 +60,7 @@ class Optimizer():
         self.step = step
         self.method = method
 
-    def get_gradients(self, constraint, *args) -> None:
+    def get_gradients(self, constraint) -> None:
         """ Add constraint to the optimizer
             Input:
                 constraint: Constraint class
@@ -78,7 +71,7 @@ class Optimizer():
         if constraint.w != 0:
             
             # Compute J, r for the constraint
-            constraint._compute(self.X, *args)
+            constraint._compute(self.X)
 
             # Add J, r to the optimizer
             if self.J is None:
@@ -92,22 +85,14 @@ class Optimizer():
  
     def optimize(self):
         
-<<<<<<< HEAD:hanan/optimization/Optimizer.py
-        if self.prevdx is None or self.prevdx > 1e-6:
-=======
         if self.prevdx is None or self.prevdx > 1e-7:
->>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
             if self.method == 'LM': # Levenberg-Marquardt
                 self.LM()
             elif self.method == 'PG': # Projected Gauss-Newton
                 self.PG()
-<<<<<<< HEAD:hanan/optimization/Optimizer.py
-        
-=======
             else:
                 print("Error: Solver not implemented or not specified")
             
->>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
 
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares
@@ -146,14 +131,7 @@ class Optimizer():
         # Update variables
         self.update_variables(dx)
 
-<<<<<<< HEAD:hanan/optimization/Optimizer.py
-        # Update previous dx
-        self.prevdx = np.linalg.norm(dx)
-
-        # Update bestX
-=======
         # Store best X and iteration
->>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
         if self.it == 0:
             self.bestX = self.X
             self.bestit = self.it
@@ -161,10 +139,6 @@ class Optimizer():
             if energy < self.energy[self.bestit]:
                 self.bestX = self.X
                 self.bestit = self.it
-<<<<<<< HEAD:hanan/optimization/Optimizer.py
-
-=======
->>>>>>> 448edca (Before pull):hJupyter/optimization/Optimizer.py
         
         # Update iteration
         self.it +=1

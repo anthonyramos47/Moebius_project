@@ -2,7 +2,7 @@
 # This is meant to be a template to compute constraints
 # The main idea is to pass a mesh and return a residual and a Jacobian
 import numpy as np
-import geometry as geo
+import hanan.geometry as geo
 from scipy.sparse import csc_matrix
 
 
@@ -26,30 +26,18 @@ class Constraint():
         """
         pass
 
-    def _compute(self, X, *args) -> None:
-<<<<<<< HEAD:hanan/optimization/constraint.py
-        
-        # Reset Jacobian
-        self.reset()
-
-        # Compute residual and Jacobian
-        self.compute(X, *args)
-
-        # Set Jacobian
-        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
-
-=======
+    def _compute(self, X) -> None:
         """
         Method to compute the residual and the Jacobian
         """
+        self.reset()
 
-        self.compute(X, *args)
+        self.compute(X)
 
         self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
->>>>>>> 448edca (Before pull):hJupyter/optimization/constraint.py
         pass
 
-    def compute(self, X, *args) -> None:
+    def compute(self, X) -> None:
         """ Function to compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables

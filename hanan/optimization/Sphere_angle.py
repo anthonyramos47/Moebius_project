@@ -1,9 +1,9 @@
 # Planarity constraint implementation
 
 import numpy as np
-from geometry.mesh import Mesh
-from geometry.utils import vec_dot
-from optimization.constraint import Constraint
+from hanan.geometry.mesh import Mesh
+from hanan.geometry.utils import vec_dot
+from hanan.optimization.constraint import Constraint
 
 class Sphere_angle(Constraint):
 
