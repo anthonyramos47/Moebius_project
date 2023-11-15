@@ -8,9 +8,12 @@ from hanan.optimization.constraint import Constraint
 class Torsal(Constraint):
 
     def __init__(self) -> None:
-        """ Torsal directions constraint energy
-        E = \sum{f \in F} || n_t1 . e_c ||^2 + || n_t1 . t1 ||^2 + || n_f1 . tt1 ||^2 + || n_t1 . n_t1 - 1 ||^2
-            +             || n_t2 . e_c ||^2 + || n_t2 . t2 ||^2 + || n_f2 . tt2 ||^2 + || n_t2 . n_t2 - 1 ||^2
+        """ 
+        Initializes a new instance of the Torsal class.
+
+        Torsal directions constraint energy, we assume nt are unitary vectors.
+        E = \sum{f \in F} || n_t1 . e_c ||^2 + || n_t1 . t1 ||^2 + || n_f1 . tt1 ||^2 
+            +             || n_t2 . e_c ||^2 + || n_t2 . t2 ||^2 + || n_f2 . tt2 ||^2 
         where, 
             n_t .- normal of torsal plane.
             t   .- torsal direction in the face of triangular mesh T.
@@ -64,11 +67,9 @@ class Torsal(Constraint):
         self.const_idx = {  "nt1.ec"  : np.arange( 0                  , self.nF),
                             "nt1.t1"  : np.arange( self.nF            , 2*self.nF),
                             "nt1.tt1" : np.arange( 2*self.nF          , 3*self.nF),
-                            "nt1.nt1" : np.arange( 3*self.nF          , 4*self.nF),
-                            "nt2.ec"  : np.arange( 4*self.nF          , 5*self.nF),
-                            "nt2.t2"  : np.arange( 5*self.nF          , 6*self.nF),
-                            "nt2.tt2" : np.arange( 6*self.nF          , 7*self.nF),
-                            "nt2.nt2" : np.arange( 7*self.nF          , 8*self.nF)
+                            "nt2.ec"  : np.arange( 3*self.nF          , 4*self.nF),
+                            "nt2.t2"  : np.arange( 4*self.nF          , 5*self.nF),
+                            "nt2.tt2" : np.arange( 5*self.nF          , 6*self.nF)
                         }
         
         # Number of variables
@@ -169,7 +170,6 @@ class Torsal(Constraint):
             nt_ec = "nt1.ec"
             nt_t = "nt1.t1"
             nt_tt = "nt1.tt1"
-            nt_nt = "nt1.nt1"
             nt = "nt1"
             va = "a1"
             vb = "b1"
@@ -179,7 +179,6 @@ class Torsal(Constraint):
             nt_ec = "nt2.ec"
             nt_t = "nt2.t2"
             nt_tt = "nt2.tt2"
-            nt_nt = "nt2.nt2"
             nt = "nt2"
             va = "a2"
             vb = "b2"
@@ -301,16 +300,6 @@ class Torsal(Constraint):
         # Set r
         # r[c_idx[nt_tt]] = np.sum(ttnor*nt1, axis=1)
         self.set_r(c_idx[nt_tt], np.sum(ttnor*nt1, axis=1))
-
-
-        # Fill J for || nt.nt - 1 ||^2
-        # J[c_idx[nt_nt].repeat(3), v_idx[nt]] = nt1.flatten()
-        self.add_derivatives(c_idx[nt_nt].repeat(3), v_idx[nt], nt1.flatten())
-
-        # Set r
-        # r[c_idx[nt_nt]] = np.sum(nt1*nt1, axis=1) - 1
-        self.set_r(c_idx[nt_nt], np.sum(nt1*nt1, axis=1) - 1)
-
    
         if torsal == 1:
             self.t1norms = np.linalg.norm(t, axis=1)
@@ -425,7 +414,6 @@ class Torsal(Constraint):
             cf = bf + df ncf
             => d df (nt.ec) = 2/3 [nt.( (ei.ncf)* ei + (ej.ncf)*ej   + (ek.ncf)*ek )]/||enor||**2
         """
-        
         # Get directions per vertex
         ei = e[F[:,0]]
         ej = e[F[:,1]]

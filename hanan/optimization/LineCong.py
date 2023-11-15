@@ -56,8 +56,7 @@ class LineCong(Constraint):
 
         e = e.reshape(-1, 3)
 
-        self.const_idx = {"E":[],
-                          "e.e" : np.arange(self.num_edge_const, self.num_edge_const + len(e) )
+        self.const_idx = {"E":[]
                           }
 
         self.dual_faces = dual_faces
@@ -168,10 +167,4 @@ class LineCong(Constraint):
             # Define residual
             self.set_r(self.const_idx["E"][idx_f], np.sum(cicj*ei[f], axis=1) )
             #self.r[self.const_idx["E"][idx_f]] = np.sum(cicj*ei[f], axis=1)
-
-        # Compute Jacobian for || e_f . e_f - 1||^2
-        self.add_derivatives(self.const_idx["e.e"].repeat(3), e_idx, ei.flatten() )
-
-        # Update residual  
-        self.set_r(self.const_idx["e.e"], np.sum ( ei*ei,  axis=1) - 1)
 

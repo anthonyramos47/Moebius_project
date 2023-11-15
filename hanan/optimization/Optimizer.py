@@ -2,6 +2,7 @@
 import numpy as np
 import time as tm
 import pandas as pd
+from hanan.optimization.Unit import Unit
 from scipy.sparse import csc_matrix,diags, vstack
 from scipy.sparse.linalg import splu, spsolve
 
@@ -33,6 +34,22 @@ class Optimizer():
         self.step = None # Step size
         self.method = None # Method used to solve the problem
         self.energy = [] # Energy vector
+        self.var_idx = None # Variable indices
+
+    def unitize_variable(self, var_name, dim) -> None:
+        """
+            Method to add a unit constraint to the optimizer. The unit constraint is a constraint that forces the variable to be unit.
+            Input:
+                var_name: Name of the variable
+                var_indices: Indices of the variable
+                dim: Dimension of the variable
+        """
+        # Initialize constraint
+        unit = Unit()
+        unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
+
+        # Add constraint
+        self.get_gradients(unit)
 
     def fix_vertices(self, fix_vertices) -> None:
         """
@@ -49,12 +66,13 @@ class Optimizer():
 
 
 
-    def initialize_optimizer(self, X, method= "LM", step = 0.8) -> None:
+    def initialize_optimizer(self, X, var_dic, method= "LM", step = 0.8) -> None:
         """
         Initialize the optimizer( variables, step size)
         """
         # Initialize variables
         self.X = X
+        self.var_idx = var_dic
         self.X0 = X.copy()
         self.it = 0
         self.step = step
