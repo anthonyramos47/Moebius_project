@@ -92,6 +92,8 @@ class Visualizer():
         # # Show main plotter
         self.plotter.show(interactive=True, axes=1 )
     
+
+
     def display_weights(self) -> None:
         """ 
         Function that displays the weights in plot window
@@ -132,8 +134,13 @@ class Visualizer():
             for name, constraint in self.constraints.items():                
                 self.optimizer.get_gradients(constraint)
             
+
+            self.optimizer.unitize_variable("nt1",3)
+            self.optimizer.unitize_variable("nt2",3)
+            self.optimizer.unitize_variable("e",3)
             # Optimize step
             self.optimizer.optimize()
+
 
             # Update the scene
             self.update_scene(self.optimizer.X)
@@ -249,7 +256,8 @@ class Visualizer():
         self.plotter.clear()
         for i, mesh in enumerate(self.meshes):
             actor = vd.Mesh([mesh[0], mesh[1]])
-            actor.lc("k").lw(0.1).c("r").alpha(0.5)
+            actor.lc("k").lw(0.2).c("r").alpha(0.6)
+            actor.lighting("default", ambient=0.8, diffuse=0.4, specular=0.3, specular_power=20, specular_color="white")
             self.add_to_scene("mesh_"+str(i), actor)
         
         self.plotter.render()

@@ -90,8 +90,11 @@ class Vis_Approx(Visualizer):
 
         # Draw spheres per each face
         spheres = []
+
         for c, r in zip(cf, r):
-            spheres.append(vd.Sphere(c, r, c="b", alpha=1))
+            sphere = vd.Sphere(c, r, c="b", alpha=0.9)
+            spheres.append(sphere)
+
 
         # Cut spheres with planes at each edge
         for e in range(len(inner_edges)):
@@ -117,10 +120,29 @@ class Vis_Approx(Visualizer):
             s1.cut_with_plane(x0, -sig1*n)
             s2.cut_with_plane(x0, -sig2*n)
 
+            # Choose one envelope
+            s1.cut_with_plane(x0, b1-x0)
+            s2.cut_with_plane(x0, b2-x0)
+
         #Draw spheres
+        s0 = vd.Mesh()
         for i, s_id in enumerate(inner_faces):
-            s = spheres[s_id]
-            self.add_to_scene("spheres_"+str(i), s)
+            
+            s0 = vd.merge(s0, spheres[s_id])
+        
+        s0 = s0.fill_holes()
+        s0.c("b").alpha(0.9).render_lines_as_tubes()
+        s0.lighting('glossy', ambient=0.2, diffuse=0.5, specular=0.9, specular_power=40, specular_color='white')
+        s0.phong()
+
+        self.add_to_scene("Spherical panels", s0)
+
+        self.plotter.add(vd.Light([0,0,1], c='w', intensity=0.9))
+        self.plotter.add(vd.Light([1,0,0], c='w', intensity=0.9))
+        self.plotter.add(vd.Light([0,1,0], c='w', intensity=0.9))
+        self.plotter.add(vd.Light([0,0,-1], c='w', intensity=0.9))
+        self.plotter.add(vd.Light([-1,0,0], c='w', intensity=0.9))
+        self.plotter.add(vd.Light([0,-1,0], c='w', intensity=0.9))
 
 
     
@@ -229,7 +251,7 @@ class Vis_Approx(Visualizer):
 
         # init optimizer
         optimizer = Optimizer()
-        optimizer.initialize_optimizer(X, "LM", 0.6)
+        optimizer.initialize_optimizer(X, var_idx, "LM", 0.6)
 
         self.optimizer = optimizer
 
