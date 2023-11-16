@@ -159,7 +159,7 @@ class Visualizer():
             # Display the values in plotter
             self.display_weights()    
             
-            self.opt_menu.quit()
+            #self.opt_menu.quit()
             self.opt_menu.destroy()
 
             # Run optimization

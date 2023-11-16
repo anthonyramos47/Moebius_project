@@ -5,6 +5,7 @@ import sys
 path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(path)
 print(path)
+
 import vedo as vd 
 import tkinter as tk
 from tkinter import Entry, Label, Button, filedialog, Toplevel
