@@ -120,8 +120,9 @@ class LineCong(Constraint):
         for idx_f in range(len(inner_vertices)):
 
             f = inner_vertices[idx_f]
+
             # Get face
-            face = self.dual_faces[f]
+            face     = self.dual_faces[f]
             faceroll = np.roll(face, -1, axis=0) 
 
             # Get normals
@@ -137,34 +138,40 @@ class LineCong(Constraint):
 
             norms = self.norms[idx_f]
 
-            self.norms[idx_f] = np.linalg.norm(cicj, axis=1)[:, None] 
-
+                 
             # Define Jacobian
-            cicj /= np.array(norms)
+            cicjnor = cicj/np.array(norms)
 
             # d ei
             #J[i:i + len(face), 3*f: 3*f + 3 ] = cicj
 
             row_indices = self.const_idx["E"][idx_f].repeat(3)
             col_indices = e_idx[np.tile(np.arange(3*f, 3*f + 3), len(face))]
+
+            
             
             # print(f" f : {f} \t 3*f : {3*f}")
             # print("row indices:",row_indices)
             # print(f"col indices: {col_indices}")
             # print("\n\n")
-            self.add_derivatives(row_indices, col_indices, cicj.flatten() )
+            self.add_derivatives(row_indices, col_indices, cicjnor.flatten() )
 
             # Indices for I and J derivative
             dfi = self.var_idx["df"][face]
             dfj = self.var_idx["df"][faceroll]
+            
             # d dfi || e_f (cj - ci)/|| cj - ci||  ||^2 =>  - ef.ni
             #J[range(i,i + len(face)), ii] = -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten()
             self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
+            
             #d dfj
             #J[range(i,i + len(face)), jj] = np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten()
             self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
 
             # Define residual
-            self.set_r(self.const_idx["E"][idx_f], np.sum(cicj*ei[f], axis=1) )
+            self.set_r(self.const_idx["E"][idx_f], np.sum(cicjnor*ei[f], axis=1) )
             #self.r[self.const_idx["E"][idx_f]] = np.sum(cicj*ei[f], axis=1)
+
+
+            self.norms[idx_f] = np.linalg.norm(cicj, axis=1)[:, None] 
 

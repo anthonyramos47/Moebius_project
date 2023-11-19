@@ -19,11 +19,12 @@ import scipy
 
 # -----------------------------------------------------------------------------
 
+from pathlib import Path
 import sys
-
-import geopt
-
+path_root = Path(__file__).parents[2]
+sys.path.append(str(path_root))
 import geolab as geo
+import geopt
 
 # -----------------------------------------------------------------------------
 
@@ -73,6 +74,7 @@ if __name__ == '__main__':
         open_name = '{}_final.obj'.format(name)
 
     if save:
+
         geo.save_mesh_obj(V0[c], Hq, '{}_final'.format(name), overwrite=True)
 
 
