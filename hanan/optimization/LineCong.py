@@ -20,8 +20,8 @@ class LineCong(Constraint):
         # X : Variables
         # var_indices: Dictionary with the indices of the variables
         # ei_dim: Number of edges per face
-        # bt: Barycenters
-        # nbt: Normals at barycenters
+        # bt: Circumcenters of the faces
+        # nbt: Normals at the circumcenters
         # num_faces: Number of faces
         # dual_faces: List of dual faces
         # inner_vertices: List of inner vertices
@@ -49,7 +49,7 @@ class LineCong(Constraint):
         self.num_edge_const = edge_num
 
         
-        self.const = self.num_edge_const + num_faces
+        self.const = self.num_edge_const
         self.var = len(X)
 
         e, df = self.uncurry_X(X, "e", "df")
@@ -66,11 +66,12 @@ class LineCong(Constraint):
         # Loop over faces
         for idx_f in range(len(inner_vertices)):
             
-            # Face 
+            # Face index in dual
             f = inner_vertices[idx_f]
 
-            # Get face
+            # Get dual face
             face = dual_faces[f]
+            # Get rolled indices
             faceroll = np.roll(face, -1, axis=0)
 
             # Get vertices
@@ -137,22 +138,19 @@ class LineCong(Constraint):
             cicj = (self.bij[idx_f] + (lbj[:, None]*nj - lbi[:, None]*ni) )
 
             norms = self.norms[idx_f]
-
                  
             # Define Jacobian
             cicjnor = cicj/np.array(norms)
 
             # d ei
             #J[i:i + len(face), 3*f: 3*f + 3 ] = cicj
-
             row_indices = self.const_idx["E"][idx_f].repeat(3)
             col_indices = e_idx[np.tile(np.arange(3*f, 3*f + 3), len(face))]
 
-            
-            
             # print(f" f : {f} \t 3*f : {3*f}")
             # print("row indices:",row_indices)
             # print(f"col indices: {col_indices}")
+            # print("cicjnor:", cicjnor)
             # print("\n\n")
             self.add_derivatives(row_indices, col_indices, cicjnor.flatten() )
 
@@ -162,11 +160,11 @@ class LineCong(Constraint):
             
             # d dfi || e_f (cj - ci)/|| cj - ci||  ||^2 =>  - ef.ni
             #J[range(i,i + len(face)), ii] = -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten()
-            self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
+            #self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
             
             #d dfj
             #J[range(i,i + len(face)), jj] = np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten()
-            self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
+            #self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
 
             # Define residual
             self.set_r(self.const_idx["E"][idx_f], np.sum(cicjnor*ei[f], axis=1) )
