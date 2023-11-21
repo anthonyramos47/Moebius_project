@@ -99,19 +99,6 @@ class Torsal(Constraint):
 
         self.ecnorms = np.linalg.norm(ec, axis=1)
 
-        # Compute initial directions of normals of torsal plane
-        nt1 = np.cross(ec, self.fvij[:,0])
-        nt1 /= np.linalg.norm(nt1, axis=1)[:, None]
-
-        nt2 = np.cross(ec, self.fvij[:,0])
-        nt2 /= np.linalg.norm(nt2, axis=1)[:, None]
-
-        vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, F)
-        
-        # Set initial directions of normals of torsal plane
-        X[self.var_idx["nt1"]] = nt1.flatten()
-        X[self.var_idx["nt2"]] = nt2.flatten()
-
         # Set initial a1 
         X[self.var_idx["a1"]] = np.linalg.norm(vj-vi, axis=1)
         X[self.var_idx["b1"]] = np.linalg.norm(vk-vi, axis=1)
@@ -130,6 +117,9 @@ class Torsal(Constraint):
         X[self.var_idx["a2"]] /= np.linalg.norm(t2, axis=1)
         X[self.var_idx["b2"]] /= np.linalg.norm(t2, axis=1)
 
+    
+        vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, F)
+        
 
         tt, _, _ = self.compute_tt(X[self.var_idx["a1"]], X[self.var_idx["b1"]], vvi, vvj, vvk)
 
@@ -138,6 +128,18 @@ class Torsal(Constraint):
         tt, _, _ = self.compute_tt(X[self.var_idx["a2"]], X[self.var_idx["b2"]], vvi, vvj, vvk)
 
         self.ttnorms2 = np.linalg.norm(tt, axis=1)
+
+        # Compute initial directions of normals of torsal plane
+        nt1 = np.cross(ec, t1)
+        nt1 /= np.linalg.norm(nt1, axis=1)[:, None]
+
+        nt2 = np.cross(ec, nt1)
+        nt2 /= np.linalg.norm(nt2, axis=1)[:, None]
+        
+        # Set initial directions of normals of torsal plane
+        X[self.var_idx["nt1"]] = nt1.flatten()
+        X[self.var_idx["nt2"]] = nt2.flatten()
+
 
 
 

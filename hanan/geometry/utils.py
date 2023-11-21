@@ -1,16 +1,55 @@
 import numpy as np
+import polyscope as ps
 
 def unit(v):
     """normalize a list of vectors v
     """
+    if len(v.shape) == 1:
+        unit_v = v/np.linalg.norm(v)
+    else:
+        unit_v = v/np.linalg.norm(v, axis=1)[:, None]
+    return unit_v
 
-    return v/np.linalg.norm(v, axis=1)[:, None]
+def proj(v, u):
+    """
+        Project v on u
+    """
+    
+    v = np.array(v)
+    u = np.array(u)
 
+    vu = vec_dot(v, u)
+    vv = vec_dot(u, u)
+
+    if len(v.shape) == 1 and len(u.shape) == 1:
+        proj = vu/vv*u
+    else:
+        proj = vu/vv[:, None]*u
+    return proj
+
+def barycenters(v, f):
+     
+    bary = np.zeros((len(f), 3))
+    for i, face in enumerate(f):
+        b = v[face]
+        b = np.sum(b, axis=0)/len(face)
+        bary[i] = b
+
+    return bary
+
+
+def orth_proj(v, u):
+    return v - proj(v, u)
 
 def vec_dot(v1, v2):
     """dot product between two lists of vectors v1, v2
     """
-    return np.sum(v1*v2, axis=1)
+    if len(v1.shape) == 1 and len(v2.shape) == 1:
+        dot =  v1@v2
+    else: 
+        dot = np.sum(v1*v2, axis=1) 
+
+    return dot
 
 def circle_3pts(p1, p2, p3):
     """
@@ -215,3 +254,32 @@ def torsal_dir_vec(tv, tf, e_i):
     # print(f"f : 214 \n  disc : {disc[214]} \n ei : {ei[214]} \n ej : {ej[214]} \n ek : {ek[214]} \n eij : {eij[214]} \n eik : {eik[214]} \n vij : {vij[214]} \n vik : {vik[214]} \n g0 : {g0[214]} \n g1 : {g1[214]} \n g2 : {g2[214]} \n t1 : {t1[214]} \n t2 : {t2[214]} \n vijXec : {vijXec[214]} \n vikXec : {vikXec[214]} \n ec : {ec[214]} \n barycenters : {barycenters[214]} \n cos_tors : {cos_tors[214]}")
 
     return  barycenters, t1, t2, cos_tors
+
+
+# ====================== Polyscope Functions =================
+
+def draw_polygon(vertices, name="_"):
+    """
+        Register a polygon as a surface
+    """
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]])
+    
+def draw_plane(p0, n, size=(1,1), name="_"):
+    """
+        Register a plane as a surface
+    """
+    aux = n + np.array([1,0,0])
+
+    v1 = unit(orth_proj(aux, n))
+
+    print(v1@aux)
+    v2 = unit(np.cross(n, v1))
+
+    v1 *= size[0]
+    v2 *= size[1]
+
+    vertices = np.array([p0 + v1 + v2, p0 + v1 - v2, p0 - v1 - v2, p0 - v1 + v2])
+
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.2)
+
+

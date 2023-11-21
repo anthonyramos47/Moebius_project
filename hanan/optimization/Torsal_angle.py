@@ -1,13 +1,13 @@
 # Planarity constraint implementation
 import numpy as np
+from hanan.geometry.utils import vec_dot
 from hanan.optimization.constraint import Constraint
 
 class Torsal_angle(Constraint):
 
     def __init__(self) -> None:
         """ Torsal directions constraint energy
-        E = \sum{f \in F} || n_t1 . e_c ||^2 + || n_t1 . t1 ||^2 + || n_f1 . tt1 ||^2 + || n_t1 . n_t1 - 1 ||^2
-            +             || n_t2 . e_c ||^2 + || n_t2 . t2 ||^2 + || n_f2 . tt2 ||^2 + || n_t2 . n_t2 - 1 ||^2
+        E = \sum{f \in F} ||nt1.nt2 - cos(60) + mu^2||^2  + || nt1.nt2 - nu^2 ||^2 
         where, 
             n_t .- normal of torsal plane.
             t   .- torsal direction in the face of triangular mesh T.
@@ -52,6 +52,15 @@ class Torsal_angle(Constraint):
         # Number of variables
         self.var = len(X)
 
+        # nt1 = X[var_indices["nt1"]].reshape(-1, 3)
+        # nt2 = X[var_indices["nt2"]].reshape(-1, 3)
+
+        # nt1 /= np.linalg.norm(nt1, axis=1)[: , None]
+        # nt2 /= np.linalg.norm(nt2, axis=1)[: , None]
+
+        # # Compute the initial residual
+        # X[var_indices["c0"]] = vec_dot(nt1, nt2)
+
        
 
     def compute(self, X) -> None:
@@ -67,34 +76,30 @@ class Torsal_angle(Constraint):
         c_idx = self.const_idx
 
         # Get variables of interest
-        nt1, nt2, c0, u = self.uncurry_X(X, "nt1", "nt2", "c0", "u")
+        nt1, nt2, v, u = self.uncurry_X(X, "nt1", "nt2", "v", "u")
 
         # Unflatten nt1, nt2
         nt1uf = nt1.reshape(-1, 3)
         nt2uf = nt2.reshape(-1, 3)
 
-        # dc0( E1)  =  dc0 ( c0^2 - 0.7 + u^2 ) = 2 c0
-        #           J[c_idx["E1"], v_idx["c0"]] = 2*c0
-        self.add_derivatives(c_idx["E1"], v_idx["c0"], 2*c0)
+        # d nt1 (E1) = d nt1(nt1.nt2 - cos(60) + mu^2) = nt2
+        self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt1"], nt2)
 
-        # du( E1)   =  du ( c0^2 - 0.7 + u^2 ) = 2 u
-        #           J[c_idx["E1"], v_idx["u"]] = 2*u
+        # d nt2 (E1) = d nt2(nt1.nt2 - cos(60) + mu^2) = nt1
+        self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt2"], nt1)
+
+        # d u (E1) = d nt2(nt1.nt2 - cos(60) + u^2) = 2u
         self.add_derivatives(c_idx["E1"], v_idx["u"], 2*u)
 
-        # dc0( E2)  =  dc0 ( c0 - nt1.nt2 ) = 1
-        #           J[c_idx["E2"], v_idx["c0"]] = 1
-        self.add_derivatives(c_idx["E2"], v_idx["c0"], np.ones(len(c_idx["E2"])))
+        self.set_r(c_idx["E1"], vec_dot(nt1uf, nt2uf) - np.cos(60*np.pi/180) + u**2 )
 
-        # dnt1( E2) =  dnt1 ( c0 - nt1.nt2 ) = -nt2
-        #           J[c_idx["E2"].repeat(3), v_idx["nt1"]] = -nt2.flatten()
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], -nt2)
+        # d nt1 (E2) = d nt1(nt1.nt2 - v^2) = nt2
+        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], nt2)
 
-        # dnt2( E2) =  dnt2 ( c0 - nt1.nt2 ) = -nt1
-        #           J[c_idx["E2"].repeat(3), v_idx["nt2"]] = -nt1.flatten()
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], -nt1)
-        
-        # r of E1 
-        self.set_r(c_idx["E1"], c0**2 - np.cos(60*np.pi/180)**2 + u**2)
+        # d nt2 (E2) = d nt2(nt1.nt2 - v^2) = nt1
+        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], nt1)
 
-        # r of E2
-        self.set_r(c_idx["E2"], c0 - np.sum(nt1uf*nt2uf, axis=1))
+        # d v (E2) = d v(nt1.nt2 - v^2) = 2v
+        self.add_derivatives(c_idx["E1"], v_idx["u"], 2*v)
+
+        self.set_r(c_idx["E2"], vec_dot(nt1uf, nt2uf) - v**2 )
