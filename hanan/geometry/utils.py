@@ -283,3 +283,43 @@ def draw_plane(p0, n, size=(1,1), name="_"):
     ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.2)
 
 
+def read_obj(filename):
+    """
+        Read obj file and return vertices and faces
+    """
+    file_name = str(filename)
+    obj_file = open(file_name, encoding='utf-8')
+    vertices_list = []
+    faces_list = []
+    for l in obj_file:
+        splited_line = l.split(' ')
+        if splited_line[0] == 'v':
+            split_x = splited_line[1].split('\n')
+            x = float(split_x[0])
+            split_y = splited_line[2].split('\n')
+            y = float(split_y[0])
+            split_z = splited_line[3].split('\n')
+            try:
+                z = float(split_z[0])
+            except ValueError:
+                print('WARNING: disable line wrap when saving .obj')
+            vertices_list.append([x, y ,z])
+        elif splited_line[0] == 'f':
+            v_list = []
+            L = len(splited_line)
+            try:
+                for i in range(1, L):
+                    splited_face_data = splited_line[i].split('/')
+                    v_list.append(int(splited_face_data[0]) - 1 )
+                faces_list.append(v_list)
+            except ValueError:
+                v_list = []
+                for i in range(1, L-1):
+                    v_list.append(int(splited_line[i]) - 1 )
+                faces_list.append(v_list)
+    try:
+        faces_list = np.array(faces_list)
+    except:
+        pass 
+    
+    return np.array(vertices_list), faces_list
