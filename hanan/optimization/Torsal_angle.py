@@ -43,23 +43,14 @@ class Torsal_angle(Constraint):
         # Define indices indices
         self.var_idx = var_indices
 
-        # E1 = || c0^2 - 0.7 + u^2 ||^2
-        # E2 = || c0 - nt1.nt2 ||^2
+        # E1 = || nt1.nt2  - cos(60) + u^2 ||^2  <=> nt1.nt2 <= 60
+        # E2 = || nt1.nt2  - v^2           ||^2  <=> nt1.nt2 >= 0
         self.const_idx = {  "E1"  : np.arange( 0                  , self.nF),
                             "E2"  : np.arange( self.nF            , 2*self.nF),
                     }
         
         # Number of variables
         self.var = len(X)
-
-        # nt1 = X[var_indices["nt1"]].reshape(-1, 3)
-        # nt2 = X[var_indices["nt2"]].reshape(-1, 3)
-
-        # nt1 /= np.linalg.norm(nt1, axis=1)[: , None]
-        # nt2 /= np.linalg.norm(nt2, axis=1)[: , None]
-
-        # # Compute the initial residual
-        # X[var_indices["c0"]] = vec_dot(nt1, nt2)
 
        
 
@@ -93,6 +84,7 @@ class Torsal_angle(Constraint):
 
         self.set_r(c_idx["E1"], vec_dot(nt1uf, nt2uf) - np.cos(60*np.pi/180) + u**2 )
 
+
         # d nt1 (E2) = d nt1(nt1.nt2 - v^2) = nt2
         self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], nt2)
 
@@ -100,6 +92,6 @@ class Torsal_angle(Constraint):
         self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], nt1)
 
         # d v (E2) = d v(nt1.nt2 - v^2) = 2v
-        self.add_derivatives(c_idx["E1"], v_idx["u"], 2*v)
+        self.add_derivatives(c_idx["E2"], v_idx["v"], 2*v)
 
         self.set_r(c_idx["E2"], vec_dot(nt1uf, nt2uf) - v**2 )

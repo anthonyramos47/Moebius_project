@@ -323,3 +323,282 @@ def read_obj(filename):
         pass 
     
     return np.array(vertices_list), faces_list
+
+
+def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
+    mesh.add_vector_quantity(name+"_vec1" ,    vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
+    #mesh.add_vector_quantity(name+"_-vec1",   -vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
+    mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
+    #mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
+
+def solve_torsal(vi, vj, vk, ei, ej, ek) :
+
+    # Get edges
+    vij = vj - vi 
+    vik = vk - vi
+
+    eij = ej - ei 
+    eik = ek - ei
+    
+
+    ec = (ei + ej + ek)/3
+
+    vijxec = np.cross(vij, ec)
+    vikxec = np.cross(vik, ec)
+
+    # g0 
+    g0 = np.sum(eij*vijxec, axis=1)
+
+    # g1
+    g1 = np.sum(eij*vikxec, axis=1) + np.sum(eik*vijxec, axis=1)
+
+    # g2
+    g2 = np.sum(eik*vikxec, axis=1)
+
+
+    disc = g1**2 - 4*g0*g2 
+
+    t1 = np.zeros_like(vij)
+    t2 = np.zeros_like(vij)
+
+    a1 = np.zeros(len(vij))
+    a2 = np.zeros(len(vij))
+    b1 = np.zeros(len(vij))
+
+    # indices disc >0 
+    idx = np.where(disc > 0)[0]
+
+    a1[idx] = (-g1[idx] + np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))
+    a2[idx] = (-g1[idx] - np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))
+    b1[idx] = 2*g0[idx]
+
+    # sol
+    t1[idx] = (-g1[idx] + np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))[:, None]*vij[idx] + 2*g0[idx,None]*vik[idx]
+    t2[idx] = (-g1[idx] - np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))[:, None]*vij[idx] + 2*g0[idx,None]*vik[idx]
+
+    # Normalize
+    t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
+    t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
+
+    return t1, t2, a1, a2, b1 
+
+def vv_second(vvi, vvj, vvk, f, numV):
+
+    vv = np.zeros((numV, 3))
+
+    for i in range(len(f)):
+        vv[f[i,0]] = vvi[i]
+        vv[f[i,1]] = vvj[i]
+        vv[f[i,2]] = vvk[i]
+
+    return vv
+
+
+def init_test_data(data):
+    # # Define paths
+    dir_path = os.getcwd()
+    data_path = dir_path+"/approximation/data/" # data path
+
+    # Data of interest
+    k = data
+
+    # Load M mesh (centers of sphere mesh)
+    mv, mf = igl.read_triangle_mesh( os.path.join(data_path ,"centers.obj") ) 
+
+    # Load test mesh
+    tv, tf = igl.read_triangle_mesh(os.path.join(data_path,  "test_remeshed_"+str(k)+".obj"))
+
+    # Create dual mesh
+    tmesh = Mesh()
+    tmesh.make_mesh(tv,tf)
+
+    # Get inner vertices
+    inner_vertices = tmesh.inner_vertices()
+
+    # Get vertex normals for test mesh
+    e_i = igl.per_vertex_normals(tv, tf)
+
+    # Fix normal directions
+    signs = np.sign(np.sum(e_i * ([0,0,1]), axis=1))
+    e_i = e_i * signs[:, None]
+
+    # Compute circumcenters and axis vectors for each triangle
+    p1, p2, p3 = tv[tf[:, 0]], tv[tf[:, 1]], tv[tf[:, 2]]
+
+    ct, _, nt = circle_3pts(p1, p2, p3)
+
+    # Dual topology 
+    dual_tf = tmesh.vertex_ring_faces_list()
+
+    dual_top = tmesh.dual_top()
+
+    # Create hexagonal mesh                            
+    h_pts = np.empty((len(tf), 3), dtype=np.float64)
+    
+    li = np.zeros(len(tf), dtype=np.float64)
+    
+    center = vd.Mesh((mv, mf), alpha = 0.9, c=[0.4, 0.4, 0.81])
+
+    # Intersect circumcircle axis with center mesh
+    for i in range(len(tf)):
+        # Get points on circumcircle axis
+        p0  = ct[i] - 10*nt[i]
+        p1  = ct[i] + 10*nt[i]
+
+        # Get intersection points
+        h_pts[i,:] = np.array(center.intersect_with_line(p0, p1)[0])
+
+        # Set li 
+        li[i] = np.linalg.norm(h_pts[i] - ct[i])
+
+    # Get radius of spheres
+    r = np.linalg.norm(h_pts - tv[tf[:,0]], axis=1)
+
+    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, dual_top, r 
+
+
+def visualize_data(data):
+        # # Define paths
+    dir_path = os.getcwd()
+    data_path = dir_path+"/approximation/data/" # data path
+
+    # Data of interest
+    k = data
+
+    # Load M mesh (centers of sphere mesh)
+    mv, mf = igl.read_triangle_mesh( os.path.join(data_path ,"centers.obj") ) 
+
+    # Load test mesh
+    tv, tf = igl.read_triangle_mesh(os.path.join(data_path,  "test_remeshed_"+str(k)+".obj"))
+
+    # Create dual mesh
+    tmesh = Mesh()
+    tmesh.make_mesh(tv,tf)
+
+    # Get inner vertices
+    inner_vertices = tmesh.inner_vertices()
+
+    # Get vertex normals for test mesh
+    e_i = igl.per_vertex_normals(tv, tf)
+
+    # Fix normal directions
+    signs = np.sign(np.sum(e_i * ([0,0,1]), axis=1))
+    e_i = e_i * signs[:, None]
+
+    # Compute circumcenters and axis vectors for each triangle
+    p1, p2, p3 = tv[tf[:, 0]], tv[tf[:, 1]], tv[tf[:, 2]]
+
+    ct, _, nt = circle_3pts(p1, p2, p3)
+
+    # Dual topology 
+    dual_tf = tmesh.vertex_ring_faces_list()
+
+    # Create hexagonal mesh                            
+    h_pts = np.empty((len(tf), 3), dtype=np.float64)
+    center = vd.Mesh((mv, mf), alpha = 0.9, c=[0.4, 0.4, 0.81])
+
+    ps.init()
+
+    ps.remove_all_structures()
+
+    v_mesh = ps.register_surface_mesh("test", tv, tf)
+
+    c_mesh = ps.register_surface_mesh("centers", mv, mf)
+
+    v_mesh.add_vector_quantity("n_t", nt, defined_on = "faces", enabled=True, length=1.5, color=(0.1, 0.1, 0.1))
+    v_mesh.add_vector_quantity("e", e_i, defined_on = "vertices", enabled=True, length=1.5, color=(0.1, 0.1, 0.1))
+
+    ps.show()
+
+
+def compute_disc(tv, tf, e_i):
+
+    # # Compute the edge vectors per each face
+    vi, vj, vk = tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]]
+
+    # # Compute the edge vectors per each face
+    vij = vj - vi
+    vik = vk - vi
+
+    # Set up X 
+    eij = e_i[tf[:,1]] - e_i[tf[:,0]]
+    eik = e_i[tf[:,2]] - e_i[tf[:,0]]
+
+    ec = np.sum( e_i[tf], axis = 1) / 3
+
+    # A = [vij, eik, ec] + [eij, vik, ec], where [ , , ] denotes determinant
+    # A = gamma11 +  gamma12
+    eikXec = np.cross(eik, ec)
+    vikXec = np.cross(vik, ec)
+
+    det1 = np.sum(vij*eikXec, axis=1)
+    det2 = np.sum(eij*vikXec, axis=1)
+
+    # b = [eij, eik, ec]  c = [vij, vik, ec]
+
+    gamma0 = np.sum(eij*eikXec, axis=1)
+    gamma2 = np.sum(vij*vikXec, axis=1)
+
+    A = det1 + det2 
+
+    return A, A**2 - 4*gamma0*gamma2
+
+def unormalize_dir(h_pts, dual, inner_vertices, tv, e_i, rad):
+    """Input 
+        h_pts: sphere centers
+        e_i: edge directions normalized
+        rad: sphere radii
+        Ouput:
+        le: unormalized edge directions
+
+    """
+    le = np.ones_like(e_i)
+    for i in range(len(inner_vertices)):
+        # Get dual faces index
+        idx = inner_vertices[i]
+
+        # Get dual face
+        f = dual[idx]
+
+        # Get sphere centers
+        p = h_pts[f]
+
+        # Get edge direction/'
+        e = e_i[idx]
+
+        # Get radius
+        r = rad[idx]
+
+        # angle e_i with the direction to the center
+        theta = np.arccos(np.sum(e*(p - tv[idx]), axis=1))
+
+        print(theta)
+
+        # Get the lambda
+        le[idx] = 2*r*np.cos(theta)
+
+    return le
+
+def planarity_check(t1, tt1, ec):
+
+    t1_tt1 = np.cross(t1, tt1)
+    ec /= np.linalg.norm(ec, axis=1)[:, None]
+    # Check planarity
+    planar = np.sum(t1_tt1*ec, axis=1)
+
+    return planar
+
+def compute_torsal_angles(t1, t2, ec):
+
+    # Compute nt1 
+    nt1 = np.cross(t1, ec)
+    nt1 /= np.linalg.norm(nt1, axis=1)[:, None]
+
+    # Compute nt2
+    nt2 = np.cross(t2, ec)
+    nt2 /= np.linalg.norm(nt2, axis=1)[:, None]
+
+    # Compute torsal angles
+    torsal_angles = np.arccos(np.sum(nt1*nt2, axis=1))
+
+    return torsal_angles, nt1, nt2
