@@ -29,12 +29,12 @@ math_path = dir_path+"/approximation/mathematica/" # mathematica path
 
 
 # Iterations
-It = 150 
+It = 300
 Data = 1
 
 Weights = {"linecong": 1, 
-           "torsal": 1, 
-           "torsal_angle": 0, 
+           "torsal": 0.01, 
+           "torsal_angle": 15, 
            "sphere_angle": 0}
 
 
@@ -136,8 +136,8 @@ def run_optimization(it, data):
 
     X[var_idx["e"]] = e_i.flatten() 
     X[var_idx["df"]] = df
-    X[var_idx["u"]] = 0.2
-    X[var_idx["v"]] = 0.2
+    X[var_idx["u"]] = 0.00001
+    X[var_idx["v"]] = 0.001
 
 
     # Init LineCong
@@ -162,7 +162,7 @@ def run_optimization(it, data):
 
     # Init optimizer
     optimizer = Optimizer()
-    optimizer.initialize_optimizer(X, var_idx, "LM", 0.25)
+    optimizer.initialize_optimizer(X, var_idx, "LM", 0.5)
 
     
     for _ in range(it):
@@ -216,6 +216,28 @@ def fix_boundary_cross_field(v, f, t1, t2):
         # print("boundary face: ",bf)   
         # print(t1[bf])
         # print(t2[bf])
+
+def cross_field_error(t1, t2, t1a, t2a):
+    """ Function to measure the cross field error between two cross fields
+    """
+
+    t1 = unit(t1)
+    t2 = unit(t2)
+    t1a = unit(t1a)
+    t2a = unit(t2a)
+
+    error = np.zeros(len(t1))
+    for i in range(len(t1)):
+        # check nan values 
+     
+        if abs(t1[i]@t1a[i]) > abs(t1[i]@t2a[i]):
+            error[i] = 1 - (abs(t1[i]@t1a[i]) + abs(t2[i]@t2a[i]))/2 
+        else:
+            error[i] = 1 - (abs(t1[i]@t2a[i]) + abs(t2[i]@t1a[i]))/2
+    
+    return error
+
+
    
 def visualization(constraint, optimizer, tv, tf):
 
@@ -256,11 +278,14 @@ def visualization(constraint, optimizer, tv, tf):
     # Compute torsal directions
     t1 = constraint.compute_t(a1, b1)
     t2 = constraint.compute_t(a2, b2)
+    
+    t1 = unit(t1)
+    t2 = unit(t2)
 
     print("norms t1: ", np.sum( np.linalg.norm(t1, axis=1))/ len(t1))
     print("norms t2: ", np.sum( np.linalg.norm(t2, axis=1))/ len(t2))
 
-    fix_boundary_cross_field(tv, tf, t1, t2)
+    #fix_boundary_cross_field(tv, tf, t1, t2)
 
     # Compute torsal directions on second envelope
     tt1, _, _ = constraint.compute_tt(a1, b1, vvi, vvj, vvk)
@@ -288,24 +313,31 @@ def visualization(constraint, optimizer, tv, tf):
     ec2 = constraint.compute_ec(di, e, tf)
 
     # Compute planarity
-    planar = planarity_check(t2, tt2, ec2)
+    planar_t1 = planarity_check(t1, tt1, ec)
+    planar_t2 = planarity_check(t2, tt2, ec)
 
-    aplanar = planarity_check(at2, att2, ec2)
+    aplanar_t1 = planarity_check(at1, att1, ec)
+    aplanar_t2 = planarity_check(at2, att2, ec)
 
     #filter nan values
-    aplanar = aplanar[~np.isnan(aplanar)]
+    aplanar_t1 = aplanar_t1[~np.isnan(aplanar_t1)]
+    aplanar_t2 = aplanar_t2[~np.isnan(aplanar_t2)]
 
-    print("planarity",planar@planar)
-    print("analytic planarity", aplanar@aplanar)
+    print(f"planarity t1: {np.linalg.norm(planar_t1)} \t analytic t1: {np.linalg.norm(aplanar_t1)}")
+    print(f"planarity t2: {np.linalg.norm(planar_t2)} \t analytic t2: {np.linalg.norm(aplanar_t2)}")
 
-    un1 = nt1/np.linalg.norm(nt1, axis=1)[:, None]
-    un2 = nt2/np.linalg.norm(nt2, axis=1)[:, None]
-
+    # for i in range(len(t1)):
+    #     if abs(nt1[i]@nt2[i]) > 0.9:
+    #         print(f"i :{i} t1.nt1 : {nt1[i]@nt1[i]} \t t1.nt2 : {nt1[i]@nt2[i]}")
+    #         print(f"   nt1.nt2 : {nt1[i]@nt2[i]} \t v : {constraint.uncurry_X(optimizer.X,'v')[i]} \t E :{nt1[i]@nt2[i] - constraint.uncurry_X(optimizer.X,'v')[i]**2} \n")
+    #     # if abs(t1[i]@nt2[i]) < 0.2:
+    #     #     print(f"i :{i} t1.nt1 : {at1[i]@nt1[i]} \t t1.nt2 : {t1[i]@nt2[i]}")
+    
     # Angles between torsal directions
     #anglesnt = np.arccos(vec_dot(nt1,nt2))*180/np.pi
 
     #anglest = np.arccos(abs(vec_dot(t1,t2)))*180/np.pi
-    angles_error = np.arccos(abs(vec_dot(t1,at1)))*180/np.pi
+    cf_error = cross_field_error(t1, t2, at1, at2)
 
 
     # Visualization
@@ -320,7 +352,7 @@ def visualization(constraint, optimizer, tv, tf):
 
     triangle.add_vector_quantity("ec", ec2, defined_on='faces', enabled=True, radius=0.0001, length=1.0, color=(0.0, 0.0, 0.0))
 
-    #triangle.add_scalar_quantity("angles error", angles_error, defined_on='faces', enabled=True, cmap="viridis")
+    triangle.add_scalar_quantity("Cross Field error", cf_error, defined_on='faces', enabled=True, cmap="viridis")
 
     add_cross_field(triangle, "opt", t1, t2, 0.0002, 0.007, (0.0, 0.0, 0.0))
 

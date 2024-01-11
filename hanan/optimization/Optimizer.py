@@ -110,7 +110,8 @@ class Optimizer():
                 self.PG()
             else:
                 print("Error: Solver not implemented or not specified")
-            
+        else:
+            pass   
 
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares

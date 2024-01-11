@@ -70,7 +70,8 @@ class Torsal(Constraint):
                             "nt2.t2"  : np.arange( 4*self.nF          , 5*self.nF),
                             "nt2.tt2" : np.arange( 5*self.nF          , 6*self.nF),
                             "ut1"    : np.arange( 6*self.nF          , 7*self.nF),
-                            "ut2"    : np.arange( 7*self.nF          , 8*self.nF)                          
+                            "ut2"    : np.arange( 7*self.nF          , 8*self.nF),
+                            "t1.t2"  : np.arange( 8*self.nF          , 9*self.nF)
                         }
         
         # Number of variables
@@ -100,8 +101,8 @@ class Torsal(Constraint):
         self.ecnorms = np.linalg.norm(ec, axis=1)
 
         # Set initial a1 
-        X[self.var_idx["a1"]] = np.linalg.norm(vj-vi, axis=1)
-        X[self.var_idx["b1"]] = np.linalg.norm(vk-vi, axis=1)
+        X[self.var_idx["a1"]] = 1
+        X[self.var_idx["b1"]] = 1
 
         t1 = self.compute_t(X[self.var_idx["a1"]], X[self.var_idx["b1"]])
 
@@ -109,18 +110,19 @@ class Torsal(Constraint):
         X[self.var_idx["b1"]] /= np.linalg.norm(t1, axis=1)
 
         # Set initial b
-        X[self.var_idx["a2"]] = np.linalg.norm(vj-vi, axis=1)
-        X[self.var_idx["b2"]] = -np.linalg.norm(vk-vi, axis=1)
+        X[self.var_idx["a2"]] = ( - vec_dot(self.fvij[:,0],self.fvij[:,1]) -  vec_dot(self.fvij[:,1],self.fvij[:,1]) )/( vec_dot(self.fvij[:,0],self.fvij[:,0]) + vec_dot(self.fvij[:,0],self.fvij[:,1]))
+        X[self.var_idx["b2"]] = 1
 
         t2 = self.compute_t(X[self.var_idx["a2"]], X[self.var_idx["b2"]])
+
+        print(vec_dot(t1,t2)@vec_dot(t1,t2))
 
         X[self.var_idx["a2"]] /= np.linalg.norm(t2, axis=1)
         X[self.var_idx["b2"]] /= np.linalg.norm(t2, axis=1)
 
-    
+        # Get vertices of second envelope
         vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, F)
         
-
         tt, _, _ = self.compute_tt(X[self.var_idx["a1"]], X[self.var_idx["b1"]], vvi, vvj, vvk)
 
         self.ttnorms1 = np.linalg.norm(tt, axis=1)
@@ -133,7 +135,7 @@ class Torsal(Constraint):
         nt1 = np.cross(ec, t1)
         nt1 /= np.linalg.norm(nt1, axis=1)[:, None]
 
-        nt2 = np.cross(ec, nt1)
+        nt2 = np.cross(ec, t2)
         nt2 /= np.linalg.norm(nt2, axis=1)[:, None]
         
         # Set initial directions of normals of torsal plane
@@ -250,7 +252,7 @@ class Torsal(Constraint):
 
         # Set r
         # r[c_idx[nt_ec]] = np.sum(nt1*ec, axis=1)
-        self.set_r(c_idx[nt_ec], np.sum(nt1*ecnor, axis=1))
+        self.set_r(c_idx[nt_ec],  vec_dot(ecnor, nt1))
 
         
         # Fill J for || nt.t ||^2; t = a vij + b vik
@@ -269,7 +271,7 @@ class Torsal(Constraint):
 
         # Set r 
         #self.r[c_idx[nt_t]] = np.sum(tnor*nt1, axis=1)
-        self.set_r(c_idx[nt_t], np.sum(t*nt1, axis=1))
+        self.set_r(c_idx[nt_t], vec_dot(t, nt1))
 
         # Fill J for || nt.tt ||^2; tt = a vvij + b vvik
         ttnor = tt/ttnorms[:, None]
