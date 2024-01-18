@@ -210,10 +210,6 @@ class Optimizer():
         elif self.method == "PG":
             pass
         
-    def get_variables(self) -> np.array:
-        # Return best variables
-        print(f"Best iteration: {self.bestit + 1}\t Best energy: {self.energy[self.bestit]}")
-        return self.bestX
 
     def clear_constraints(self):
         # Clear Jacobian and residual

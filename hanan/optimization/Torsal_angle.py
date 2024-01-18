@@ -43,10 +43,10 @@ class Torsal_angle(Constraint):
         # Define indices indices
         self.var_idx = var_indices
 
-        # E1 = || nt1.nt2  - cos(60) + u^2 ||^2  <=> nt1.nt2 <= 60
-        # E2 = || nt1.nt2  - v^2           ||^2  <=> nt1.nt2 >= 0
-        self.const_idx = {  "E1"  : np.arange( 0                  , self.nF),
-                            "E2"  : np.arange( self.nF            , 2*self.nF),
+        # E1 = || nt1.nt2^2  - cos(60) + u^2 ||^2  <=> nt1.nt2 <= cos(60)
+        # E2 = || nt1.nt2  - v^2           ||^2  <=> nt1.nt2 >= cos(90)
+        self.const_idx = {  "E1"  : np.arange( 0                  , self.nF)
+                            #"E2"  : np.arange( self.nF            , 2*self.nF),
                     }
         
         # Number of variables
@@ -67,31 +67,33 @@ class Torsal_angle(Constraint):
         c_idx = self.const_idx
 
         # Get variables of interest
-        nt1, nt2, v, u = self.uncurry_X(X, "nt1", "nt2", "v", "u")
+        nt1, nt2, u = self.uncurry_X(X, "nt1", "nt2", "u")
 
         # Unflatten nt1, nt2
         nt1uf = nt1.reshape(-1, 3)
         nt2uf = nt2.reshape(-1, 3)
 
+        dotnt1_nt2= vec_dot(nt1uf, nt2uf)
+
         # d nt1 (E1) = d nt1(nt1.nt2 - cos(60) + mu^2) = nt2
-        self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt1"], nt2)
+        self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt1"], (2*dotnt1_nt2[:,None]*nt2uf).flatten())
 
         # d nt2 (E1) = d nt2(nt1.nt2 - cos(60) + mu^2) = nt1
-        self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt2"], nt1)
+        self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt2"], (2*dotnt1_nt2[:,None]*nt1uf).flatten())
 
         # d u (E1) = d nt2(nt1.nt2 - cos(60) + u^2) = 2u
         self.add_derivatives(c_idx["E1"], v_idx["u"], 2*u)
 
-        self.set_r(c_idx["E1"], vec_dot(nt1uf, nt2uf) - np.cos(60*np.pi/180) + u**2 )
+        self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(60*np.pi/180)**2 + u**2 )
 
 
-        # d nt1 (E2) = d nt1(nt1.nt2 - v^2) = nt2
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], nt2)
+        # # d nt1 (E2) = d nt1(nt1.nt2 - v^2) = nt2
+        # self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], (2*vec_dot(nt1uf, nt2uf)[:,None]*nt2uf).flatten())
 
-        # d nt2 (E2) = d nt2(nt1.nt2 - v^2) = nt1
-        self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], nt1)
+        # # d nt2 (E2) = d nt2(nt1.nt2 - v^2) = nt1
+        # self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], (2*vec_dot(nt1uf, nt2uf)[:,None]*nt1uf).flatten())
 
-        # d v (E2) = d v(nt1.nt2 - v^2) = -2v
-        self.add_derivatives(c_idx["E2"], v_idx["v"], -2*v)
+        # # d v (E2) = d v(nt1.nt2 - v^2) = -2v
+        # self.add_derivatives(c_idx["E2"], v_idx["v"], -2*v)
 
-        self.set_r(c_idx["E2"], vec_dot(nt1uf, nt2uf) - v**2 )
+        # self.set_r(c_idx["E2"], vec_dot(nt1uf, nt2uf)**2 - - np.cos(90*np.pi/180)**2 - v**2 )

@@ -160,15 +160,15 @@ class LineCong(Constraint):
             
             # d dfi || e_f (cj - ci)/|| cj - ci||  ||^2 =>  - ef.ni
             #J[range(i,i + len(face)), ii] = -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten()
-            #self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
+            self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
             
             #d dfj
             #J[range(i,i + len(face)), jj] = np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten()
-            #self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
+            self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
 
             # Define residual
             self.set_r(self.const_idx["E"][idx_f], np.sum(cicjnor*ei[f], axis=1) )
-            #self.r[self.const_idx["E"][idx_f]] = np.sum(cicj*ei[f], axis=1)
+            self.r[self.const_idx["E"][idx_f]] = np.sum(cicj*ei[f], axis=1)
 
 
             self.norms[idx_f] = np.linalg.norm(cicj, axis=1)[:, None] 

@@ -20,6 +20,7 @@ from optimization.Torsal_angle import Torsal_angle
 from optimization.Optimizer import Optimizer
 from optimization.LineCong import LineCong
 from optimization.Sphere_angle import Sphere_angle
+from optimization.LineCong_Fairness import LineCong_Fair
 
 # Define paths
 dir_path = os.getcwd()
@@ -29,14 +30,19 @@ math_path = dir_path+"/approximation/mathematica/" # mathematica path
 
 
 # Iterations
-It = 1
+It = 100
 Data = 1
 
 Weights = {"linecong": 1, 
-           "torsal": 0, 
-           "torsal_angle": 0, 
-           "sphere_angle": 0}
+           "torsal": 1, 
+           "torsal_angle": 1, 
+           "sphere_angle": 0,
+            "lc_fairness": 1
+           }
 
+# Global Torsal variables
+T1 = None 
+T2 = None 
 
 def init_test_data(data):
     # Define paths
@@ -98,21 +104,56 @@ def init_test_data(data):
     # Get radius of spheres
     r = np.linalg.norm(h_pts - tv[tf[:,0]], axis=1)
 
-    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, dual_top, r 
+    # Get inner edges
+    inner_edges = tmesh.inner_edges()
+
+    # Get vertices of inner edges
+    ev1, ev2 = tmesh.edge_vertices()
+    iv1 = ev1[inner_edges]
+    iv2 = ev2[inner_edges]
+
+    # Get faces of inner edges
+    f1, f2 = tmesh.edge_faces()
+
+    # Get vertices indices of inner edges
+    vf1 = tf[f1[inner_edges]]
+    vf2 = tf[f2[inner_edges]]
+
+    vf = []
+    # Delete vertices of inner edges in each vf1 and vf2
+    for i in range(len(inner_edges)):
+        valid_vertices = [] 
+        for j in range(len(vf1[i])):
+            if vf1[i][j] not in np.array([iv1[i], iv2[i]]):
+                valid_vertices.append(vf1[i][j])
+        for j in range(len(vf2[i])):
+            if vf2[i][j] not in np.array([iv1[i], iv2[i]]):
+                valid_vertices.append(vf2[i][j])
+
+        vf.append(valid_vertices)
+
+    ie_f = np.array([f1, f2]).T
+
+    vertex_adj = tmesh.vertex_adjacency_list()
+    
+    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, inner_edges, vertex_adj
 
 
 
 def run_optimization(it, data):
     
     # Init data 
-    tv, tf, bt, nt, df, inner_vertices, e_i, dual_tf, dual_top, r = init_test_data(data)
+    tv, tf, _, nt, df, inner_vertices, e_i, dual_tf, inner_edges, vertex_adj = init_test_data(data)
 
     # Correct normals
     nt = - nt
 
-    # Get number of vertices and faces
+    # Get number of vertices, faces and inner edges
     nV = len(tv)
     nF = len(tf)
+    nIE = len(inner_edges)
+
+    
 
     # Define variable indices
     var_idx = {     "e"  : np.arange( 0            , 3*nV), 
@@ -123,21 +164,22 @@ def run_optimization(it, data):
                     "b2" : np.arange( 3*nV +  6*nF, 3*nV +  7*nF),
                     "nt2": np.arange( 3*nV +  7*nF, 3*nV + 10*nF),
                     "df" : np.arange( 3*nV + 10*nF, 3*nV + 11*nF),
-                    "u" : np.arange( 3*nV + 11*nF, 3*nV + 12*nF),
-                    "v"  : np.arange( 3*nV + 12*nF, 3*nV + 13*nF),
+                    "u"  : np.arange( 3*nV + 11*nF, 3*nV + 12*nF)
+#                    "bb1" : np.arange( 3*nV + 12*nF, 3*nV + 12*nF + 3*nIE),
+#                    "bb2" : np.arange( 3*nV + 12*nF + 3*nIE, 3*nV + 12*nF + 6*nIE)
             }
 
 
     # Compute the circumcircle
-    bf, _, ncf = circle_3pts(tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]])
+    bf, _, _ = circle_3pts(tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]])
 
     # Init X 
-    X = np.zeros(3*len(tv) + 13*len(tf))
+    X = np.zeros(sum(len(arr) for arr in var_idx.values()))
 
-    X[var_idx["e"]] = e_i.flatten() 
+    X[var_idx["e"]]  = e_i.flatten() 
     X[var_idx["df"]] = df
-    X[var_idx["u"]] = 10
-    X[var_idx["v"]] = 0.5
+    X[var_idx["u"]]  = 0.1
+    
 
 
     # Init LineCong
@@ -155,16 +197,31 @@ def run_optimization(it, data):
     tang.initialize_constraint(X, var_idx, tv, tf)
     tang.set_weigth(Weights["torsal_angle"])
 
+    # Init LineCong Fairness
+    lc_fair = LineCong_Fair()
+    lc_fair.initialize_constraint(X, var_idx, vertex_adj, inner_vertices)
+    lc_fair.set_weigth(Weights["lc_fairness"])
+
     # Sphere angle
     sph_ang = Sphere_angle()
     sph_ang.initialize_constraint(X, var_idx, tv, tf, bf, nt) 
     sph_ang.set_weigth(Weights["sphere_angle"])
 
+
+
     # Init optimizer
     optimizer = Optimizer()
     optimizer.initialize_optimizer(X, var_idx, "LM", 0.5)
 
-    
+    a1, b1 = torsal.uncurry_X(X, "a1", "b1")
+
+    T1 = unit(torsal.compute_t(a1, b1))
+
+    a2, b2 = torsal.uncurry_X(X, "a2", "b2")
+
+    T2 = unit(torsal.compute_t(a2, b2))
+
+
     for _ in range(it):
         
         optimizer.unitize_variable("nt1", 3)
@@ -172,50 +229,15 @@ def run_optimization(it, data):
         optimizer.unitize_variable("e", 3)
 
         optimizer.get_gradients(linecong)
+        optimizer.get_gradients(lc_fair)
         optimizer.get_gradients(tang)
         optimizer.get_gradients(torsal)
-        optimizer.get_gradients(sph_ang)
+        
 
         optimizer.optimize()
    
-    visualization(torsal, optimizer, tv, tf)
+    visualization(torsal, optimizer, tv, tf, T1, T2)
 
-
-def fix_boundary_cross_field(v, f, t1, t2):
-
-    # Make Mesh
-    mesh = Mesh()
-    mesh.make_mesh(v, f)
-
-    # Get Face face adjacency
-    f_f_adj = mesh.face_face_adjacency_list()
-
-    # Get boundary faces
-    b_faces = mesh.boundary_faces()
-
-    # Loop over boundary faces
-    for bf in b_faces:
-
-        # # Get adjacent faces
-        # adj_faces = f_f_adj[bf]
-        
-        # # Get t1 and t2
-        # t1[bf] = np.sum(t1[adj_faces], axis=0)/len(adj_faces)
-        # t2[bf] = np.sum(t2[adj_faces], axis=0)/len(adj_faces)
-
-        # Project onto triangle
-        vi, vj, vk = v[f[bf,0]], v[f[bf,1]], v[f[bf,2]]
-
-        # Get face normal
-        n = np.cross(vj - vi, vk - vi)
-
-        # Project orthogonally onto triangle
-        t1[bf] = unit(vj -vi)
-        t2[bf] = unit(np.cross(n, t1[bf]))
-
-        # print("boundary face: ",bf)   
-        # print(t1[bf])
-        # print(t2[bf])
 
 def cross_field_error(t1, t2, t1a, t2a):
     """ Function to measure the cross field error between two cross fields
@@ -239,27 +261,18 @@ def cross_field_error(t1, t2, t1a, t2a):
 
 
    
-def visualization(constraint, optimizer, tv, tf):
+def visualization(constraint, optimizer, tv, tf, T1, T2):
 
     # Get variables
     e, a1, b1, nt1, a2, b2, nt2, di = constraint.uncurry_X(optimizer.X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
 
     # Reshape variables
-    e   = e.reshape(-1,3)
+    e   = unit(e.reshape(-1,3))
     nt1 = unit(nt1.reshape(-1,3))
     nt2 = unit(nt2.reshape(-1,3))
 
-    
-
     # Get vertices on faces
     vi, vj, vk = tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]]
-
-    # Get edges
-    vik = tv[tf[:,2]] - tv[tf[:,0]]
-    vij = tv[tf[:,1]] - tv[tf[:,0]]
-
-    # Line congruence
-    e = e/np.linalg.norm(e, axis=1)[:, None]
 
     # Line congruence per face
     ei, ej, ek = e[tf[:,0]], e[tf[:,1]], e[tf[:,2]]
@@ -273,98 +286,94 @@ def visualization(constraint, optimizer, tv, tf):
 
     # Second envelope vertices
     vv = vv_second(vvi, vvj, vvk, tf, len(tv))
+
+    ptvv = np.vstack((vvi, vvj, vvk))
     
     # Compute torsal directions 
-    at1, at2, aa1, aa2, bb = solve_torsal(tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]], ei, ej, ek)
+    at1, at2, aa1, aa2, bb = solve_torsal(tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]], vvi, vvj, vvk)
 
     # Compute torsal directions
-    t1 = constraint.compute_t(a1, b1)
-    t2 = constraint.compute_t(a2, b2)
-    
-    print("norms t1: ", np.sum( np.linalg.norm(t1, axis=1))/ len(t1))
-    print("norms t2: ", np.sum( np.linalg.norm(t2, axis=1))/ len(t2))
+    t1 = unit(constraint.compute_t(a1, b1))
+    t2 = unit(constraint.compute_t(a2, b2))
 
-    t1 = unit(t1)
-    t2 = unit(t2)
+    # print("nt1 norm", np.sum(np.linalg.norm(nt1, axis=1))/len(nt1))
+    # print("nt2 norm", np.sum(np.linalg.norm(nt2, axis=1))/len(nt2))
 
-    
 
-    #fix_boundary_cross_field(tv, tf, t1, t2)
+    # print("t1 norms:", np.sum(np.linalg.norm(t1, axis=1))/len(t1))
+    # print("t2 norms:", np.sum(np.linalg.norm(t2, axis=1))/len(t2))
 
     # Compute torsal directions on second envelope
     tt1, _, _ = constraint.compute_tt(a1, b1, vvi, vvj, vvk)
     tt2, _, _ = constraint.compute_tt(a2, b2, vvi, vvj, vvk)
-
-    tt1 = tt1/constraint.ttnorms1[:, None]
-    tt2 = tt2/constraint.ttnorms2[:, None]
-
-    print("norms tt1: ", np.sum( np.linalg.norm(tt1, axis=1))/ len(t1))
-    print("norms tt2: ", np.sum( np.linalg.norm(tt2, axis=1))/ len(t2))
-
-    # Compute analytic torsal directions
-    att1 = aa1[:, None]*vvij + bb[:, None]*vvik
-    att2 = aa2[:, None]*vvij + bb[:, None]*vvik
-
-    att1 /= np.linalg.norm(att1, axis=1)[:, None]
-    att2 /= np.linalg.norm(att2, axis=1)[:, None]
-
+    
+    tt1 = unit(tt1)
+    tt2 = unit(tt2)
+    # # Compute norms
+    # print("tt1 norms:", np.sum(np.linalg.norm(tt1, axis=1))/len(tt1))
+    # print("tt2 norms:", np.sum(np.linalg.norm(tt2, axis=1))/len(tt2))
     
     # Barycenter on both envelopes
     vc = (vi + vj + vk)/3
     vvc = (vvi + vvj + vvk)/3
     ec = vvc - vc
+   
+    # Compute analytic torsal directions
+    att1 = unit(aa1[:, None]*vvij + bb[:, None]*vvik)
+    att2 = unit(aa2[:, None]*vvij + bb[:, None]*vvik)
 
-    ec2 = constraint.compute_ec(di, e, tf)
+    att1 /= np.linalg.norm(att1, axis=1)[:, None]
+    att2 /= np.linalg.norm(att2, axis=1)[:, None]
+    
+  
+    # normal planes to att
+    ant1 = unit(np.cross(at1, ec))
+    ant2 = unit(np.cross(at2, ec))
 
     # Compute planarity
-    planar_t1 = planarity_check(t1, tt1, ec)
-    planar_t2 = planarity_check(t2, tt2, ec)
+    planar_t1 = planarity_check(nt1, t1, tt1, ec)
+    planar_t2 = planarity_check(nt2, t2, tt2, ec)
 
-    aplanar_t1 = planarity_check(at1, att1, ec)
-    aplanar_t2 = planarity_check(at2, att2, ec)
+    aplanar_t1 = planarity_check(ant1, at1, att1, ec)
+    aplanar_t2 = planarity_check(ant2, at2, att2, ec)
 
-    #filter nan values
-    aplanar_t1 = aplanar_t1[~np.isnan(aplanar_t1)]
-    aplanar_t2 = aplanar_t2[~np.isnan(aplanar_t2)]
 
-    print(f"planarity t1: {np.linalg.norm(planar_t1)} \t analytic t1: {np.linalg.norm(aplanar_t1)}")
-    print(f"planarity t2: {np.linalg.norm(planar_t2)} \t analytic t2: {np.linalg.norm(aplanar_t2)}")
-
-    # for i in range(len(t1)):
-    #     if abs(nt1[i]@nt2[i]) > 0.9:
-    #         print(f"i :{i} t1.nt1 : {nt1[i]@nt1[i]} \t t1.nt2 : {nt1[i]@nt2[i]}")
-    #         print(f"   nt1.nt2 : {nt1[i]@nt2[i]} \t v : {constraint.uncurry_X(optimizer.X,'v')[i]} \t E :{nt1[i]@nt2[i] - constraint.uncurry_X(optimizer.X,'v')[i]**2} \n")
-    #     # if abs(t1[i]@nt2[i]) < 0.2:
-    #     #     print(f"i :{i} t1.nt1 : {at1[i]@nt1[i]} \t t1.nt2 : {t1[i]@nt2[i]}")
+    planarity = (planar_t1 + planar_t2)/2
     
-    # Angles between torsal directions
-    #anglesnt = np.arccos(vec_dot(nt1,nt2))*180/np.pi
 
-    #anglest = np.arccos(abs(vec_dot(t1,t2)))*180/np.pi
+    analytic_planar = (aplanar_t1 + aplanar_t2)/2
+    
+
+    # Cross field Error
     cf_error = cross_field_error(t1, t2, at1, at2)
 
-    angles = np.arccos(abs(vec_dot(nt1,nt2)))*180/np.pi
-
+    # Angle nt1 nt2
+    angle = np.arccos(abs(vec_dot(nt1, nt2)))*180/np.pi
 
     # Visualization
     ps.init()
-
     ps.remove_all_structures()
-
-
+    
+    #ps.register_point_cloud("Points", ptvv, radius=0.0005, enabled=True, color=(1.0, 0.0, 0.0))
     # Create mesh
     triangle = ps.register_surface_mesh("T1", tv, tf)
     triangle2 = ps.register_surface_mesh("T2", vv, tf)
-    #sphere = ps.register_point_cloud("Sphere", bf + di[:,None]*ncf)
+    triangle.add_scalar_quantity("Planarity", planarity, defined_on='faces', enabled=True, cmap="viridis")
+    triangle.add_scalar_quantity("Analytic Planarity", analytic_planar, defined_on='faces', enabled=True, cmap="viridis")
+    triangle.add_scalar_quantity("Angle Torsal Planes", angle, defined_on='faces', enabled=True, cmap="viridis")
+    triangle.add_vector_quantity("LC", e, defined_on='vertices', enabled=True, radius=0.001, length=2.0, color=(0.0, 1.0, 0.0))
 
-    triangle.add_vector_quantity("ec", ec2, defined_on='faces', enabled=True, radius=0.0001, length=1.0, color=(0.0, 0.0, 0.0))
+    
+    #add_cross_field(triangle, "Planes normals", nt1, nt2, 0.0002, 0.007, (0.0, 0.0, 1.0))
+    add_cross_field(triangle, "Torsal Directions", t1, t2, 0.0003, 0.008, (1.0, 1.0, 1.0))
 
-    triangle.add_scalar_quantity("Cross Field error", cf_error, defined_on='faces', enabled=True, cmap="viridis")
-    triangle.add_scalar_quantity("Angles ", angles, defined_on='faces', enabled=True, cmap="viridis")
-
-    add_cross_field(triangle, "Planes normals", nt1, nt2, 0.0002, 0.007, (0.0, 0.0, 0.0))
-
-    #add_cross_field(triangle, "analytic", at1, at2, 0.0005, 0.004, (1.0, 0.0, 0.0))
+    # l = 0.08
+    # for _ in range(20):
+    #     f = np.random.randint(0, len(tf))
+    #     ps.register_surface_mesh("Torsal plane "+str(f), np.array([vc[f]- l*t1[f], vc[f]+ l*t1[f], vc[f] + l*tt1[f] + l*ec[f], vc[f] - l*tt1[f] + l*ec[f] ]), [[0,1,2,3]], color=(0.2, 0.2, 0.2), transparency=0.5)
+    #     ps.register_surface_mesh("Torsal plane 2 "+str(f), np.array([vc[f]- l*t2[f], vc[f]+ l*t2[f], vc[f] + l*tt2[f] + l*ec[f], vc[f] - l*tt2[f] + l*ec[f] ]), [[0,1,2,3]], color=(0.2, 0.2, 0.2), transparency=0.5)
+    #add_cross_field(triangle, "Init Torsal Directions", T1, T2, 0.0003, 0.007, (0.2, 0.0, 0.8))
+    #add_cross_field(triangle, "Analytical Torsal Directions", at1, at2, 0.0002, 0.008, (0.0, 1.0, 0.0))
 
     ps.show()
 

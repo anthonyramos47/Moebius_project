@@ -29,13 +29,8 @@ math_path = dir_path+"/approximation/mathematica/" # mathematica path
 
 
 # Iterations
-It = 1
+It = 100
 Data = 1
-
-Weights = {"linecong": 1, 
-           "torsal": 0, 
-           "torsal_angle": 0, 
-           "sphere_angle": 0}
 
 
 def init_test_data(data):
@@ -143,22 +138,12 @@ def run_optimization(it, data):
     # Init LineCong
     linecong = LineCong()
     linecong.initialize_constraint(X, var_idx, len(tv), bf, nt, len(tf), dual_tf, inner_vertices)
-    linecong.set_weigth(Weights["linecong"])
+    linecong.set_weigth(1)
 
     # Init Torsal 
     torsal = Torsal()
     torsal.initialize_constraint(X, var_idx, tv, tf, bf, nt)
-    torsal.set_weigth(Weights["torsal"])
-
-    # Init Torsal angle
-    tang = Torsal_angle()
-    tang.initialize_constraint(X, var_idx, tv, tf)
-    tang.set_weigth(Weights["torsal_angle"])
-
-    # Sphere angle
-    sph_ang = Sphere_angle()
-    sph_ang.initialize_constraint(X, var_idx, tv, tf, bf, nt) 
-    sph_ang.set_weigth(Weights["sphere_angle"])
+    torsal.set_weigth(0)
 
     # Init optimizer
     optimizer = Optimizer()
@@ -172,13 +157,10 @@ def run_optimization(it, data):
         optimizer.unitize_variable("e", 3)
 
         optimizer.get_gradients(linecong)
-        optimizer.get_gradients(tang)
-        optimizer.get_gradients(torsal)
-        optimizer.get_gradients(sph_ang)
 
         optimizer.optimize()
    
-    visualization(torsal, optimizer, tv, tf)
+    visualization(torsal, optimizer, tv, tf, inner_vertices)
 
 
 def fix_boundary_cross_field(v, f, t1, t2):
@@ -239,133 +221,40 @@ def cross_field_error(t1, t2, t1a, t2a):
 
 
    
-def visualization(constraint, optimizer, tv, tf):
+def visualization(constraint, optimizer, tv, tf, inner_vertices):
 
     # Get variables
-    e, a1, b1, nt1, a2, b2, nt2, di = constraint.uncurry_X(optimizer.X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
+    e = constraint.uncurry_X(optimizer.X, "e")
 
     # Reshape variables
-    e   = e.reshape(-1,3)
-    nt1 = unit(nt1.reshape(-1,3))
-    nt2 = unit(nt2.reshape(-1,3))
+    e   = unit(e.reshape(-1,3))
+   
+    # LoadGround truth line congruence
+    # Analytic torsal directions
+    edir = np.loadtxt(math_path+"edir.dat")
+    edir = unit(edir)
+
+    # Check dimensions
+    assert len(edir) == len(e), "Not same dimensions in e_i"
+        
+
+    # Compute error as the angle between the analytic and the computed edge directions
+    error_lc = 0.6*np.ones(len(tv))
+    error_lc[inner_vertices] = np.arccos(np.sum(e[inner_vertices]*edir[inner_vertices], axis=1)) * 180/np.pi
 
     
-
-    # Get vertices on faces
-    vi, vj, vk = tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]]
-
-    # Get edges
-    vik = tv[tf[:,2]] - tv[tf[:,0]]
-    vij = tv[tf[:,1]] - tv[tf[:,0]]
-
-    # Line congruence
-    e = e/np.linalg.norm(e, axis=1)[:, None]
-
-    # Line congruence per face
-    ei, ej, ek = e[tf[:,0]], e[tf[:,1]], e[tf[:,2]]
-
-    # Second envelope
-    vvi, vvj, vvk, _, _, _ = constraint.compute_second_env(di, e, tf)
-
-    # Second envelope edges
-    vvij = vvj - vvi
-    vvik = vvk - vvi
-
-    # Second envelope vertices
-    vv = vv_second(vvi, vvj, vvk, tf, len(tv))
-    
-    # Compute torsal directions 
-    at1, at2, aa1, aa2, bb = solve_torsal(tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]], ei, ej, ek)
-
-    # Compute torsal directions
-    t1 = constraint.compute_t(a1, b1)
-    t2 = constraint.compute_t(a2, b2)
-    
-    print("norms t1: ", np.sum( np.linalg.norm(t1, axis=1))/ len(t1))
-    print("norms t2: ", np.sum( np.linalg.norm(t2, axis=1))/ len(t2))
-
-    t1 = unit(t1)
-    t2 = unit(t2)
-
-    
-
-    #fix_boundary_cross_field(tv, tf, t1, t2)
-
-    # Compute torsal directions on second envelope
-    tt1, _, _ = constraint.compute_tt(a1, b1, vvi, vvj, vvk)
-    tt2, _, _ = constraint.compute_tt(a2, b2, vvi, vvj, vvk)
-
-    tt1 = tt1/constraint.ttnorms1[:, None]
-    tt2 = tt2/constraint.ttnorms2[:, None]
-
-    print("norms tt1: ", np.sum( np.linalg.norm(tt1, axis=1))/ len(t1))
-    print("norms tt2: ", np.sum( np.linalg.norm(tt2, axis=1))/ len(t2))
-
-    # Compute analytic torsal directions
-    att1 = aa1[:, None]*vvij + bb[:, None]*vvik
-    att2 = aa2[:, None]*vvij + bb[:, None]*vvik
-
-    att1 /= np.linalg.norm(att1, axis=1)[:, None]
-    att2 /= np.linalg.norm(att2, axis=1)[:, None]
-
-    
-    # Barycenter on both envelopes
-    vc = (vi + vj + vk)/3
-    vvc = (vvi + vvj + vvk)/3
-    ec = vvc - vc
-
-    ec2 = constraint.compute_ec(di, e, tf)
-
-    # Compute planarity
-    planar_t1 = planarity_check(t1, tt1, ec)
-    planar_t2 = planarity_check(t2, tt2, ec)
-
-    aplanar_t1 = planarity_check(at1, att1, ec)
-    aplanar_t2 = planarity_check(at2, att2, ec)
-
-    #filter nan values
-    aplanar_t1 = aplanar_t1[~np.isnan(aplanar_t1)]
-    aplanar_t2 = aplanar_t2[~np.isnan(aplanar_t2)]
-
-    print(f"planarity t1: {np.linalg.norm(planar_t1)} \t analytic t1: {np.linalg.norm(aplanar_t1)}")
-    print(f"planarity t2: {np.linalg.norm(planar_t2)} \t analytic t2: {np.linalg.norm(aplanar_t2)}")
-
-    # for i in range(len(t1)):
-    #     if abs(nt1[i]@nt2[i]) > 0.9:
-    #         print(f"i :{i} t1.nt1 : {nt1[i]@nt1[i]} \t t1.nt2 : {nt1[i]@nt2[i]}")
-    #         print(f"   nt1.nt2 : {nt1[i]@nt2[i]} \t v : {constraint.uncurry_X(optimizer.X,'v')[i]} \t E :{nt1[i]@nt2[i] - constraint.uncurry_X(optimizer.X,'v')[i]**2} \n")
-    #     # if abs(t1[i]@nt2[i]) < 0.2:
-    #     #     print(f"i :{i} t1.nt1 : {at1[i]@nt1[i]} \t t1.nt2 : {t1[i]@nt2[i]}")
-    
-    # Angles between torsal directions
-    #anglesnt = np.arccos(vec_dot(nt1,nt2))*180/np.pi
-
-    #anglest = np.arccos(abs(vec_dot(t1,t2)))*180/np.pi
-    cf_error = cross_field_error(t1, t2, at1, at2)
-
-    angles = np.arccos(abs(vec_dot(nt1,nt2)))*180/np.pi
-
-
     # Visualization
     ps.init()
 
     ps.remove_all_structures()
 
-
     # Create mesh
-    triangle = ps.register_surface_mesh("T1", tv, tf)
-    triangle2 = ps.register_surface_mesh("T2", vv, tf)
-    #sphere = ps.register_point_cloud("Sphere", bf + di[:,None]*ncf)
+    tm = ps.register_surface_mesh("T1", tv, tf)
+    tm.add_vector_quantity("LC", e, defined_on='vertices', enabled=True, radius=0.001, length=2.0, color=(0.0, 1.0, 0.0))
+    tm.add_vector_quantity("GT LC", edir, defined_on='vertices', enabled=True, radius=0.001, length=2.0, color=(0.0, 0.0, 1.0))
+    tm.add_scalar_quantity("LC error", error_lc, defined_on='vertices', enabled=True, cmap="viridis")
 
-    triangle.add_vector_quantity("ec", ec2, defined_on='faces', enabled=True, radius=0.0001, length=1.0, color=(0.0, 0.0, 0.0))
-
-    triangle.add_scalar_quantity("Cross Field error", cf_error, defined_on='faces', enabled=True, cmap="viridis")
-    triangle.add_scalar_quantity("Angles ", angles, defined_on='faces', enabled=True, cmap="viridis")
-
-    add_cross_field(triangle, "Planes normals", nt1, nt2, 0.0002, 0.007, (0.0, 0.0, 0.0))
-
-    #add_cross_field(triangle, "analytic", at1, at2, 0.0005, 0.004, (1.0, 0.0, 0.0))
-
+    
     ps.show()
 
 

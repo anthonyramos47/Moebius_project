@@ -37,6 +37,23 @@ def barycenters(v, f):
 
     return bary
 
+def barycentric_coordinates(vi, vj, vk, vl):
+    """ Function to find the barycentric coordinates of a point vl 
+        in the triangle defined by vi, vj, vk
+    """
+
+    # Define the linear system matrix
+    A = np.vstack([vi, vj, vk])
+    
+    # Sol
+    b1, b2, b3 = np.linalg.solve(A, vl)
+
+    return b1,b2,b3
+
+
+    
+
+
 
 def orth_proj(v, u):
     return v - proj(v, u)
@@ -327,21 +344,25 @@ def read_obj(filename):
 
 def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
     mesh.add_vector_quantity(name+"_vec1" ,    vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
-    #mesh.add_vector_quantity(name+"_-vec1",   -vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
+    mesh.add_vector_quantity(name+"_-vec1",   -vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
-    #mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
+    mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
 
-def solve_torsal(vi, vj, vk, ei, ej, ek) :
+def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
 
     # Get edges
     vij = vj - vi 
     vik = vk - vi
 
+    ei = vvi - vi 
+    ej = vvj - vj
+    ek = vvk - vk
+
     eij = ej - ei 
     eik = ek - ei
     
 
-    ec = (ei + ej + ek)/3
+    ec = (vvi + vvj + vvk)/3 - (vi + vj + vk)/3
 
     vijxec = np.cross(vij, ec)
     vikxec = np.cross(vik, ec)
@@ -366,7 +387,7 @@ def solve_torsal(vi, vj, vk, ei, ej, ek) :
     b1 = np.zeros(len(vij))
 
     # indices disc >0 
-    idx = np.where(disc > 0)[0]
+    idx = np.where(disc >= 0)[0]
 
     a1[idx] = (-g1[idx] + np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))
     a2[idx] = (-g1[idx] - np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))
@@ -380,13 +401,28 @@ def solve_torsal(vi, vj, vk, ei, ej, ek) :
     t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
     t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
 
+    # # indices disc < 0
+    # idx = np.where(disc < 0)[0]
+    # a1[idx] = 1
+    # a2[idx] = ( - vec_dot(vij[idx],vik[idx]) -  vec_dot(vik[idx],vik[idx]) )/( vec_dot(vij[idx],vij[idx]) + vec_dot(vij[idx], vik[idx]))
+    # b1[idx] = 1
+
+    # # sol
+    # t1[idx] = a1[idx,None]*vij[idx] + vik[idx]
+    # t2[idx] = a2[idx,None]*vij[idx] + vik[idx]
+
+    # # Normalize
+    # t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
+    # t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
+
     return t1, t2, a1, a2, b1 
+
 
 def vv_second(vvi, vvj, vvk, f, numV):
 
     vv = np.zeros((numV, 3))
 
-    for i in range(len(f)):
+    for i in range(len(f)):      
         vv[f[i,0]] = vvi[i]
         vv[f[i,1]] = vvj[i]
         vv[f[i,2]] = vvk[i]
@@ -579,12 +615,19 @@ def unormalize_dir(h_pts, dual, inner_vertices, tv, e_i, rad):
 
     return le
 
-def planarity_check(t1, tt1, ec):
+def planarity_check(nt1, t1, tt1, ec):
 
+    t1 = unit(t1)
+    tt1 = unit(tt1)
+    ec = unit(ec)
     t1_tt1 = np.cross(t1, tt1)
-    ec /= np.linalg.norm(ec, axis=1)[:, None]
     # Check planarity
-    planar = np.sum(t1_tt1*ec, axis=1)
+    planar = abs(vec_dot(t1_tt1, ec))
+
+    #planar = abs(vec_dot(nt1, t1)) + abs(vec_dot(nt1, tt1)) + abs(vec_dot(nt1, ec))
+
+    # # Replace nan with 0
+    planar[np.where(np.isnan(planar))] = 1
 
     return planar
 
