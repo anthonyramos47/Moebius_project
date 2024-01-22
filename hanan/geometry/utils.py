@@ -28,6 +28,11 @@ def proj(v, u):
     return proj
 
 def barycenters(v, f):
+    """ Function to compute the barycenters of the faces
+    Input:
+        v: vertices
+        f: faces
+    """
      
     bary = np.zeros((len(f), 3))
     for i, face in enumerate(f):
@@ -48,18 +53,17 @@ def barycentric_coordinates(vi, vj, vk, vl):
     # Sol
     b1, b2, b3 = np.linalg.solve(A, vl)
 
-    return b1,b2,b3
-
-
-    
+    return b1,b2,b3    
 
 
 
 def orth_proj(v, u):
+    """ Orthogonal projection of v on u
+    """
     return v - proj(v, u)
 
 def vec_dot(v1, v2):
-    """dot product between two lists of vectors v1, v2
+    """ Dot product between two lists of vectors v1, v2
     """
     if len(v1.shape) == 1 and len(v2.shape) == 1:
         dot =  v1@v2
@@ -96,8 +100,6 @@ def circle_3pts(p1, p2, p3):
     cx = np.sum((p3 - p1)*u1, axis=1)
     cy = np.sum((p3 - p1)*u3, axis=1)
 
-
-    # h 
     # h = ( (cx - bx/2)**2 + cy**2 - (bx/2)**2 )/(2*cy)
     h = ((cx-bx/2)**2 + cy**2 - (bx/2)**2 )/(2*cy)
     
@@ -110,80 +112,7 @@ def circle_3pts(p1, p2, p3):
     
     return center, radius, u2
 
-def torsal_directions(v, f, e_i):
-    num_faces = len(f)
-    tors = np.zeros((2 * num_faces, 3))
-    cos_tors = np.zeros(num_faces)
-    for i in range(num_faces):
-        # Extract vertex indices for the current face
-        vertex_indices = f[i]
 
-        # Calculate vectors e(u, v), e_u, e_v for the current face
-        e_u, e_v = e_i[vertex_indices[1]] - e_i[vertex_indices[0]], \
-                    e_i[vertex_indices[2]] - e_i[vertex_indices[0]]
-        e = (e_i[vertex_indices[0]] + e_i[vertex_indices[1]] + e_i[vertex_indices[2]])/3
-
-        # Calculate vectors a(u, v), a_u, a_v for the current face
-        v_u, v_v = v[vertex_indices[1]] - v[vertex_indices[0]], \
-                    v[vertex_indices[2]] - v[vertex_indices[0]]
-        vv = (v[vertex_indices[0]] + v[vertex_indices[1]]+ v[vertex_indices[2]])/3
-
-        # Calculate coefficients of the equation and solve it
-        gamma_0 = np.linalg.det(np.array([e_u, v_u, e]))
-        gamma_1 = np.linalg.det(np.array([e_u, v_v, e])) + np.linalg.det(np.array([e_v, v_u, e]))
-        gamma_2 = np.linalg.det(np.array([e_v, v_v, e]))
-
-        discr = gamma_1 * gamma_1 - 4.0 * gamma_0 * gamma_2
-        # here should be exception about the negative discriminant
-
-        # Negative discriminant
-        if discr < 0 and abs(discr) > 1e-7:
-            print("Discriminant is negative")
-            tors[2*i] = np.array([0,0,0])
-            tors[2 * i + 1] = np.array([0,0,0])
-            cos_tors[i] = -1
-
-        # Zero discriminant
-        elif abs(discr) < 1e-7 :
-            if discr < 0 : 
-                soln = [(-gamma_1 ), (-gamma_1 )]
-                sold = (2.0 * gamma_0)
-            else:
-                soln = [(-gamma_1 - np.sqrt(discr)), (-gamma_1 + np.sqrt(discr))]
-                sold = (2.0 * gamma_0)
-                     
-            # Calculate torsal directions for the current face
-            tors1 = soln[0] * v_u + sold * v_v
-            tors1 = tors1 / np.linalg.norm(tors1)
-            tors[2*i] = tors1
-            tors2 = soln[1] * v_u + sold * v_v
-            tors2 = tors2 / np.linalg.norm(tors2)
-            tors[2 * i + 1] = tors2
-
-            normal_plane_1 = np.cross(tors1, e)
-            normal_plane_2 = np.cross(tors2, e)
-            
-            cos_tors[i] = abs(np.dot(normal_plane_1, normal_plane_2)) / (np.linalg.norm(normal_plane_1) * np.linalg.norm(normal_plane_2))
-
-        # Positive discriminant
-        else:            
-            soln = [(-gamma_1 - np.sqrt(discr)), (-gamma_1 + np.sqrt(discr))]
-            sold = (2.0 * gamma_0)
-            
-            # Calculate torsal directions for the current face
-            tors1 = soln[0] * v_u + sold * v_v
-            tors1 = tors1 / np.linalg.norm(tors1)
-            tors[2*i] = tors1
-            tors2 = soln[1] * v_u + sold * v_v
-            tors2 = tors2 / np.linalg.norm(tors2)
-            tors[2 * i + 1] = tors2
-
-            normal_plane_1 = np.cross(tors1, e)
-            normal_plane_2 = np.cross(tors2, e)
-            
-            cos_tors[i] = abs(np.dot(normal_plane_1, normal_plane_2)) / (np.linalg.norm(normal_plane_1) * np.linalg.norm(normal_plane_2))
-
-    return tors, cos_tors
 def torsal_dir_vec(tv, tf, e_i):
     
     # Get vertices
@@ -343,12 +272,20 @@ def read_obj(filename):
 
 
 def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
+    """ Function to add cross field to polyscope
+    """
+
     mesh.add_vector_quantity(name+"_vec1" ,    vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec1",   -vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
 
 def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
+    """ Function to solve the torsal directions analytically
+    Input:
+        vi, vj, vk: vertices
+        vvi, vvj, vvk: second envelope vertices
+    """
 
     # Get edges
     vij = vj - vi 
@@ -419,135 +356,35 @@ def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
 
 
 def vv_second(vvi, vvj, vvk, f, numV):
+    """ Compute second envelope 
+    """
 
     vv = np.zeros((numV, 3))
+    nv = np.zeros(numV)
 
     for i in range(len(f)):      
-        vv[f[i,0]] = vvi[i]
-        vv[f[i,1]] = vvj[i]
-        vv[f[i,2]] = vvk[i]
+        vv[f[i,0]] += vvi[i]
+        vv[f[i,1]] += vvj[i]
+        vv[f[i,2]] += vvk[i]
+
+        nv[f[i,0]] += 1
+        nv[f[i,1]] += 1
+        nv[f[i,2]] += 1
+    
+    vv /= nv[:, None]
 
     return vv
 
 
-def init_test_data(data):
-    # # Define paths
-    dir_path = os.getcwd()
-    data_path = dir_path+"/approximation/data/" # data path
-
-    # Data of interest
-    k = data
-
-    # Load M mesh (centers of sphere mesh)
-    mv, mf = igl.read_triangle_mesh( os.path.join(data_path ,"centers.obj") ) 
-
-    # Load test mesh
-    tv, tf = igl.read_triangle_mesh(os.path.join(data_path,  "test_remeshed_"+str(k)+".obj"))
-
-    # Create dual mesh
-    tmesh = Mesh()
-    tmesh.make_mesh(tv,tf)
-
-    # Get inner vertices
-    inner_vertices = tmesh.inner_vertices()
-
-    # Get vertex normals for test mesh
-    e_i = igl.per_vertex_normals(tv, tf)
-
-    # Fix normal directions
-    signs = np.sign(np.sum(e_i * ([0,0,1]), axis=1))
-    e_i = e_i * signs[:, None]
-
-    # Compute circumcenters and axis vectors for each triangle
-    p1, p2, p3 = tv[tf[:, 0]], tv[tf[:, 1]], tv[tf[:, 2]]
-
-    ct, _, nt = circle_3pts(p1, p2, p3)
-
-    # Dual topology 
-    dual_tf = tmesh.vertex_ring_faces_list()
-
-    dual_top = tmesh.dual_top()
-
-    # Create hexagonal mesh                            
-    h_pts = np.empty((len(tf), 3), dtype=np.float64)
-    
-    li = np.zeros(len(tf), dtype=np.float64)
-    
-    center = vd.Mesh((mv, mf), alpha = 0.9, c=[0.4, 0.4, 0.81])
-
-    # Intersect circumcircle axis with center mesh
-    for i in range(len(tf)):
-        # Get points on circumcircle axis
-        p0  = ct[i] - 10*nt[i]
-        p1  = ct[i] + 10*nt[i]
-
-        # Get intersection points
-        h_pts[i,:] = np.array(center.intersect_with_line(p0, p1)[0])
-
-        # Set li 
-        li[i] = np.linalg.norm(h_pts[i] - ct[i])
-
-    # Get radius of spheres
-    r = np.linalg.norm(h_pts - tv[tf[:,0]], axis=1)
-
-    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, dual_top, r 
-
-
-def visualize_data(data):
-        # # Define paths
-    dir_path = os.getcwd()
-    data_path = dir_path+"/approximation/data/" # data path
-
-    # Data of interest
-    k = data
-
-    # Load M mesh (centers of sphere mesh)
-    mv, mf = igl.read_triangle_mesh( os.path.join(data_path ,"centers.obj") ) 
-
-    # Load test mesh
-    tv, tf = igl.read_triangle_mesh(os.path.join(data_path,  "test_remeshed_"+str(k)+".obj"))
-
-    # Create dual mesh
-    tmesh = Mesh()
-    tmesh.make_mesh(tv,tf)
-
-    # Get inner vertices
-    inner_vertices = tmesh.inner_vertices()
-
-    # Get vertex normals for test mesh
-    e_i = igl.per_vertex_normals(tv, tf)
-
-    # Fix normal directions
-    signs = np.sign(np.sum(e_i * ([0,0,1]), axis=1))
-    e_i = e_i * signs[:, None]
-
-    # Compute circumcenters and axis vectors for each triangle
-    p1, p2, p3 = tv[tf[:, 0]], tv[tf[:, 1]], tv[tf[:, 2]]
-
-    ct, _, nt = circle_3pts(p1, p2, p3)
-
-    # Dual topology 
-    dual_tf = tmesh.vertex_ring_faces_list()
-
-    # Create hexagonal mesh                            
-    h_pts = np.empty((len(tf), 3), dtype=np.float64)
-    center = vd.Mesh((mv, mf), alpha = 0.9, c=[0.4, 0.4, 0.81])
-
-    ps.init()
-
-    ps.remove_all_structures()
-
-    v_mesh = ps.register_surface_mesh("test", tv, tf)
-
-    c_mesh = ps.register_surface_mesh("centers", mv, mf)
-
-    v_mesh.add_vector_quantity("n_t", nt, defined_on = "faces", enabled=True, length=1.5, color=(0.1, 0.1, 0.1))
-    v_mesh.add_vector_quantity("e", e_i, defined_on = "vertices", enabled=True, length=1.5, color=(0.1, 0.1, 0.1))
-
-    ps.show()
-
 
 def compute_disc(tv, tf, e_i):
+    """ Function to compute the discriminant of the torsal directions
+    Input:
+        tv: vertices
+        tf: faces
+        e_i: edge directions normalized
+    """
+
 
     # # Compute the edge vectors per each face
     vi, vj, vk = tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]]
@@ -615,7 +452,13 @@ def unormalize_dir(h_pts, dual, inner_vertices, tv, e_i, rad):
 
     return le
 
-def planarity_check(nt1, t1, tt1, ec):
+def planarity_check(t1, tt1, ec):
+    """ Function to check the planarity of the torsal directions
+    Input:
+        t1: Torsal direction
+        tt1: Second envelope torsal direction
+        ec: Lince congruence joining barycenters of the faces
+    """
 
     t1 = unit(t1)
     tt1 = unit(tt1)
@@ -632,6 +475,12 @@ def planarity_check(nt1, t1, tt1, ec):
     return planar
 
 def compute_torsal_angles(t1, t2, ec):
+    """ Function to compute the torsal angles between two cross fields
+    Input:
+        t1: Torsal direction
+        t2: Second torsal direction
+        ec: Lince congruence joining barycenters of the faces
+    """
 
     # Compute nt1 
     nt1 = np.cross(t1, ec)
@@ -645,3 +494,5 @@ def compute_torsal_angles(t1, t2, ec):
     torsal_angles = np.arccos(np.sum(nt1*nt2, axis=1))
 
     return torsal_angles, nt1, nt2
+
+
