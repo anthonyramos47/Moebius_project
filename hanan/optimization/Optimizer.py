@@ -35,6 +35,7 @@ class Optimizer():
         self.method = None # Method used to solve the problem
         self.energy = [] # Energy vector
         self.var_idx = None # Variable indices
+        self.verbose = False # Verbose
 
     def unitize_variable(self, var_name, dim) -> None:
         """
@@ -66,7 +67,7 @@ class Optimizer():
 
 
 
-    def initialize_optimizer(self, X, var_dic, method= "LM", step = 0.8) -> None:
+    def initialize_optimizer(self, X, var_dic, method= "LM", step = 0.8, print=0) -> None:
         """
         Initialize the optimizer( variables, step size)
         """
@@ -77,6 +78,7 @@ class Optimizer():
         self.it = 0
         self.step = step
         self.method = method
+        self.verbose = print
 
     def get_gradients(self, constraint) -> None:
         """ Add constraint to the optimizer
@@ -111,7 +113,7 @@ class Optimizer():
             else:
                 print("Error: Solver not implemented or not specified")
         else:
-            pass   
+            pass
 
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares
@@ -162,8 +164,9 @@ class Optimizer():
         # Update iteration
         self.it +=1
         
-        # Print energy
-        print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
+        if self.verbose:
+            # Print energy
+            print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
 
         # Clear constraints
         self.clear_constraints()
@@ -209,7 +212,17 @@ class Optimizer():
             self.X += self.step*arg
         elif self.method == "PG":
             pass
-        
+    
+    def uncurry_X(self, *v_idx):
+        """ Function to uncurry the variables
+            Input:
+                v_idx: Variable indices
+        """
+
+        if len(v_idx) == 1:
+            return self.X[self.var_idx[v_idx[0]]]
+        else:
+            return [self.X[self.var_idx[k]] for k in v_idx]
 
     def clear_constraints(self):
         # Clear Jacobian and residual

@@ -1,12 +1,14 @@
 # Planarity constraint implementation
 import numpy as np
 from hanan.optimization.constraint import Constraint
+from hanan.utils import vec_dot
 
 class LineCong(Constraint):
 
     def __init__(self) -> None:
         super().__init__()
         self.ei_dim = None # Number of edges per face
+        self.ei_norms = None # Norms of the edges
         self.num_edge_const = None # Number of edge constraints
         self.bij = [] # List to store vertices distance
         self.nt = [] # List to store normals
@@ -55,6 +57,8 @@ class LineCong(Constraint):
         e, df = self.uncurry_X(X, "e", "df")
 
         e = e.reshape(-1, 3)
+
+        self.ei_norms = np.linalg.norm(e, axis=1)
 
         self.const_idx = {"E":[]
                           }
@@ -111,11 +115,15 @@ class LineCong(Constraint):
         inner_vertices = self.inner_vertices
 
         # Get variables
-        ei, df = self.uncurry_X(X, "e", "df")
+        e, df = self.uncurry_X(X, "e", "df")
 
-        ei = ei.reshape(-1, 3)
+        e = e.reshape(-1, 3)
+
+        ei = e/self.ei_norms[:, None]
 
         e_idx = self.var_idx["e"]
+
+        
 
         # Compute Jacobian for || e_f (cj - ci)/|| cj - ci||  ||^2 ; ci = bi + df * nbi
         for idx_f in range(len(inner_vertices)):
@@ -154,22 +162,22 @@ class LineCong(Constraint):
             # print("\n\n")
             self.add_derivatives(row_indices, col_indices, cicjnor.flatten() )
 
+            # Multply the norms of || e_f || ||cj - ci||
+            norms = self.norms[idx_f]*self.ei_norms[f]
+
             # Indices for I and J derivative
             dfi = self.var_idx["df"][face]
             dfj = self.var_idx["df"][faceroll]
             
-            # d dfi || e_f (cj - ci)/|| cj - ci||  ||^2 =>  - ef.ni
+            # d dfi || e_f (cj - ci)/|| cj - ci|||e_f|  ||^2 =>  - ef.ni
             #J[range(i,i + len(face)), ii] = -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten()
-            self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
+            self.add_derivatives(self.const_idx["E"][idx_f], dfi, -vec_dot(ei[f], ni)/norms.flatten())
             
             #d dfj
             #J[range(i,i + len(face)), jj] = np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten()
-            self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
+            self.add_derivatives(self.const_idx["E"][idx_f], dfj, vec_dot(ei[f],nj)/norms.flatten())
 
             # Define residual
-            self.set_r(self.const_idx["E"][idx_f], np.sum(cicjnor*ei[f], axis=1) )
-            self.r[self.const_idx["E"][idx_f]] = np.sum(cicj*ei[f], axis=1)
+            self.set_r(self.const_idx["E"][idx_f], vec_dot(cicjnor,ei[f])/self.ei_norms[f] )
 
-
-            self.norms[idx_f] = np.linalg.norm(cicj, axis=1)[:, None] 
-
+        self.ei_norms = np.linalg.norm(e, axis=1)

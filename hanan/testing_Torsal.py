@@ -156,17 +156,14 @@ def run_optimization(it, data):
     
 
     # Define variable indices
-    var_idx = {     "e"  : np.arange( 0            , 3*nV), 
-                    "a1" : np.arange( 3*nV        , 3*nV +    nF),
-                    "b1" : np.arange( 3*nV +    nF, 3*nV +  2*nF),
-                    "nt1": np.arange( 3*nV +  2*nF, 3*nV +  5*nF),
-                    "a2" : np.arange( 3*nV +  5*nF, 3*nV +  6*nF),
-                    "b2" : np.arange( 3*nV +  6*nF, 3*nV +  7*nF),
-                    "nt2": np.arange( 3*nV +  7*nF, 3*nV + 10*nF),
-                    "df" : np.arange( 3*nV + 10*nF, 3*nV + 11*nF),
-                    "u"  : np.arange( 3*nV + 11*nF, 3*nV + 12*nF)
-#                    "bb1" : np.arange( 3*nV + 12*nF, 3*nV + 12*nF + 3*nIE),
-#                    "bb2" : np.arange( 3*nV + 12*nF + 3*nIE, 3*nV + 12*nF + 6*nIE)
+    var_idx = {     "e"    : np.arange( 0            , 3*nV),  # Line congruence
+                    "sph_c": np.arange( 3*nV         , 3*nV +  3*nF), # Sphere centers
+                    "sph_r": np.arange( 3*nV +  3*nF , 3*nV +  4*nF), # Sphere radius
+                    "th"   : np.arange( 3*nV +  4*nF , 3*nV +  5*nF), # Angle torsal direction t1
+                    "phi"  : np.arange( 3*nV +  5*nF , 3*nV +  6*nF), # Angle torsal direction t2
+                    "nt1"  : np.arange( 3*nV +  6*nF , 3*nV +  9*nF), # Normal to torsal plane 1
+                    "nt2"  : np.arange( 3*nV +  9*nF , 3*nV + 12*nF), # Normal to torsal plane 2
+                    "u"    : np.arange( 3*nV + 12*nF , 3*nV + 13*nF), # Auxiliar variable plane angles
             }
 
 
