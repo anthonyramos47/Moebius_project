@@ -55,10 +55,10 @@ class LineCong_Fair(Constraint):
 
         e_idx = self.var_idx["e"]
 
-        indices = 3 * np.repeat(e_idx, 3) + np.tile(range(3), len(e_idx))
+        #indices = 3 * np.repeat(e_idx, 3) + np.tile(range(3), len(e_idx))
         
-        # d ej
-        self.add_derivatives(self.const_idx["Fair"], indices, np.ones(len(indices))) 
+        # d ei
+        self.add_derivatives(self.const_idx["Fair"], e_idx, np.ones(3*len(e))) 
         
         for i in range(len(e)):
 
@@ -73,9 +73,18 @@ class LineCong_Fair(Constraint):
 
             indices = e_idx[3 * np.repeat(neigh, 3) + np.tile(range(3), len(neigh))]
 
-            print(len(e[i] - np.sum(ej, axis=0)/n_neigh))
+            # Assert three values are the same
+            assert len(np.tile(self.const_idx["Fair"][3*i: 3*i+3], n_neigh)) == len(indices), "Row != Cols"
+
+            assert len(indices) == len(-ej.flatten()/n_neigh), "Cols != Vals"
+
+
             # d ej 
-            self.add_derivatives(np.tile(self.const_idx["Fair"][3*i: 3*i+3], n_neigh), indices, -ej.flatten()/n_neigh)
+            self.add_derivatives(np.tile(self.const_idx["Fair"][3*i: 3*i+3], n_neigh), indices, -np.ones_like(ej).flatten()/n_neigh)
+        
+            # Assert columnsa and values same size
+            assert len(self.const_idx["Fair"][3*i: 3*i+3]) == len(e[i] - np.sum(ej, axis=0)/n_neigh), "r: Cols != Values"
+           
             self.set_r(self.const_idx["Fair"][3*i: 3*i+3], e[i] - np.sum(ej, axis=0)/n_neigh) 
 
 
