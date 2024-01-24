@@ -27,10 +27,12 @@ class LineCong_Fair(Constraint):
         # Set inner vertices
         self.inner_vertices = inner_vertices
 
-        self.const = 3*len(inner_vertices)
+        
         self.var = len(X)
 
         e = self.uncurry_X(X, "e")
+        
+        self.const = len(e)
 
         e = e.reshape(-1, 3)
 
@@ -44,10 +46,8 @@ class LineCong_Fair(Constraint):
             Input:
                 X: Variables
         """
-        
-        # Get inner vertices
-        inner_vertices = self.inner_vertices
 
+        
         # Get variables
         e = self.uncurry_X(X, "e")
 
@@ -55,17 +55,15 @@ class LineCong_Fair(Constraint):
 
         e_idx = self.var_idx["e"]
 
-        indices = 3 * np.repeat(e_idx[inner_vertices], 3) + np.tile(range(3), len(e_idx[inner_vertices]))
+        indices = 3 * np.repeat(e_idx, 3) + np.tile(range(3), len(e_idx))
         
-        # d ei
+        # d ej
         self.add_derivatives(self.const_idx["Fair"], indices, np.ones(len(indices))) 
         
-        for i in range(len(inner_vertices)):
-
-            idx = inner_vertices[i]
+        for i in range(len(e)):
 
             # Get neighbors
-            neigh = e_idx[self.vertices_neighbors[idx]]
+            neigh = self.vertices_neighbors[i] 
 
             # Get number of neighbors
             n_neigh = len(neigh)
@@ -73,11 +71,12 @@ class LineCong_Fair(Constraint):
             # Get edges
             ej = e[neigh]
 
-            indices = 3 * np.repeat(neigh, 3) + np.tile(range(3), len(neigh))
+            indices = e_idx[3 * np.repeat(neigh, 3) + np.tile(range(3), len(neigh))]
 
+            print(len(e[i] - np.sum(ej, axis=0)/n_neigh))
             # d ej 
             self.add_derivatives(np.tile(self.const_idx["Fair"][3*i: 3*i+3], n_neigh), indices, -ej.flatten()/n_neigh)
-            self.set_r(self.const_idx["Fair"][3*i: 3*i+3], e[idx] - np.sum(ej, axis=0)/n_neigh) 
+            self.set_r(self.const_idx["Fair"][3*i: 3*i+3], e[i] - np.sum(ej, axis=0)/n_neigh) 
 
 
         
