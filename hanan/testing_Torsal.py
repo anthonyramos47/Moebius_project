@@ -30,14 +30,14 @@ math_path = dir_path+"/approximation/mathematica/" # mathematica path
 
 
 # Iterations
-It = 100
+It = 300
 Data = 1
 
 Weights = {"linecong": 1, 
            "torsal": 1, 
-           "torsal_angle": 1, 
-           "sphere_angle": 0,
-            "lc_fairness": 1
+           "torsal_angle": 2, 
+           "sphere_angle": 0.0,
+            "lc_fairness": 0.2
            }
 
 # Global Torsal variables
@@ -136,14 +136,14 @@ def init_test_data(data):
 
     vertex_adj = tmesh.vertex_adjacency_list()
     
-    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, inner_edges, vertex_adj
+    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, dual_top, inner_edges, vertex_adj
 
 
 
 def run_optimization(it, data):
     
     # Init data 
-    tv, tf, _, nt, df, inner_vertices, e_i, dual_tf, inner_edges, vertex_adj = init_test_data(data)
+    tv, tf, _, nt, df, inner_vertices, e_i, dual_tf, dual_top, inner_edges, vertex_adj = init_test_data(data)
 
     # Correct normals
     nt = - nt
@@ -178,7 +178,8 @@ def run_optimization(it, data):
 
     X[var_idx["e"]]  = e_i.flatten() 
     X[var_idx["df"]] = df
-    X[var_idx["u"]]  = 0.1
+    #X[var_idx["df"]] = 4.0
+    X[var_idx["u"]]  = 0.001
     
 
 
@@ -232,11 +233,12 @@ def run_optimization(it, data):
         optimizer.get_gradients(lc_fair)
         optimizer.get_gradients(tang)
         optimizer.get_gradients(torsal)
+        optimizer.get_gradients(sph_ang)
         
 
         optimizer.optimize()
    
-    visualization(torsal, optimizer, tv, tf, T1, T2)
+    visualization(torsal, optimizer, tv, tf, T1, T2, bf, nt, dual_top)
 
 
 def cross_field_error(t1, t2, t1a, t2a):
@@ -261,7 +263,7 @@ def cross_field_error(t1, t2, t1a, t2a):
 
 
    
-def visualization(constraint, optimizer, tv, tf, T1, T2):
+def visualization(constraint, optimizer, tv, tf, T1, T2, bf, ncf, dual_tf):
 
     # Get variables
     e, a1, b1, nt1, a2, b2, nt2, di = constraint.uncurry_X(optimizer.X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
@@ -350,14 +352,20 @@ def visualization(constraint, optimizer, tv, tf, T1, T2):
     # Angle nt1 nt2
     angle = np.arccos(abs(vec_dot(nt1, nt2)))*180/np.pi
 
+    # Sphere centers
+    c = bf + di[:,None]*ncf
+
+
     # Visualization
     ps.init()
     ps.remove_all_structures()
     
-    #ps.register_point_cloud("Points", ptvv, radius=0.0005, enabled=True, color=(1.0, 0.0, 0.0))
+    ps.register_point_cloud("Points", ptvv, radius=0.0005, enabled=True, color=(1.0, 0.0, 0.0))
     # Create mesh
     triangle = ps.register_surface_mesh("T1", tv, tf)
     triangle2 = ps.register_surface_mesh("T2", vv, tf)
+    sph_c = ps.register_surface_mesh("Sphere centers", c, dual_tf)
+
     triangle.add_scalar_quantity("Planarity", planarity, defined_on='faces', enabled=True, cmap="viridis")
     triangle.add_scalar_quantity("Analytic Planarity", analytic_planar, defined_on='faces', enabled=True, cmap="viridis")
     triangle.add_scalar_quantity("Angle Torsal Planes", angle, defined_on='faces', enabled=True, cmap="viridis")
