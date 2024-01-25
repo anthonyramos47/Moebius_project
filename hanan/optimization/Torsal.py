@@ -25,13 +25,13 @@ class Torsal(Constraint):
         self.nV = None # Number of vertices
         self.F = None # Faces
         self.nF = None # Number of faces
-        self.ncf = None # List of circumcenter axis direction
-        self.bf = None # List of circumcenters
-        self.fvij = None # List of the edge vectors per each face
         self.v = None # List of the vertices per each face
         self.vc= None # List og the barycenters of the faces
+        self.fvij = None # List of the edge vectors per each face
         self.ecnorms = None # List of the norms of the line congruence directions
-        self.ttnorms1 = None # List of the norms of the torsal directions
+        self.tnorms1 = None # List of the norms of the torsal directions 1st env 
+        self.tnorms2 = None # List of the norms of the torsal directions 1nd env
+        self.ttnorms1 = None # List of the norms of the torsal directions 
         self.ttnorms2 = None # List of the norms of the torsal directions
 
 
@@ -77,92 +77,27 @@ class Torsal(Constraint):
         # Number of variables
         self.var = len(X)
 
-        # Get df 
-        df = X[var_indices["df"]]
-
         # Get ei
-        e_i = X[var_indices["e"]].reshape(-1, 3)
+        e  = X[var_indices["e"]].reshape(-1, 3)
+
+        # Get barycentric ec 
+        ec = np.sum(e[F], axis=1)/3
         
         # Get vertices of the faces
         vi, vj, vk = V[F[:,0]], V[F[:,1]], V[F[:,2]]
+
         self.v = vi, vj, vk
         self.vc = (vi + vj + vk)/3
 
         # Compute the edge vectors per each face
         self.fvij = np.empty((self.nF, 2, 3), dtype=float)
 
-        
         # Compute the edge vectors per each face
         self.fvij[:,0] = vj - vi
         self.fvij[:,1] = vk - vi
 
-        # Compute the direction of the line congruence at the barycenters
-        ec = self.compute_ec(df, e_i, F)
-
+        # Set ec norms
         self.ecnorms = np.linalg.norm(ec, axis=1)
-
-        # vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, self.F)
-
-        # at1, at2, a1, a2, bb = solve_torsal(vi, vj, vk, vvi, vvj, vvk)
-
-        
-        # X[self.var_idx["a1"]] = a1
-        # X[self.var_idx["b1"]] = bb
-
-        # X[self.var_idx["a1"]] /= np.linalg.norm(at1, axis=1)
-        # X[self.var_idx["b1"]] /= np.linalg.norm(at1, axis=1)
-
-        # X[self.var_idx["a2"]] = a2
-        # X[self.var_idx["b2"]] = bb
-
-        # X[self.var_idx["a2"]] /= np.linalg.norm(at2, axis=1)
-        # X[self.var_idx["b2"]] /= np.linalg.norm(at2, axis=1)
-
-
-        # Set initial a1 
-        X[self.var_idx["a1"]] = 1
-        X[self.var_idx["b1"]] = 1
-
-        print(len(self.var_idx["b1"]))
-
-        t1 = self.compute_t(X[self.var_idx["a1"]], X[self.var_idx["b1"]])
-
-        X[self.var_idx["a1"]] /= np.linalg.norm(t1, axis=1)
-        X[self.var_idx["b1"]] /= np.linalg.norm(t1, axis=1)
-
-        # Set initial b
-        X[self.var_idx["a2"]] = ( - vec_dot(self.fvij[:,0],self.fvij[:,1]) -  vec_dot(self.fvij[:,1],self.fvij[:,1]) )/( vec_dot(self.fvij[:,0],self.fvij[:,0]) + vec_dot(self.fvij[:,0],self.fvij[:,1]))
-        X[self.var_idx["b2"]] = 1
-        # X[self.var_idx["a2"]] = 0.8
-        # X[self.var_idx["b2"]] = 1
-
-        t2 = self.compute_t(X[self.var_idx["a2"]], X[self.var_idx["b2"]])
-
-        X[self.var_idx["a2"]] /= np.linalg.norm(t2, axis=1)
-        X[self.var_idx["b2"]] /= np.linalg.norm(t2, axis=1)
-
-        # Get vertices of second envelope
-        vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, F)
-        
-        tt, _, _ = self.compute_tt(X[self.var_idx["a1"]], X[self.var_idx["b1"]], vvi, vvj, vvk)
-        
-        # Compute initial directions of normals of torsal plane
-        nt1 = np.cross(t1, ec)
-        nt1 /= np.linalg.norm(nt1, axis=1)[:, None]
-
-        self.ttnorms1 = np.linalg.norm(tt, axis=1)
-
-        tt, _, _ = self.compute_tt(X[self.var_idx["a2"]], X[self.var_idx["b2"]], vvi, vvj, vvk)
-
-        self.ttnorms2 = np.linalg.norm(tt, axis=1)
-
-        nt2 = np.cross(t2, ec)
-        nt2 /= np.linalg.norm(nt2, axis=1)[:, None]
-        
-        # Set initial directions of normals of torsal plane
-        X[self.var_idx["nt1"]] = nt1.flatten()
-        X[self.var_idx["nt2"]] = nt2.flatten()
-
 
 
 
@@ -511,7 +446,7 @@ class Torsal(Constraint):
     
        
  
-    
+
 
 
 

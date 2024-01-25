@@ -1,5 +1,6 @@
 import numpy as np
 import polyscope as ps
+from scipy.optimize import minimize
 
 def unit(v):
     """normalize a list of vectors v
@@ -280,7 +281,7 @@ def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
     mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
 
-def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
+def solve_torsal(vi, vj, vk, ei, ej, ek) :
     """ Function to solve the torsal directions analytically
     Input:
         vi, vj, vk: vertices
@@ -291,15 +292,11 @@ def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
     vij = vj - vi 
     vik = vk - vi
 
-    ei = vvi - vi 
-    ej = vvj - vj
-    ek = vvk - vk
-
     eij = ej - ei 
     eik = ek - ei
     
 
-    ec = (vvi + vvj + vvk)/3 - (vi + vj + vk)/3
+    ec = (ei + ej + ek)/3
 
     vijxec = np.cross(vij, ec)
     vikxec = np.cross(vik, ec)
@@ -323,6 +320,9 @@ def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
     a2 = np.zeros(len(vij))
     b1 = np.zeros(len(vij))
 
+    # Valid
+    valid = np.zeros(len(vij))
+
     # indices disc >0 
     idx = np.where(disc >= 0)[0]
 
@@ -335,24 +335,24 @@ def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
     t2[idx] = (-g1[idx] - np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))[:, None]*vij[idx] + 2*g0[idx,None]*vik[idx]
 
     # Normalize
-    t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
-    t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
+    t1[idx] = unit(t1[idx])
+    t2[idx] = unit(t2[idx])
 
-    # # indices disc < 0
-    # idx = np.where(disc < 0)[0]
-    # a1[idx] = 1
-    # a2[idx] = ( - vec_dot(vij[idx],vik[idx]) -  vec_dot(vik[idx],vik[idx]) )/( vec_dot(vij[idx],vij[idx]) + vec_dot(vij[idx], vik[idx]))
-    # b1[idx] = 1
+    # Put 1 on valid disc
+    valid[idx] = 1
 
-    # # sol
-    # t1[idx] = a1[idx,None]*vij[idx] + vik[idx]
-    # t2[idx] = a2[idx,None]*vij[idx] + vik[idx]
+    # For disc < 0 we approximate the solution
+    app_idx = np.where(disc < 0)[0]
+    for i in app_idx:
+        a1[i] = approximate_torsal(100, g0[i], g1[i], g2[i])
+        a2[i] = approximate_torsal(-100, g0[i], g1[i], g2[i])
+        b1[i] = 1
 
-    # # Normalize
-    # t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
-    # t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
+        t1[i] = unit(a1[i]*vij[i] + b1[i]*vik[i])
 
-    return t1, t2, a1, a2, b1 
+        t2[i] = unit(a2[i]*vij[i] + b1[i]*vik[i])
+
+    return t1, t2, a1, a2, b1, valid
 
 
 def vv_second(vvi, vvj, vvk, f, numV):
@@ -496,3 +496,20 @@ def compute_torsal_angles(t1, t2, ec):
     return torsal_angles, nt1, nt2
 
 
+# ====================== Torsal Approximation Functions =================
+
+def approximate_torsal(init, g0, g1, g2):
+
+    # Perform the optimization
+    result = minimize(objective_function, init, args=(g0, g1, g2))
+
+    return result.x
+
+# Define the quadratic equation to be minimized
+def quadratic_equation(x, g0, g1, g2):
+    l = x
+    return l**2 * g0 + l * g1 + g2
+
+# Function to be minimized
+def objective_function(x, g0, g1, g2):
+    return (quadratic_equation(x, g0, g1, g2))**2
