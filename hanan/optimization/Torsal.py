@@ -29,9 +29,9 @@ class Torsal(Constraint):
         self.vc= None # List og the barycenters of the faces
         self.fvij = None # List of the edge vectors per each face
         self.ecnorms = None # List of the norms of the line congruence directions
-        self.tnorms1 = None # List of the norms of the torsal directions 1st env 
-        self.tnorms2 = None # List of the norms of the torsal directions 1nd env
-        self.ttnorms1 = None # List of the norms of the torsal directions 
+        self.tnorms1 = None # List of the norms of the torsal directions
+        self.tnorms2 = None # List of the norms of the torsal directions
+        self.ttnorms1 = None # List of the norms of the torsal directions
         self.ttnorms2 = None # List of the norms of the torsal directions
 
 
@@ -76,6 +76,9 @@ class Torsal(Constraint):
         
         # Number of variables
         self.var = len(X)
+
+        # Get df 
+        cf = X[var_indices["df"]]
 
         # Get ei
         e  = X[var_indices["e"]].reshape(-1, 3)
