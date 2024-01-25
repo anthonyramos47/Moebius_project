@@ -36,7 +36,7 @@ class Torsal(Constraint):
 
 
     
-    def initialize_constraint(self, X, var_indices, V, F, bf, ncf) -> np.array:
+    def initialize_constraint(self, X, var_indices, V, F) -> np.array:
         # Input
         # X: variables [ e   | a | b | n_t  | d_i ] 
         # X  size      [ 3*V | F | F | 3*F  | F   ]
@@ -46,11 +46,6 @@ class Torsal(Constraint):
         # ncf: normals of the circumcenters
 
         self.F = F
-        # Set circumcenters
-        self.bf = bf
-
-        # Set circumcenters axis
-        self.ncf = ncf
 
         # Number of vertices
         self.nV = len(V)
@@ -76,20 +71,21 @@ class Torsal(Constraint):
         
         # Number of variables
         self.var = len(X)
-
-        # Get df 
-        cf = X[var_indices["df"]]
-
+        
         # Get ei
         e  = X[var_indices["e"]].reshape(-1, 3)
 
         # Get barycentric ec 
         ec = np.sum(e[F], axis=1)/3
+
+        i, j, k = F[:,0], F[:,1], F[:,2]
         
         # Get vertices of the faces
         vi, vj, vk = V[F[:,0]], V[F[:,1]], V[F[:,2]]
 
+        # Set vertices per face
         self.v = vi, vj, vk
+        # Set barycenters per face
         self.vc = (vi + vj + vk)/3
 
         # Compute the edge vectors per each face
@@ -102,351 +98,240 @@ class Torsal(Constraint):
         # Set ec norms
         self.ecnorms = np.linalg.norm(ec, axis=1)
 
+        # Compute initial torsal directions
+        t1, t2, a1, a2, b, _ = solve_torsal(vi, vj, vk, e[i], e[j], e[k])
 
+        # Compute angles between t1 and vij 
+        vij = unit(self.fvij[:,0])
+        
+        th = np.arccos(abs(vec_dot(t1, vij)))
+        # Compute angles between t1 and t2 
+        phi = np.arccos(abs(vec_dot(t2, t1)))
+
+        X[var_indices["th"]] = th
+        X[var_indices["phi"]] = phi
+
+        # Compute torsal directions with respec to angle
+        t1 = np.cos(th)[:,None]*self.fvij[:,0] + np.sin(th)[:,None]*self.fvij[:,1]
+        t2 = np.cos(th + phi)[:,None]*self.fvij[:,0] + np.sin(th + phi)[:,None]*self.fvij[:,1]
+
+        # Compute torsal norms
+        self.tnorms1 = np.linalg.norm(t1, axis=1)
+        self.tnorms2 = np.linalg.norm(t2, axis=1)
+
+        # Compute torsal in second envelope
+        vvi = vi + e[i]
+        vvj = vj + e[j]
+        vvk = vk + e[k]
+
+        tt1 =       np.cos(th)[:,None]*(vvj - vvi) + np.sin(th)[:,None]*(vvk - vvi)
+        tt2 = np.cos(th + phi)[:,None]*(vvj - vvi) + np.sin(th + phi)[:,None]*(vvk - vvi)
+
+        # Compute torsal norms
+        self.ttnorms1 = np.linalg.norm(tt1, axis=1)
+        self.ttnorms2 = np.linalg.norm(tt2, axis=1)
+
+        # Set initial normals to torsal planes
+
+        nt1 = unit(np.cross(t1, ec))
+        nt2 = unit(np.cross(t2, ec))
+
+        X[self.var_idx["nt1"]] = nt1.flatten()
+        X[self.var_idx["nt2"]] = nt2.flatten()
 
 
     def compute(self, X) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
-                F: Faces
         """
-        e, a1, b1, nt1, a2, b2, nt2, df = self.uncurry_X(X, "e", "a1", "b1", "nt1", "a2", "b2", "nt2", "df")
+        e, nt1, nt2, th, phi = self.uncurry_X(X, "e", "nt1", "nt2", "th", "phi")
 
         e   = e.reshape(-1, 3)
         nt1 = nt1.reshape(-1, 3)
         nt2 = nt2.reshape(-1, 3)
 
+        ec = np.sum(e[self.F], axis=1)/3
+
+        # Set derivatives || nt1.ec/||ec|| ||^2  + || nt2.ec/||ec|| ||^2
+        self.energy_nt_ec(e, ec, nt1, nt2)
+
+        # Set derivatives || nt1.t1/||t1|| ||^2  + || nt2.t2\||t2|| ||^2
+        self.energy_nt_t(nt1, nt2, th, phi)
+
+        # Set derivatives || nt1.tt1/||tt1|| ||^2  + || nt2.tt2/||tt2|| ||^2
+        self.energy_nt_tt(e, nt1, nt2, th, phi)
         
-        # Get vertices of second envelope
-        vvi, vvj, vvk, dcvi, dcvj, dcvk = self.compute_second_env(df, e, self.F)
+        self.ecnorms = np.linalg.norm(ec, axis=1)
+    
 
-        # Compute ec
-        ec = self.compute_ec(df, e, self.F)
-              
+    def energy_nt_ec(self, e, ec, nt1, nt2):
+        """ Function to set up the derivatives and residual for
+        the energy || nt1.ec/||ec|| ||^2  + || nt2.ec/||ec|| ||^2
+        """
 
-        # Get vij, vik
+        i, j, k = self.F[:,0], self.F[:,1], self.F[:,2]
+
+        e_idx = self.var_idx["e"]
+
+
+        nF = len(self.F)
+
+        indices_i = e_idx[3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
+        indices_j = e_idx[3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
+        indices_k = e_idx[3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
+
+        # d nt1 => ec/||ec||
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), self.var_idx["nt1"], (ec/self.ecnorms[:, None]).flatten())
+
+        # d ei,j,k => 1/3 nt1.ec/||ec||
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_i, (nt1/self.ecnorms[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_j, (nt1/self.ecnorms[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_k, (nt1/self.ecnorms[:, None]).flatten())
+
+        # Set r
+        self.set_r(self.const_idx["nt1.ec"], vec_dot(nt1, ec)/self.ecnorms)
+
+        # d nt2 => ec/||ec||
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), self.var_idx["nt2"], (ec/self.ecnorms[:, None]).flatten())
+
+        # d ei,j,k => 1/3 nt2.ec/||ec||
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_i, (nt2/self.ecnorms[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_j, (nt2/self.ecnorms[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_k, (nt2/self.ecnorms[:, None]).flatten())
+
+        # Set r
+        self.set_r(self.const_idx["nt2.ec"], vec_dot(nt2, ec)/self.ecnorms)
+
+    def energy_nt_t(self, nt1, nt2, th, phi):
+        """ Function to set up the derivatives and residual for
+        the energy || nt1.t1/||t1|| ||^2  + || nt2.t2\||t2|| ||^2
+        """
+
+        # Get directions of the faces
         vij = self.fvij[:,0]
         vik = self.fvij[:,1]
 
-        #print("Sumary Torsal energies\n")
-        # Init indices for sparse J matrix
-        self.fill_J_t(e, ec, a1, b1, nt1, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, self.F, 1)
+        alpha = th + phi
 
-        self.fill_J_t(e, ec, a2, b2, nt2, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, self.F, 2)
+        t1 = np.cos(th)[:,None]*vij + np.sin(th)[:,None]*vik
+        t2 = np.cos(alpha)[:,None]*vij + np.sin(alpha)[:,None]*vik
 
-        # Compute t
-        # t1 = self.compute_t(a1, b1)
-        # t2 = self.compute_t(a2, b2)
+        dt1 = -np.sin(th)[:,None]*vij + np.cos(th)[:,None]*vik
+        dt2 = -np.sin(alpha)[:,None]*vij + np.cos(alpha)[:,None]*vik
 
-        # # Add energies related to t1,t2 angle
-        # # t1.t2g = || t1.t2 - g^2 ||;  t1 = a1 vij + b1 vik, t2 = a2 vij + b2 vik =>  t1, t2 same side
-        # # self.add_derivatives(self.const_idx["t1.t2g"], self.var_idx["a1"], w*vec_dot(vij, t2))
-        # # self.add_derivatives(self.const_idx["t1.t2g"], self.var_idx["b1"], w*vec_dot(vik, t2))
-        # # self.add_derivatives(self.const_idx["t1.t2g"], self.var_idx["a2"], w*vec_dot(vij, t1))
-        # # self.add_derivatives(self.const_idx["t1.t2g"], self.var_idx["b2"], w*vec_dot(vik, t1))
-        # # self.add_derivatives(self.const_idx["t1.t2g"], self.var_idx["g"] , -w*2*g )     
-        # # self.set_r(self.const_idx["t1.t2g"], w*(vec_dot(t1, t2) - g**2))
+        # E: ||nt1.t1||; t1 = cos(th) vij + sin(th) vik
+        # d nt1 => t1\||t1||
+        self.add_derivatives(self.const_idx["nt1.t1"].repeat(3), self.var_idx["nt1"], (t1/self.tnorms1[:, None]).flatten())
 
-        # # t1.t2l = || t1.t2^2 - 1 + l^2 ||;  t1 = a1 vij + b1 vik, t2 = a2 vij + b2 vik =>  t1, t2 not parallel
-        # self.add_derivatives(self.const_idx["t1.t2l"], self.var_idx["a1"], w*2*vec_dot(t1,t2)*vec_dot(vij, t2))
-        # self.add_derivatives(self.const_idx["t1.t2l"], self.var_idx["b1"], w*2*vec_dot(t1,t2)*vec_dot(vik, t2))
-        # self.add_derivatives(self.const_idx["t1.t2l"], self.var_idx["a2"], w*2*vec_dot(t1,t2)*vec_dot(vij, t1))
-        # self.add_derivatives(self.const_idx["t1.t2l"], self.var_idx["b2"], w*2*vec_dot(t1,t2)*vec_dot(vik, t1))
-        # self.add_derivatives(self.const_idx["t1.t2l"], self.var_idx["l"] , w*2*l )
-        # self.set_r(self.const_idx["t1.t2l"], w*(vec_dot(t1, t2)**2 -1 + l**2))
+        # d th => nt1.(-sin(th) vij + cos(th) vik)\||t1||
+        self.add_derivatives(self.const_idx["nt1.t1"], self.var_idx["th"], vec_dot(nt1, dt1)/self.tnorms1)
 
-        self.ecnorms = np.linalg.norm(ec, axis=1)
-        
+        # r 
+        self.set_r(self.const_idx["nt1.t1"], vec_dot(nt1, t1)/self.tnorms1)
 
-    def fill_J_t(self, e, ec, a, b, npt, vij, vik, vvi, vvj, vvk, dcvi, dcvj, dcvk, F, torsal=1):
-        """ Function to define the values of J per each torsal direction
+        # E: ||nt2.t2||; t2 = cos(alpha) vij + sin(alpha) vik
+        self.add_derivatives(self.const_idx["nt2.t2"].repeat(3), self.var_idx["nt2"], (t2/self.tnorms2[:, None]).flatten())
+
+        # d th => nt2.(-sin(alpha) vij + cos(alpha) vik)\||t2||
+        self.add_derivatives(self.const_idx["nt2.t2"], self.var_idx["th"], vec_dot(nt2, dt2)/self.tnorms2)
+
+        # d phi => nt2.(-sin(alpha) vij + cos(alpha) vik)\||t2||
+        self.add_derivatives(self.const_idx["nt2.t2"], self.var_idx["phi"], vec_dot(nt2, dt2)/self.tnorms2)
+
+        # r
+        self.set_r(self.const_idx["nt2.t2"], vec_dot(nt2, t2)/self.tnorms2)
+
+        # update torsal norms
+        self.tnorms1 = np.linalg.norm(t1, axis=1)
+        self.tnorms2 = np.linalg.norm(t2, axis=1)
+
+    def energy_nt_tt(self, e, nt1, nt2, th, phi):
+        """ Function to set up the derivatives and residual for
+        the energy || nt1.tt1/||tt1|| ||^2  + || nt2.tt2/||tt2|| ||^2
         """
 
-        if torsal == 1:
-            nt_ec = "nt1.ec"
-            nt_t = "nt1.t1"
-            nt_tt = "nt1.tt1"
-            nt = "nt1"
-            va = "a1"
-            vb = "b1"
-            ut = "ut1"
-            ttnorms = self.ttnorms1
-            
-        else:
-            nt_ec = "nt2.ec"
-            nt_t = "nt2.t2"
-            nt_tt = "nt2.tt2"
-            nt = "nt2"
-            va = "a2"
-            vb = "b2"
-            ut = "ut2"
-            ttnorms = self.ttnorms2
-            
-            
-        # Compute derivatives of de (nt.ec)
-        deix, deiy, deiz, dejx, dejy, dejz, dekx, deky, dekz = self.compute_decnt(dcvi, dcvj, dcvk, e, npt, F)
-        
-        # Compute derivatives of d df (nt.ec)
-        d_df, eicf_ei, ejcf_ej, ekcf_ek = self.compute_d_df(e, npt, F)
-
-        # Compute t
-        t = self.compute_t(a, b)
-
-        # Compute tt
-        tt, vvij, vvik = self.compute_tt(a, b, vvi, vvj, vvk)
-
-        # constrain indices
-        c_idx = self.const_idx
-        v_idx = self.var_idx
-
-
-        # Fill J for || nt.ec ||^2----------------------------------------
-        # Set derivatives de (nt.ec)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,0]]  , 2/3*deix/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,0]]+1, 2/3*deiy/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,0]]+2, 2/3*deiz/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,1]]  , 2/3*dejx/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,1]]+1, 2/3*dejy/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,1]]+2, 2/3*dejz/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,2]]  , 2/3*dekx/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,2]]+1, 2/3*deky/self.ecnorms)
-        # self.add_derivatives(c_idx[nt_ec], 3*v_idx["e"][F[:,2]]+2, 2/3*dekz/self.ecnorms)    
-
-        # Normalize ec
-        ecnor = (ec/self.ecnorms[:,None])
-          
-
-        # Set derivateives dnt (nt.ec)
-        self.add_derivatives(c_idx[nt_ec].repeat(3), v_idx[nt], ecnor.flatten())
-        
-        # Set derivatives d(df) (nt.ec)
-        #self.add_derivatives(c_idx[nt_ec], v_idx["df"], d_df/self.ecnorms)
-
-        # Set r
-        self.set_r(c_idx[nt_ec],  vec_dot(ecnor, npt))
-        #---------------------------------------------------------------------
-
-
-
-        # Fill J for || nt.t ||^2; t = a vij + b vik ------------------------
-        
-        # Set derivatives dnt (nt.t)
-        self.add_derivatives(c_idx[nt_t].repeat(3), v_idx[nt], t.flatten())
-        
-        # Set derivatives da (nt.t)
-        self.add_derivatives(c_idx[nt_t], v_idx[va], vec_dot(vij, npt))
-
-        # Set derivatives db (nt.t)
-        self.add_derivatives(c_idx[nt_t], v_idx[vb], vec_dot(vik, npt))
-
-        # Set r 
-        self.set_r(c_idx[nt_t], vec_dot(t, npt))
-        # --------------------------------------------------------------------
-
-
-        # Fill J for || nt.tt ||^2; tt = a vvij + b vvik ---------------------
-        ttnor = tt/ttnorms[:, None]
-        
-        # Set derivatives dnt (nt.tt)
-        self.add_derivatives(c_idx[nt_tt].repeat(3), v_idx[nt], ttnor.flatten())
-
-        # Set derivatives da (nt1.tt1)
-        self.add_derivatives(c_idx[nt_tt], v_idx[va], vec_dot(vvij, npt)/ttnorms)
-
-        # Set derivatives db (nt1.tt1)
-        self.add_derivatives(c_idx[nt_tt], v_idx[vb], vec_dot(vvik, npt)/ttnorms)
-
-
-        # Set derivatives d e (nt.tt)
-        # # d ei
-        # self.add_derivatives(c_idx[nt_tt],   3*F[:,0], -2*(a+b)*deix/ttnorms)
-        # self.add_derivatives(c_idx[nt_tt], 3*F[:,0]+1, -2*(a+b)*deiy/ttnorms)
-        # self.add_derivatives(c_idx[nt_tt], 3*F[:,0]+2, -2*(a+b)*deiz/ttnorms)
-        # # d ej
-        # self.add_derivatives(c_idx[nt_tt],   3*F[:,1],   2*a*dejx/ttnorms)
-        # self.add_derivatives(c_idx[nt_tt], 3*F[:,1]+1,   2*a*dejy/ttnorms)
-        # self.add_derivatives(c_idx[nt_tt], 3*F[:,1]+2,   2*a*dejz/ttnorms)
-        # # d ek 
-        # self.add_derivatives(c_idx[nt_tt],   3*F[:,2],   2*b*dekx/ttnorms)
-        # self.add_derivatives(c_idx[nt_tt], 3*F[:,2]+1,   2*b*deky/ttnorms)
-        # self.add_derivatives(c_idx[nt_tt], 3*F[:,2]+2,   2*b*dekz/ttnorms)
-        
-        # Set derivatives d df (nt.tt)
-        #self.add_derivatives(c_idx[nt_tt], v_idx["df"], vec_dot((2*a[:,None]*(ejcf_ej - eicf_ei) + 2*b[:,None]*(ekcf_ek - eicf_ei)), npt)/ttnorms)
-        
-        # Set r
-        self.set_r(c_idx[nt_tt], vec_dot(ttnor, npt)) 
-        # --------------------------------------------------------------------
-
-
-        # Normalization of t;  t = a vij + b vik ------------------------------
-        # da ||t.t -1||^2 = 2 vij. t 
-        self.add_derivatives(c_idx[ut], v_idx[va], 2*vec_dot(vij, t))
-        # db ||t.t -1||^2 = 2 vik. t
-        self.add_derivatives(c_idx[ut], v_idx[vb], 2*vec_dot(vik, t))
-
-        self.set_r(c_idx[ut], vec_dot(t, t) - 1)
-        # --------------------------------------------------------------------
-
-
-        # print("Direction: ", torsal)
-        # print(f" nt.ec : {self.r[c_idx[nt_ec]]@self.r[c_idx[nt_ec]]}")
-        # print(f" nt.t  : {self.r[c_idx[nt_t]]@self.r[c_idx[nt_t]]}")
-        # print(f" nt.tt : {self.r[c_idx[nt_tt]]@self.r[c_idx[nt_tt]]}")
-        # print(f" ut    : {self.r[c_idx[ut]]@self.r[c_idx[ut]]}\n")
-
-        
-        if torsal== 1:
-            self.ttnorms1 = np.linalg.norm(tt, axis=1)
-        else:
-            self.ttnorms2 = np.linalg.norm(tt, axis=1)
-
-
-    def compute_second_env(self, df, ei, F):
-        """ Compute the second envelope of the mesh
-        Input:
-            df .- distance to center np.array
-            vi .- Vertices np.array
-            ei .- direction vectors np.array
-        Output:
-            vvi, vvj, vvk, dcvi, dcvj, dcvk
-        """
-
-        cf = self.compute_sphere_centers(df)
+        # Get direction on the faces
+        vij = self.fvij[:,0]
+        vik = self.fvij[:,1]
 
         # Get vertices of the faces
-        vi, vj, vk = self.v 
+        vi, vj, vk = self.v
         
-        # Direction from vi to cf
-        dcvi = cf - vi
-        # Direction from vj to cf
-        dcvj = cf - vj
-        # Direction from vk to cf
-        dcvk = cf - vk
+        i, j, k = self.F[:,0], self.F[:,1], self.F[:,2]
 
-        ue = unit(ei)
+        indices_i = self.var_idx["e"][3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
+        indices_j = self.var_idx["e"][3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
+        indices_k = self.var_idx["e"][3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
 
-        # compute the second envelope as vi + 2*(dcv.ei) uei; uei = ei/||ei||
-        vvi = 2*vec_dot(dcvi,ue[F[:,0]])[:, None] * ue[F[:,0]] + vi
-        vvj = 2*vec_dot(dcvj,ue[F[:,1]])[:, None] * ue[F[:,1]] + vj
-        vvk = 2*vec_dot(dcvk,ue[F[:,2]])[:, None] * ue[F[:,2]] + vk
+        # compute the second envelope as vvi = vi + e[i]
+        vvi = vi + e[i]
+        vvj = vj + e[j]
+        vvk = vk + e[k]
 
-        return vvi, vvj, vvk, dcvi, dcvj, dcvk
-
-
-    def compute_sphere_centers(self, df) ->  np.array:
-        """ Compute sphere centers
-        Input:
-            bf .- Circumcenters
-            df .- Distance to center
-            ncf .- Normal of circumcenters
-        """
-        return self.bf + df[:, None] * self.ncf
-    
-    def compute_ec(self, df, e_i, F) -> np.array:
-        """ Compute the direction of the line congruence at the barycenters
-        Input:
-            df .- Distance to center
-            e_i .- direction vectors np.array
-            F.- Faces
-        Output:
-            ec .- direction of the line congruence at the barycenters
-        """
-        # Get first envelope
-        vc = self.vc
-
-        # Compute second envelope
-        vvi, vvj, vvk, _, _, _ = self.compute_second_env(df, e_i, F)
-
-        # Compute varycenter in second envelope
-        vvc = (vvi + vvj + vvk)/3
-
-        # Compute ec as differencen between second and first envelope
-        ec = vvc - vc
-
-        if len(ec.shape) == 1:
-            ec = np.array([ec])
-
-        return ec
-
-
-    
-    def compute_decnt(self, dcvi, dcvj, dcvk, e, nt, F):
-        """ Function to compute the derivative of nt.ec with respect to e_i
-            (nt.ec) = (nt.(ei + ej + ek)/3) = (nt).(vvc - vc);
-            vc = (vi + vj + vk)/3
-            vvi = vi + 2*(dcv.ei) ei
-        """
-        # Get directions per vertex
-        ei = e[F[:,0]]
-        ej = e[F[:,1]]
-        ek = e[F[:,2]]  
-
-        
-
-        # Compute derivatives of de (nt.ec)
-        deix = vec_dot( ( dcvi[:,0][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([1,0,0]) ), nt)
-        deiy = vec_dot( ( dcvi[:,1][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,1,0]) ), nt)
-        deiz = vec_dot( ( dcvi[:,2][:, None]*ei +  vec_dot(ei, dcvi)[:, None]*np.array([0,0,1]) ), nt)
-
-        dejx = vec_dot( ( dcvj[:,0][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([1,0,0]) ), nt)
-        dejy = vec_dot( ( dcvj[:,1][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([0,1,0]) ), nt)
-        dejz = vec_dot( ( dcvj[:,2][:, None]*ej +  vec_dot(ej, dcvj)[:, None]*np.array([0,0,1]) ), nt)
-
-        dekx = vec_dot( ( dcvk[:,0][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([1,0,0]) ), nt)
-        deky = vec_dot( ( dcvk[:,1][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,1,0]) ), nt)
-        dekz = vec_dot( ( dcvk[:,2][:, None]*ek +  vec_dot(ek, dcvk)[:, None]*np.array([0,0,1]) ), nt)
-
-        return deix, deiy, deiz, dejx, dejy, dejz, dekx, deky, dekz
-
-
-    def compute_d_df(self, e, nt, F):
-        """ Compute the derivative of nt.ec with respect to df
-            (nt.ec) = (nt.(ei + ej + ek)/3) = (nt).(vvc - vc);
-            vc = (vi + vj + vk)/3
-            vvi = vi + 2(dcv.ei)/||enor|| ei/||enor||; dcv = cf - vi 
-            cf = bf + df ncf
-            => d df (nt.ec) = 2/3 [nt.( (ei.ncf)* ei + (ej.ncf)*ej   + (ek.ncf)*ek )]/||enor||**2
-        """
-        # Get directions per vertex
-        ei = e[F[:,0]]
-        ej = e[F[:,1]]
-        ek = e[F[:,2]] 
-
-        # Get normals of the circumcenters
-        ncf = self.ncf 
-
-        # Compute dot produts
-        eicf = vec_dot(ei, ncf)
-        ejcf = vec_dot(ej, ncf)
-        ekcf = vec_dot(ek, ncf)
-
-        eicf_ei = eicf[:,None]*ei
-        ejcf_ej = ejcf[:,None]*ej
-        ekcf_ek = ekcf[:,None]*ek
-
-        # Compute the derivative of nt.ec with respect to df
-        d_df = 2/3*vec_dot( (eicf_ei + ejcf_ej + ekcf_ek ), nt)
-
-        return d_df, eicf_ei, ejcf_ej, ekcf_ek   
-
-
-    
-    def compute_t(self, a, b):
-        """ Compute t = a vij + b vik
-        """
-
-
-        return a[:, None]*self.fvij[:,0] + b[:, None]*self.fvij[:,1]
-
-    def compute_tt(self, a, b, vvi, vvj, vvk):
-        """ Compute tt = a vvij + b vvik
-        """
         vvij = vvj - vvi
         vvik = vvk - vvi
-        return a[:, None]*vvij + b[:, None]*vvik, vvij, vvik
-    
+
+        alpha = th + phi
+
+        # Compute torsal directions in the second envelope
+        tt1 =    np.cos(th)[:,None]*vvij +    np.sin(th)[:,None]*vik
+        tt2 = np.cos(alpha)[:,None]*vvij + np.sin(alpha)[:,None]*vvik
+
+        dtt1_th =    -np.sin(th)[:,None]*vij + np.cos(th)[:,None]*vik
+        dtt2_th = -np.sin(alpha)[:,None]*vij + np.cos(alpha)[:,None]*vik
+
+        nt1nor = nt1/self.tnorms1[:, None]
+
+        # E : ||nt1.tt1||; tt1 = cos(th) (vvj - vvi) + sin(th) (vvk - vvi)
+        # d nt1 => tt1/||tt1||
+        self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), self.var_idx["nt1"], (tt1/self.ttnorms1[:, None]).flatten())
+
+        # d th => nt1.(-sin(th) (vvj - vvi) + cos(th) (vvk - vvi))/||tt1||
+        self.add_derivatives(self.const_idx["nt1.tt1"], self.var_idx["th"], vec_dot(nt1, dtt1_th)/self.ttnorms1)
+
+        # d ei => -nt1*(cos(th) + sin[th])/||tt1||
+        self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), indices_i, (-(np.cos(th) + np.sin(th))[:,None]*nt1nor).flatten())
+
+        # d ej => nt1*cos(th)/||tt1||
+        self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), indices_j, (np.cos(th)[:,None]*nt1nor).flatten())
+
+        # d ek => nt1*sin(th)/||tt1||
+        self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), indices_k, (np.sin(th)[:,None]*nt1nor).flatten())
+
+        # r
+        self.set_r(self.const_idx["nt1.tt1"], vec_dot(nt1, tt1)/self.ttnorms1)
+
+        nt2nor = nt2/self.tnorms2[:, None]
+
+        # E : ||nt2.tt2||; tt2 = cos(alpha) (vvj - vvi) + sin(alpha) (vvk - vvi)
+        # d nt2 => tt2/||tt2||
+        self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), self.var_idx["nt2"], (tt2/self.ttnorms2[:, None]).flatten())
+
+        # d th => nt2.(-sin(alpha) (vvj - vvi) + cos(alpha) (vvk - vvi))/||tt2||
+        self.add_derivatives(self.const_idx["nt2.tt2"], self.var_idx["th"], vec_dot(nt2, dtt2_th)/self.ttnorms2)
+
+        # d phi => nt2.(-sin(alpha) (vvj - vvi) + cos(alpha) (vvk - vvi))/||tt2||
+        self.add_derivatives(self.const_idx["nt2.tt2"], self.var_idx["phi"], vec_dot(nt2, dtt2_th)/self.ttnorms2)
+
+        # d ei => -nt2*(cos(alpha) + sin[alpha])/||tt2||
+        self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), indices_i, (-(np.cos(alpha) + np.sin(alpha))[:,None]*nt2nor).flatten())
+
+        # d ej => nt2*cos(alpha)/||tt2||
+        self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), indices_j, (np.cos(alpha)[:,None]*nt2nor).flatten())
+
+        # d ek => nt2*sin(alpha)/||tt2||
+        self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), indices_k, (np.sin(alpha)[:,None]*nt2nor).flatten())
+
+        # r
+        self.set_r(self.const_idx["nt2.tt2"], vec_dot(nt2, tt2)/self.ttnorms2)
+
+        
+
+        # update torsal norms
+        self.ttnorms1 = np.linalg.norm(tt1, axis=1)
+        self.ttnorms2 = np.linalg.norm(tt2, axis=1)
+
        
  
 
