@@ -104,9 +104,14 @@ class Torsal(Constraint):
         # Compute angles between t1 and vij 
         vij = unit(self.fvij[:,0])
         
-        th = np.arccos(abs(vec_dot(t1, vij)))
+        th = np.ones(self.nF)*np.pi/2
+        th[b != 0] = np.arctan(a1/b)
+
         # Compute angles between t1 and t2 
-        phi = np.arccos(abs(vec_dot(t2, t1)))
+        alpha = np.ones(self.nF)*np.pi/2
+        alpha[b != 0] = np.arctan(a2/b)
+
+        phi = alpha - th
 
         X[var_indices["th"]] = th
         X[var_indices["phi"]] = phi
