@@ -71,14 +71,12 @@ class Sphericity(Constraint):
         i_e =  3 * np.repeat(i, 3) + np.tile(range(3), len(i))
         j_e =  3 * np.repeat(j, 3) + np.tile(range(3), len(j))
         k_e =  3 * np.repeat(k, 3) + np.tile(range(3), len(k))
+
+
         # Env1 
-
-        
-
         cf_vi = np.vstack( (s_c - v[i], s_c - v[j], s_c - v[k] ))
                 # Check lenght indices
-
-        
+       
 
         # d sph_c =>   2*(c_f - v_i)
         self.add_derivatives(self.const_idx["Env1"].repeat(3), np.tile(self.var_idx["sph_c"],3), 2*cf_vi.flatten())
@@ -91,8 +89,9 @@ class Sphericity(Constraint):
         # set r
         self.set_r(self.const_idx["Env1"], np.sum(cf_vi*cf_vi, axis=1) - np.tile(s_r*s_r, 3))
 
-        # Env2
+        
 
+        # Env2
         cf_vvi = np.vstack( (s_c - vv[i], s_c - vv[j], s_c - vv[k] ))
         
         # d sph_c =>   2*(c_f - vv_i)
@@ -100,7 +99,7 @@ class Sphericity(Constraint):
 
         
         # d e_i,j,k =>  -(2*sph_c-2*v_i-2*e_i)
-        #self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
+        self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
 
         # d r =>  -2*r
         self.add_derivatives(self.const_idx["Env2"], np.tile(self.var_idx["sph_r"],3), -2*np.tile(s_r,3))
@@ -108,7 +107,7 @@ class Sphericity(Constraint):
         # set r
         self.set_r(self.const_idx["Env2"], np.sum(cf_vvi*cf_vvi, axis=1) - np.tile(s_r*s_r, 3))
         
-
+        
 
         # Square distance center and vertices
         

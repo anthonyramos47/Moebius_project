@@ -217,10 +217,10 @@ class Torsal(Constraint):
 
         alpha = th + phi
 
-        t1 = np.cos(th)[:,None]*vij + np.sin(th)[:,None]*vik
+        t1 =    np.cos(th)[:,None]*vij + np.sin(th)[:,None]*vik
         t2 = np.cos(alpha)[:,None]*vij + np.sin(alpha)[:,None]*vik
 
-        dt1 = -np.sin(th)[:,None]*vij + np.cos(th)[:,None]*vik
+        dt1 =    -np.sin(th)[:,None]*vij + np.cos(th)[:,None]*vik
         dt2 = -np.sin(alpha)[:,None]*vij + np.cos(alpha)[:,None]*vik
 
         # E: ||nt1.t1||; t1 = cos(th) vij + sin(th) vik
