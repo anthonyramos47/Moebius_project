@@ -1,7 +1,7 @@
 # Planarity constraint implementation
 
 import numpy as np
-from hanan.geometry.utils import vec_dot, solve_torsal, unit
+from hanan.geometry.utils import vec_dot, solve_torsal, unit, find_initial_torsal_th_phi
 from hanan.optimization.constraint import Constraint
 
 
@@ -99,22 +99,20 @@ class Torsal(Constraint):
         self.ecnorms = np.linalg.norm(ec, axis=1)
 
         # Compute initial torsal directions
-        t1, t2, a1, a2, b, _ = solve_torsal(vi, vj, vk, e[i], e[j], e[k])
+        t1, t2, a1, a2, b, validity = solve_torsal(vi, vj, vk, e[i], e[j], e[k])
 
+        vij = self.fvij[:,0]
+        vik = self.fvij[:,1]
         # Compute angles between t1 and vij 
-        vij = unit(self.fvij[:,0])
-        
-        th = np.ones(self.nF)*np.pi/2
-        th[b != 0] = np.arctan(a1/b)
+        th, phi, _ = find_initial_torsal_th_phi(t1, t2, vij, vik)
 
-        # Compute angles between t1 and t2 
-        alpha = np.ones(self.nF)*np.pi/2
-        alpha[b != 0] = np.arctan(a2/b)
-
-        phi = alpha - th
+        idx_f = np.where(validity == False)[0]
+        phi[idx_f] = th[idx_f] + np.pi/2
 
         X[var_indices["th"]] = th
         X[var_indices["phi"]] = phi
+
+
 
         # Compute torsal directions with respec to angle
         t1 = np.cos(th)[:,None]*self.fvij[:,0] + np.sin(th)[:,None]*self.fvij[:,1]

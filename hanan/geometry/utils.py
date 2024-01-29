@@ -281,6 +281,32 @@ def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
     mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
 
+def find_initial_torsal_th_phi(t1, t2, vij, vik):
+    """ Function to find the initial torsal directions parameters
+    Input:
+        t: Torsal direction
+        vij: edge vector
+        vik: edge vector
+    """
+    
+    theta = np.zeros(len(t1))
+    phi   = np.zeros(len(t1))
+
+    alpha = np.zeros(len(t1)) # alpha = theta + phi
+
+    for i in range(len(t1)):
+        # Compute theta
+        theta[i]   = find_angles(0, t1[i], vij[i], vik[i])
+        alpha[i]   = find_angles(0, t2[i], vij[i], vik[i])
+
+        # Compute phi
+        phi[i] = alpha[i] - theta[i]
+    
+    return theta, phi, alpha
+
+
+    
+
 def solve_torsal(vi, vj, vk, ei, ej, ek) :
     """ Function to solve the torsal directions analytically
     Input:
@@ -497,6 +523,20 @@ def compute_torsal_angles(t1, t2, ec):
 
 
 # ====================== Torsal Approximation Functions =================
+
+def find_angles(init, t, vij, vik):
+    # Perform the optimization
+    result = minimize(quadratic_equation_angle, init, args=(t, vij, vik))
+
+    return result.x
+
+# Define the quadratic equation to be minimized
+def quadratic_equation_angle(x, t, vij, vik):
+    l = x
+    t_th = np.cos(l)*vij + np.sin(l)*vik
+
+    return (unit(t)@unit(t_th) - 1)**2
+
 
 def approximate_torsal(init, g0, g1, g2):
 

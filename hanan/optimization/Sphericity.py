@@ -100,7 +100,7 @@ class Sphericity(Constraint):
 
         
         # d e_i,j,k =>  -(2*sph_c-2*v_i-2*e_i)
-        self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
+        #self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
 
         # d r =>  -2*r
         self.add_derivatives(self.const_idx["Env2"], np.tile(self.var_idx["sph_r"],3), -2*np.tile(s_r,3))
