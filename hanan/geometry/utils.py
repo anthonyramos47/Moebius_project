@@ -20,12 +20,12 @@ def proj(v, u):
     u = np.array(u)
 
     vu = vec_dot(v, u)
-    vv = vec_dot(u, u)
+    uu = vec_dot(u, u)
 
     if len(v.shape) == 1 and len(u.shape) == 1:
-        proj = vu/vv*u
+        proj = vu/uu*u
     else:
-        proj = vu/vv[:, None]*u
+        proj = (vu/uu)[:,None]*u
     return proj
 
 def barycenters(v, f):
@@ -43,6 +43,24 @@ def barycenters(v, f):
 
     return bary
 
+def barycentric_coordinates_app(vi, vj, vk, vl):
+    """ Function to find the barycentric coordinates of a point vl 
+        in the triangle defined by vi, vj, vk
+    """
+    def bar_coord(x, vi, vj, vk, vl):
+        b1, b2, b3 = x
+        return np.linalg.norm(b1*vi + b2*vj + b3*vk - vl)
+    
+    init = np.array([1/3, 1/3, 1/3])
+
+    # Perform the optimization
+    result = minimize(bar_coord, init, args=(vi, vj, vk, vl), tol=1e-6)
+    
+    # Sol
+    b1, b2, b3 = result.x
+
+    return b1, b2, b3 
+
 def barycentric_coordinates(vi, vj, vk, vl):
     """ Function to find the barycentric coordinates of a point vl 
         in the triangle defined by vi, vj, vk
@@ -54,7 +72,7 @@ def barycentric_coordinates(vi, vj, vk, vl):
     # Sol
     b1, b2, b3 = np.linalg.solve(A, vl)
 
-    return b1,b2,b3    
+    return b1, b2, b3    
 
 
 

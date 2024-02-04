@@ -30,11 +30,11 @@ class Constraint():
         """
         Method to compute the residual and the Jacobian
         """
-        self.reset()
+        self.reset()    
 
         self.compute(X)
 
-        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
+        self.J = csc_matrix((np.array(self.values), (self.i, self.j)), shape=(self.const, self.var))
         pass
 
     def compute(self, X) -> None:

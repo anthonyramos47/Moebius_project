@@ -6,8 +6,11 @@
     The mesh data structure is used to represent the geometry of a 3D object.
 
     The mesh data is stored in half-edge data structure in a matrix form.
-    Half-Edge r-th row : | Origin | Twin | Face | Next | Previous | Edge |
-                             0        1     2      3       4          5
+    Half-Edge r-th row   :  | Origin | Twin | Face | Next | Previous | Edge |
+                                0        1     2      3       4          5
+                                 
+    PrevHalf-Edge r-th row: | Origin | Face | Next | Prev |  Twin    | Edge |
+                                0        1     2      3       4          5
 
     The code is based on the code implemented by Davide Pellis. 
 
@@ -454,10 +457,7 @@ class Mesh():
 
         return adjacency
     
-    #    Half-Edge r-th row : | Origin | Twin | Face | Next | Previous | Edge |
-    #                             0        1     2      3       4          5
-    # PrevHalf-Edge r-th row: | Origin | Face | Next | Prev |  Twin    | Edge |
-    #                             0        1     2      3       4          5
+
     def vertex_ring_vertices_iterators(self, sort=False, order=False):
         H = self.halfedges
         v  = H[:,0]
@@ -714,19 +714,45 @@ class Mesh():
         v2 = v[1::2]
         return v1, v2
     
+    def edge_oposite_vertices(self):
+        """ Returns the oposite vertices of each edge
+        """
+
+        # Get halfedges
+        H  = self.halfedges
+        v  = H[np.argsort(H[:,5]),0]
+
+        opv =  H[H[H[np.argsort(H[:,5]),3], 3], 0]
+
+        # Get oposite vertices
+        # Even indices
+        ov1 = opv[0::2]
+        # Odd indices
+        ov2 = opv[1::2]
+        return ov1, ov2
+    
     def inner_edges(self):
         """ Function to get inner edges
         """
+    # Half-Edge r-th row   :  | Origin | Twin | Face | Next | Previous | Edge |
+    #                             0        1     2      3       4          5               
+    # PrevHalf-Edge r-th row: | Origin | Face | Next | Prev |  Twin    | Edge |
+    #                             0        1     2      3       4          5    
+
         # Get halfedges
         H = self.halfedges
+
         # Get boundary halfedges
-        h = np.where(H[:,1] != -1)[0]
+        h = H[np.where(H[:, 2] == -1)[0], 5] 
 
         # Get the edges 
-        e = H[h,5]
+        e = H[:, 5]
 
         # Get the unique edges
         e = np.unique(e)
+
+        # Delete boundary edges
+        e = np.delete(e, h)
 
         return e
 
