@@ -1,10 +1,10 @@
 {
     "weights_Opt" : {"sphericity" : 1, 
-           "linecong" : 1, 
-           "torsal" : 1,
-           "line_fair" : 0.001, 
-           "torsal_fair" : 1,
-           "torsal_angle": 1
+           "linecong" : 0, 
+           "torsal" : 0,
+           "line_fair" : 0, 
+           "torsal_fair" : 0,
+           "torsal_angle": 0
            },
     "iterations" : 100,
     "show" : true,
