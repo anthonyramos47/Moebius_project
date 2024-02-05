@@ -98,7 +98,7 @@ if __name__ == '__main__':
     opt.optimize()
 
     if save:
-        opt.save_mesh('{}_deformed'.format(name), field_scale=3, save_all=True)
+        opt.save_mesh('{}_deformed'.format(name), field_scale=1, save_all=True)
         geo.save_mesh_obj(V, F, '{}_start'.format(name), overwrite=True)
 
     v1, v2 = opt.vectors()
