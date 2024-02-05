@@ -2,9 +2,21 @@ import os
 import sys
 
 # Add hananLab to path
-#path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(os.getcwd()))))
-path = os.path.dirname(os.getcwd())
+# #path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(os.getcwd()))))
+# path = os.path.dirname(os.getcwd())
+# sys.path.append(path)
+from pathlib import Path
+import pickle
+
+
+
+# Obtain the path HananLab
+path = os.path.dirname(Path(__file__).resolve().parent)
 sys.path.append(path)
+print(path)
+
+# Directory path
+dir_path = os.path.join(path, 'hanan')
 
 import igl
 import polyscope as ps
@@ -23,31 +35,47 @@ from hanan.optimization.Torsal_angle import Torsal_angle
 
 
 np.random.seed(0)
-IT = 100
-weights = {"sphericity" : 1, 
-           "linecong" : 1, 
-           "torsal" : 1, 
-           "line_fair" : 0.0001, 
-           "torsal_fair" : 0,
-           "torsal_angle": 1
-           }
-Show = True
-Show_Analytical_Torsal = True
-Type_Init = 0 # 0: Random, 1: Offset
+# IT = 2
+# weights = {"sphericity" : 1, 
+#            "linecong" : 1, 
+#            "torsal" : 1,
+#            "line_fair" : 0.1, 
+#            "torsal_fair" : 2,
+#            "torsal_angle": 1
+#            }
+# Show = True
+# Show_Analytical_Torsal = True
 
-# Define paths
-dir_path = os.getcwd()
+import json
+import argparse
+
+# Crear el analizador de argumentos
+parser = argparse.ArgumentParser(description='Get a json file with parameters for the optimization.')
+# Añadir un argumento posicional
+parser.add_argument('json', type=str, help='Json with parameters for the optimization file path')
+
+# Analizar los argumentos de la línea de comandos
+args = parser.parse_args()
+
+
+with open(args.json, 'r') as f:
+    data = json.load(f)
+
+weights = data["weights_Opt"]
+IT = data["iterations"]
+
+Show = data["show"]
+Show_Analytical_Torsal = data["analytical_torsal"]
+
+Type_Init = 1 # 0: Random, 1: Offset
+
 data_path = dir_path+"/approximation/data/" # data path
 
 # Load test mesh
 #v, f = igl.read_triangle_mesh(os.path.join(data_path, "New_Tri_mesh.obj"))
 v, f = igl.read_triangle_mesh(os.path.join(data_path, "Coarse_tri_mesh.obj"))
 
-# fix seed
-# 
-# v = np.random.rand(4,3)
-# f = np.array([[0,1,2], [0,2,3]])
-
+# Compute normals
 n = igl.per_vertex_normals(v, f)
 
 # Create mesh
@@ -154,7 +182,7 @@ X = np.zeros(sum(len(arr) for arr in var_idx.values()))
 X[var_idx["e"]]      = e.flatten()
 X[var_idx["sph_c"]]  = sph_c.flatten()
 X[var_idx["sph_r"]]  = sph_r
-X[var_idx["alpha"]]  = 0.1
+X[var_idx["alpha"]]  = 0.2
 
 t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
 
@@ -192,7 +220,7 @@ tang.set_weigth(weights["torsal_angle"])
 # Init Torsal 
 
 torsal_fair = Torsal_Fair()
-torsal_fair.initialize_constraint(X, var_idx, v, e, inner_edges, ed_i, ed_j, ed_k, ed_l)
+torsal_fair.initialize_constraint(X, var_idx, v, inner_edges, ed_i, ed_j, ed_k, ed_l)
 torsal_fair.set_weigth(weights["torsal_fair"])
 
 #  Optimizer
@@ -201,15 +229,16 @@ optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
 
 
 for _ in range(IT):
-    # optimizer.unitize_variable("nt1", 3)
-    # optimizer.unitize_variable("nt2", 3)
+    optimizer.unitize_variable("nt1", 3)
+    optimizer.unitize_variable("nt2", 3)
     
     optimizer.get_gradients(sphericity)
     optimizer.get_gradients(linecong)
     optimizer.get_gradients(torsal)
     optimizer.get_gradients(line_fair)
-    optimizer.get_gradients(torsal_fair)
     optimizer.get_gradients(tang)
+
+    optimizer.get_gradients(torsal_fair)
     optimizer.optimize()
 
 
@@ -228,6 +257,10 @@ vi, vj, vk = v[i], v[j], v[k]
 vij = vj - vi 
 vki = vk - vi
 
+
+
+
+# Compute planarity
 if Show_Analytical_Torsal:
     # Compute initial torsal directions
     t1, t2, a1, a2, b, validity = solve_torsal(vi, vj, vk, ne[i], ne[j], ne[k])
@@ -262,13 +295,24 @@ for id in range(len(boundary_faces)):
     sphere = ps.register_point_cloud(f"sphere_c{i}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.5)
     sphere.set_radius(nr[i], relative=False)
 
+edges_i, edges_j = mesh.edge_vertices()
+
+l = (e[edges_i] + e[edges_j])/2
+
+m_v = (v[edges_i] + v[edges_j])/2
+
 
 
 ps.register_point_cloud("cr", ct, enabled=True, radius=0.001, color=(0,0,0))
 mesh = ps.register_surface_mesh("mesh", v, f)
 mesh2 = ps.register_surface_mesh("mesh 2", vv, f)
-mesh.add_vector_quantity("n", ne, length=1, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
+mesh.add_vector_quantity("line", ne, length=1, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
+mesh.add_vector_quantity("line-e", -ne, length=1, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
 
+
+mid_edges = ps.register_point_cloud("mid_points", m_v, enabled=True, radius=0.001, color=(0,0,0))
+
+#mid_edges.add_vector_quantity("l", - l, length=0.01, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
 
 # Show sphere circumcircle axis
 #mesh.add_vector_quantity(  "n",   nt, defined_on="faces", length=0.5, radius=0.0005, enabled=True,  color=(0.5,0,0.8))
@@ -285,11 +329,23 @@ mesh.add_scalar_quantity("Torsal angles", torsal_angles, defined_on="faces", ena
 # Visualize sphere radius as scalar quantity
 mesh.add_scalar_quantity("radius sphere", nr, defined_on="faces", enabled=True, cmap="coolwarm")
 
-
 mesh.add_vector_quantity("t1", t1, defined_on="faces", length=0.01, enabled=True,  color=(1,1,1))
 mesh.add_vector_quantity("t2", t2, defined_on="faces", length=0.01, enabled=True,  color=(0,0,0))
+
+mesh2.add_vector_quantity("tt1", tt1, defined_on="faces", length=0.01, enabled=True,  color=(1,1,1))
+mesh2.add_vector_quantity("tt2", tt2, defined_on="faces", length=0.01, enabled=True,  color=(0,0,0))
 #mesh.add_vector_quantity("Circum normal", -nt, defined_on="faces", length=4, enabled=True, vectortype="ambient", color=(0,0,0))
 #mesh.add_vector_quantity("Circum normal1", nt, defined_on="faces", length=4, enabled=True, vectortype="ambient", color=(0,0,0))
 
 if Show:
     ps.show()
+
+
+# Example object to pickle (can be any Python object)
+Optimization_Output = [v, f, t1, t2]
+
+# Open a file for writing. The 'wb' parameter denotes 'write binary'
+with open('torsal_opt.pkl', 'wb') as file:
+    pickle.dump(Optimization_Output, file)
+
+

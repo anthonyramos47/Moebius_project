@@ -34,14 +34,13 @@ class Torsal_Fair(Constraint):
         self.L_norm = None # Norm of middle edge ei+ej
         
         self.v = None # Set of vertices
-        self.e = None # Set of lines congruences
+
     
-    def initialize_constraint(self, X, var_indices, v, e, inner_edges, ie_i, ie_j, ie_k, ie_l) -> np.array:
+    def initialize_constraint(self, X, var_indices, v, inner_edges, ie_i, ie_j, ie_k, ie_l) -> np.array:
         # Set vertices
         self.v = v
-        
-        # Set lines congruences
-        self.e = e
+
+        e = X[var_indices["e"]].reshape(-1, 3)
 
         # Set inner edges
         self.inner_edges = inner_edges
@@ -77,14 +76,12 @@ class Torsal_Fair(Constraint):
             
             u1, u2, u3 = barycentric_coordinates_app(vbi[i], vbj[i], vbk[i], vbl[i])
             
-            X[self.var_idx["u"][3*i]   ] = u1 + np.random.uniform(-0.1, 0.1)
-            X[self.var_idx["u"][3*i+1] ] = u2 + np.random.uniform(-0.1, 0.1)
-            X[self.var_idx["u"][3*i+2] ] = u3 + np.random.uniform(-0.1, 0.1)
+            X[self.var_idx["u"][3*i]   ] = u1 
+            X[self.var_idx["u"][3*i+1] ] = u2 
+            X[self.var_idx["u"][3*i+2] ] = u3 
             # X[self.var_idx["u"][3*i]   ] = 1/3
             # X[self.var_idx["u"][3*i+1] ] = 1/3
             # X[self.var_idx["u"][3*i+2] ] = 1/3
-
-
 
         # Set number of constraints
         self.const_idx = {"T1": np.arange(0                   , 3*len(inner_edges)), 
@@ -103,11 +100,14 @@ class Torsal_Fair(Constraint):
                 F: Faces
         """
 
-        # Get variables
+        # Get vertices
         v = self.v
 
-        # Get lines congruences
-        e = self.e
+        # Get barycentric coordinates
+        u = X[self.var_idx["u"]].reshape(-1, 3)
+
+        # Get Lines
+        e = X[self.var_idx["e"]].reshape(-1, 3)
 
         # Get inner edges
         inner_edges = self.inner_edges
@@ -128,10 +128,9 @@ class Torsal_Fair(Constraint):
 
         # Get middle edge
         L = e[i] + e[j]
-    
-        # Get barycentric coordinates
-        u = X[self.var_idx["u"]].reshape(-1, 3)
 
+
+        
         # Get e indices
         # e_i
         e_idx_i_x = self.var_idx["e"][3*i]
@@ -151,9 +150,10 @@ class Torsal_Fair(Constraint):
         e_idx_l_z = self.var_idx["e"][3*l + 2]
 
         # Dot product vi L
-        viL = vec_dot(v[i], L)
-        vjL = vec_dot(v[j], L)
-        vkL = vec_dot(v[k], L)
+        viL = vec_dot(vi, L)
+        vjL = vec_dot(vj, L)
+        vkL = vec_dot(vk, L)
+        vlL = vec_dot(vl, L)
 
         # Get barycentric coordinates
         ui = u[:,0]
@@ -163,40 +163,40 @@ class Torsal_Fair(Constraint):
         # L/L^2
         Ln = L/L_2[:,None]
         
-        # # Dui => -vi + vi.l/l^2 l
-        # self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie)].repeat(3), (-v[i] + (viL/L_2)[:,None]*L).flatten())
-        # # Duj => -vj + vj.l/l^2 l
-        # self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), (-v[j] + (vjL/L_2)[:,None]*L).flatten())
-        # # Duk => -vk - vk.l/l^2 l
-        # self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), (-v[k] + (vkL/L_2)[:,None]*L).flatten())
+        # Dui => -vi + vi.l/l^2 l
+        self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie)].repeat(3), (-v[i] + (viL/L_2)[:,None]*L).flatten())
+        # Duj => -vj + vj.l/l^2 l
+        self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), (-v[j] + (vjL/L_2)[:,None]*L).flatten())
+        # Duk => -vk - vk.l/l^2 l
+        self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), (-v[k] + (vkL/L_2)[:,None]*L).flatten())
 
-        # # # Projection
-        # proj = (vec_dot(vl, L) - ui*viL - uj*vjL - uk*vkL)/L_2
+        # # Projection
+        proj = (vec_dot(vl, L) - ui*viL - uj*vjL - uk*vkL)/L_2
         
         
 
-        # # Proj dx 
-        # proj_dx = (-(vl[:,0]  - ui*vi[:,0] - uj*vj[:,0] - uk*vk[:,0]))[:,None]*Ln - proj[:,None]*np.array([1,0,0])
-        # # Proj dy
-        # proj_dy = (-(vl[:,1]  - ui*vi[:,1] - uj*vj[:,1] - uk*vk[:,1]))[:,None]*Ln - proj[:,None]*np.array([0,1,0])
-        # # Proj dz
-        # proj_dz = (-(vl[:,2]  - ui*vi[:,2] - uj*vj[:,2] - uk*vk[:,2]))[:,None]*Ln - proj[:,None]*np.array([0,0,1])
+        # Proj dx 
+        proj_dx = (-(vl[:,0]  - ui*vi[:,0] - uj*vj[:,0] - uk*vk[:,0]))[:,None]*Ln - proj[:,None]*np.array([1,0,0])
+        # Proj dy
+        proj_dy = (-(vl[:,1]  - ui*vi[:,1] - uj*vj[:,1] - uk*vk[:,1]))[:,None]*Ln - proj[:,None]*np.array([0,1,0])
+        # Proj dz
+        proj_dz = (-(vl[:,2]  - ui*vi[:,2] - uj*vj[:,2] - uk*vk[:,2]))[:,None]*Ln - proj[:,None]*np.array([0,0,1])
 
-        # # Deix => - (vl[0]/l^2  - sum(ui vi[0]/l^2))l - (vl.l/l^2 - sum(ui vi.l/l^2 ))[1,0,0]
-        # self.add_derivatives(self.const_idx["T1"], e_idx_i_x.repeat(3), proj_dx.flatten())
-        # # Deiy => - (vl[1]/l^2  - sum(ui vi[1]/l^2))l - (vl.l/l^2 - sum(ui vi.l/l^2 ))[0,1,0]
-        # self.add_derivatives(self.const_idx["T1"], e_idx_i_y.repeat(3), proj_dy.flatten())
-        # # Deiz => - (vl[2]/l^2  - sum(ui vi[2]/l^2))l - (vl.l/l^2 - sum(ui vi.l/l^2 ))[0,0,1]
-        # self.add_derivatives(self.const_idx["T1"], e_idx_i_z.repeat(3), proj_dz.flatten())
+        # Deix => - (vl[0]/l^2  - sum(ui vi[0]/l^2))l - (vl.l/l^2 - sum(ui vi.l/l^2 ))[1,0,0]
+        self.add_derivatives(self.const_idx["T1"], e_idx_i_x.repeat(3), proj_dx.flatten())
+        # Deiy => - (vl[1]/l^2  - sum(ui vi[1]/l^2))l - (vl.l/l^2 - sum(ui vi.l/l^2 ))[0,1,0]
+        self.add_derivatives(self.const_idx["T1"], e_idx_i_y.repeat(3), proj_dy.flatten())
+        # Deiz => - (vl[2]/l^2  - sum(ui vi[2]/l^2))l - (vl.l/l^2 - sum(ui vi.l/l^2 ))[0,0,1]
+        self.add_derivatives(self.const_idx["T1"], e_idx_i_z.repeat(3), proj_dz.flatten())
 
-        # # Dejx => - (vl[0]/l^2  - sum(ui vj[0]/l^2))l - (vl.l/l^2 - sum(ui vj.l/l^2 ))[1,0,0]
-        # self.add_derivatives(self.const_idx["T1"], e_idx_j_x.repeat(3), proj_dx.flatten())
-        # # Dejy => - (vl[1]/l^2  - sum(ui vj[1]/l^2))l - (vl.l/l^2 - sum(ui vj.l/l^2 ))[0,1,0]
-        # self.add_derivatives(self.const_idx["T1"], e_idx_j_y.repeat(3), proj_dy.flatten())
-        # # Dejz => - (vl[2]/l^2  - sum(ui vj[2]/l^2))l - (vl.l/l^2 - sum(ui vj.l/l^2 ))[0,0,1]
-        # self.add_derivatives(self.const_idx["T1"], e_idx_j_z.repeat(3), proj_dz.flatten())
+        # Dejx => - (vl[0]/l^2  - sum(ui vj[0]/l^2))l - (vl.l/l^2 - sum(ui vj.l/l^2 ))[1,0,0]
+        self.add_derivatives(self.const_idx["T1"], e_idx_j_x.repeat(3), proj_dx.flatten())
+        # Dejy => - (vl[1]/l^2  - sum(ui vj[1]/l^2))l - (vl.l/l^2 - sum(ui vj.l/l^2 ))[0,1,0]
+        self.add_derivatives(self.const_idx["T1"], e_idx_j_y.repeat(3), proj_dy.flatten())
+        # Dejz => - (vl[2]/l^2  - sum(ui vj[2]/l^2))l - (vl.l/l^2 - sum(ui vj.l/l^2 ))[0,0,1]
+        self.add_derivatives(self.const_idx["T1"], e_idx_j_z.repeat(3), proj_dz.flatten())
         
-        # self.set_r(self.const_idx["T1"], (vl - ui[:,None]*vi - uj[:,None]*vj - uk[:,None]*vk - proj[:,None]*L).flatten())
+        self.set_r(self.const_idx["T1"], (vl - ui[:,None]*vi - uj[:,None]*vj - uk[:,None]*vk - proj[:,None]*L).flatten())
 
 
         # Energy T2  = || el - sum(ui ei) - ( el.l/l^2 - sum(ui ei.l/l^2 ))l ||^2
@@ -226,9 +226,11 @@ class Torsal_Fair(Constraint):
                              self.var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), 
                              (-ek + (ekL/L_2)[:,None]*L).flatten())
 
-        # # Projection
+        # # # Projection
         proj = (elL - ui*eiL - uj*ejL - uk*ekL)/L_2
 
+
+        # proj = ( el.l/l^2 - sum(ui ei.l/l^2 ))l ; l = ei + ej => dl_ei = 1, dl_ej = 1 
         # Proj dx
         proj_ei_dx = ((el[:,0] - ui*ei[:,0] - uj*ej[:,0] - uk*ek[:,0] - ui*L[:,0]))[:,None]*Ln + proj[:,None]*np.array([1,0,0])
 
@@ -247,19 +249,19 @@ class Torsal_Fair(Constraint):
         # Proj dz
         proj_ej_dz = ((el[:,2] - ui*ei[:,2] - uj*ej[:,2] - uk*ek[:,2] - uj*L[:,2]))[:,None]*Ln + proj[:,None]*np.array([0,0,1])
 
-        # # Deix => - ui - 1/l^2(el[0] - sum(ui ei[0]) - ui [1,0,0] )*l - proj[:,None]*[1,0,0]
-        # self.add_derivatives(self.const_idx["T2"], e_idx_i_x.repeat(3),( - ui[:,None]*np.array([1,0,0]) - proj_ei_dx).flatten())
-        # # Deiy => - ui - 1/l^2(el[1] - sum(ui ei[1]) - ui [0,1,0] )*l - proj[:,None]*[0,1,0]
-        # self.add_derivatives(self.const_idx["T2"], e_idx_i_y.repeat(3),( - ui[:,None]*np.array([0,1,0]) - proj_ei_dy).flatten())
-        # # Deiz => - ui - 1/l^2(el[2] - sum(ui ei[2]) - ui [0,0,1] )*l - proj[:,None]*[0,0,1]
-        # self.add_derivatives(self.const_idx["T2"], e_idx_i_z.repeat(3),( - ui[:,None]*np.array([0,0,1]) - proj_ei_dz).flatten())
+        # Deix => - ui - 1/l^2(el[0] - sum(ui ei[0]) - ui [1,0,0] )*l - proj[:,None]*[1,0,0]
+        self.add_derivatives(self.const_idx["T2"], e_idx_i_x.repeat(3),( - ui[:,None]*np.array([1,0,0]) - proj_ei_dx).flatten())
+        # Deiy => - ui - 1/l^2(el[1] - sum(ui ei[1]) - ui [0,1,0] )*l - proj[:,None]*[0,1,0]
+        self.add_derivatives(self.const_idx["T2"], e_idx_i_y.repeat(3),( - ui[:,None]*np.array([0,1,0]) - proj_ei_dy).flatten())
+        # Deiz => - ui - 1/l^2(el[2] - sum(ui ei[2]) - ui [0,0,1] )*l - proj[:,None]*[0,0,1]
+        self.add_derivatives(self.const_idx["T2"], e_idx_i_z.repeat(3),( - ui[:,None]*np.array([0,0,1]) - proj_ei_dz).flatten())
 
-        # # Dejx => - uj - 1/l^2(el[0] - sum(ui ej[0]) - uj [1,0,0] )*l - proj[:,None]*[1,0,0]
-        # self.add_derivatives(self.const_idx["T2"], e_idx_j_x.repeat(3),( - uj[:,None]*np.array([1,0,0]) - proj_ej_dx).flatten())
-        # # Dejy => - uj - 1/l^2(el[1] - sum(ui ej[1]) - uj [0,1,0] )*l - proj[:,None]*[0,1,0]
-        # self.add_derivatives(self.const_idx["T2"], e_idx_j_y.repeat(3),( - uj[:,None]*np.array([0,1,0]) - proj_ej_dy).flatten())
-        # # Dejz => - uj - 1/l^2(el[2] - sum(ui ej[2]) - uj [0,0,1] )*l - proj[:,None]*[0,0,1]
-        # self.add_derivatives(self.const_idx["T2"], e_idx_j_z.repeat(3),( - uj[:,None]*np.array([0,0,1]) - proj_ej_dz).flatten())
+        # Dejx => - uj - 1/l^2(el[0] - sum(ui ej[0]) - uj [1,0,0] )*l - proj[:,None]*[1,0,0]
+        self.add_derivatives(self.const_idx["T2"], e_idx_j_x.repeat(3),( - uj[:,None]*np.array([1,0,0]) - proj_ej_dx).flatten())
+        # Dejy => - uj - 1/l^2(el[1] - sum(ui ej[1]) - uj [0,1,0] )*l - proj[:,None]*[0,1,0]
+        self.add_derivatives(self.const_idx["T2"], e_idx_j_y.repeat(3),( - uj[:,None]*np.array([0,1,0]) - proj_ej_dy).flatten())
+        # Dejz => - uj - 1/l^2(el[2] - sum(ui ej[2]) - uj [0,0,1] )*l - proj[:,None]*[0,0,1]
+        self.add_derivatives(self.const_idx["T2"], e_idx_j_z.repeat(3),( - uj[:,None]*np.array([0,0,1]) - proj_ej_dz).flatten())
 
         # Dekx => - uk[1,0,0] + uk l[0]/l^2 l
         self.add_derivatives(self.const_idx["T2"], e_idx_k_x.repeat(3), (-uk[:,None]*np.array([1,0,0]) + uk[:,None]*(L[:, 0]/L_2)[:,None]*L).flatten())
@@ -279,7 +281,8 @@ class Torsal_Fair(Constraint):
         self.set_r(self.const_idx["T2"], (el - ui[:,None]*ei - uj[:,None]*ej - uk[:,None]*ek - proj[:,None]*L).flatten())
         
         
-
+        #print("Torsal Fair Energy: ", self.r@self.r)
+        
         self.L_norm = np.linalg.norm(L, axis=1)
 
 

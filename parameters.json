@@ -1,0 +1,19 @@
+{
+    "weights_Opt" : {"sphericity" : 1, 
+           "linecong" : 1, 
+           "torsal" : 1,
+           "line_fair" : 0.1, 
+           "torsal_fair" : 2,
+           "torsal_angle": 1
+           },
+    "iterations" : 100,
+    "show" : true,
+    "analytical_torsal" : true,
+
+    "iterations_QR": 200,
+    "weights_QR" : 
+        {"mesh_fairnes" : 1,
+          "closeness" : 0.4
+           }
+  }
+  
