@@ -182,7 +182,7 @@ X = np.zeros(sum(len(arr) for arr in var_idx.values()))
 X[var_idx["e"]]      = e.flatten()
 X[var_idx["sph_c"]]  = sph_c.flatten()
 X[var_idx["sph_r"]]  = sph_r
-X[var_idx["alpha"]]  = 0.2
+X[var_idx["alpha"]]  = 0.5
 
 t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
 
@@ -249,6 +249,8 @@ ne = ne.reshape((-1,3))
 nc = nc.reshape((-1,3))
 nt1 = nt1.reshape((-1,3))
 nt2 = nt2.reshape((-1,3))
+
+ec = np.sum(ne[f], axis=1)/3
 
 vv = v + ne
 i, j, k = f[:,0], f[:,1], f[:,2]
