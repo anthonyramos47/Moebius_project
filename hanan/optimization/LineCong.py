@@ -39,7 +39,7 @@ class LineCong(Constraint):
         self.num_edge_const = edge_num
 
         
-        self.const = self.num_edge_const
+       
         self.var = len(X)
 
         c, e= self.uncurry_X(X, "sph_c", "e")
@@ -77,6 +77,11 @@ class LineCong(Constraint):
             # Update row index
             i += len(face)
 
+        max_E = self.const_idx["E"][-1][-1]         
+
+        self.const_idx["Length"] = np.arange(max_E + 1, max_E + 1 + len(e))
+        self.const = max_E +1 + len(e)
+
             
 
     def compute(self, X) -> None:
@@ -89,7 +94,7 @@ class LineCong(Constraint):
         inner_vertices = self.inner_vertices
 
         # Get variables
-        c, e= self.uncurry_X(X, "sph_c", "e")
+        c, e, le = self.uncurry_X(X, "sph_c", "e", "le")
 
         e = e.reshape(-1, 3)
         c = c.reshape(-1, 3)
@@ -147,3 +152,14 @@ class LineCong(Constraint):
             self.set_r(self.const_idx["E"][idx_f], vec_dot(en[f], cicjnor) )
 
         self.ei_norms = np.linalg.norm(e, axis=1)
+
+        # Length constraint || e.e - le^2 ||^2
+            
+        # d e => 2e    
+        self.add_derivatives(self.const_idx["Length"].repeat(3), e_idx, 2*e.flatten())
+        # d le => -2le
+        self.add_derivatives(self.const_idx["Length"], self.var_idx["le"], -2*le)
+
+        self.set_r(self.const_idx["Length"], np.linalg.norm(e, axis=1)**2 - le**2)
+
+        print("Lenght Energy: ", self.r[self.const_idx["Length"]]@self.r[self.const_idx["Length"]])

@@ -32,12 +32,15 @@ class LineCong_Fair(Constraint):
 
         e = self.uncurry_X(X, "e")
         
-        self.const = len(e)
+        # length of e flattened
+        e_flat = len(e)
 
         e = e.reshape(-1, 3)
 
-        self.const_idx = {"Fair": np.arange(0, self.const)
+        self.const_idx = {"Fair"  : np.arange(0, e_flat),
                           }
+        
+        self.const = e_flat
 
             
 
@@ -86,6 +89,12 @@ class LineCong_Fair(Constraint):
             assert len(self.const_idx["Fair"][3*i: 3*i+3]) == len(e[i] - np.sum(ej, axis=0)/n_neigh), "r: Cols != Values"
            
             self.set_r(self.const_idx["Fair"][3*i: 3*i+3], e[i] - np.sum(ej, axis=0)/n_neigh) 
+
+
+     
+
+
+
 
 
         

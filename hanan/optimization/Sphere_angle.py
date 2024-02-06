@@ -9,40 +9,25 @@ class Sphere_angle(Constraint):
 
     def __init__(self) -> None:
         """ Sphere angle minimization
-        E = \sum{adj(ci, cj) \in E} || (ci.cj - (ci + cj).v + v^2 - 1)/(ri * rj)  ||
+        E = \sum{adj(ci, cj) \in E} || ri^2 + rj^2 - d^2 - 2*r1*r2 ||^2; d**2 =  <cj - ci, cj - ci>
         where, 
             ci, cj,- center of the spheres i and j that are adjacent to a given edge
             v.- is a random vertex in the choosen edge
             ri, rj.- sphere radius 
         """
         super().__init__()
-        self.bc = None # Barycenters
-        self.nc = None # Normal of the barycenters
-        self.v = None # Vertices of the edges
-        self.v0 = None # Vertex of the faces
+        
         self.nE = None # Edges number
-        self.radius = None # Radius of the spheres
         self.f1 = None # First face of the edge
         self.f2 = None # Second face of the edge
 
-        
-
-    
-    def initialize_constraint(self, X, var_indices, V, F, bf, ncf) -> np.array:
+    def initialize_constraint(self, X, var_indices, V, F) -> np.array:
         # Input
         # X: variables 
         # var_indices: indices of the variables
         # V: Vertices
         # F: Faces
-        # bf: circumcenters of the faces
-        # ncf: normals of the circumcenters
     
-        # Set circumcenters
-        self.bf = bf
-
-        # Set circumcenters axis
-        self.ncf = ncf
-
         # create mesh 
         mesh = Mesh()
         mesh.make_mesh(V, F)
@@ -61,12 +46,6 @@ class Sphere_angle(Constraint):
         self.f1 = auxf1[inner_edges]
         self.f2 = auxf2[inner_edges]
 
-        # Get vertices of the edges
-        auxv, _ = mesh.edge_vertices()
-
-
-        self.v = V[auxv[inner_edges]]
-
         # Define indices indices
         self.var_idx = var_indices
     
@@ -76,15 +55,7 @@ class Sphere_angle(Constraint):
         # Number of variables
         self.var = len(X)
 
-        df = self.uncurry_X(X, "df")
 
-        # Get vertex from all faces
-        self.v0 = V[F[:, 0]]
-        # Compute radius
-        c = bf + df[:,None]*ncf
-
-        # Compute radius
-        self.radius = np.linalg.norm(self.v0 - c, axis=1)
 
         
 
@@ -101,34 +72,36 @@ class Sphere_angle(Constraint):
         c_idx = self.const_idx
 
         # Get distance from baricenters to center of spheres
-        df = self.uncurry_X(X, "df")
+        sph_c, sph_r = self.uncurry_X(X, "sph_c", "sph_r")
 
-        ri = self.radius[self.f1]
-        rj = self.radius[self.f2]
+        sph_c = sph_c.reshape(-1, 3)
 
-        cj = self.bf[self.f2] + df[self.f2, None]*self.ncf[self.f2]
-        ci = self.bf[self.f1] + df[self.f1, None]*self.ncf[self.f1] 
+        # Get spheres per corresponding edge ij
+        ri = sph_r[self.f1]
+        rj = sph_r[self.f2]
 
-        nci = self.ncf[self.f1]
-        ncj = self.ncf[self.f2]
+        ci = sph_c[self.f1]
+        cj = sph_c[self.f2]
 
-        v = self.v
+        d = np.linalg.norm(cj - ci, axis=1)
 
-        # print("ri*rj", (ri*rj).shape)
-        # print("nci", nci.shape)
-        # print("cj", cj.shape)
-        # print("v", v.shape)
-        # print("nci.(cj - v)", vec_dot(nci, (cj - v) ).shape)
-        # print("di", (vec_dot(nci, (cj - v) )/(ri*rj)[:, None]).shape)
-        # E : || (ci.cj - (ci + cj).v + v^2 - 1)/(ri * rj)  ||^2
-        # d di => nci.(cj - v)/ ri*rj
-        self.add_derivatives(c_idx["ang"], var_idx["df"][self.f1], vec_dot(nci, (cj - v) )/(ri*rj))
-        # d dj => ncj.(ci - v)/ ri*rj
-        self.add_derivatives(c_idx["ang"], var_idx["df"][self.f2], vec_dot(ncj, (ci - v) )/(ri*rj))
+        # Sphere indices
+        sph_idx = var_idx["sph_c"]
+        
+        i =  3 * np.repeat(self.f1, 3) + np.tile(range(3), len(self.f1))
+        j =  3 * np.repeat(self.f2, 3) + np.tile(range(3), len(self.f2))
+        
+        # E : || ri^2 + rj^2 - d^2 - 2r1r2||^2; d**2 =  <cj - ci, cj - ci>
+        # d ci => 2*(cj - ci).flatten
+        self.add_derivatives(c_idx["ang"].repeat(3), sph_idx[i], 2*(cj - ci).flatten())
+        # d cj => -2*(cj - ci).flatten
+        self.add_derivatives(c_idx["ang"].repeat(3), sph_idx[j], -2*(cj - ci).flatten())
+        # d ri => 2*ri - 2*rj
+        self.add_derivatives(c_idx["ang"], var_idx["sph_r"][self.f1], 2*ri - 2*rj)
+        # d rj => 2*rj - 2*ri
+        self.add_derivatives(c_idx["ang"], var_idx["sph_r"][self.f2], 2*rj - 2*ri)
 
-        self.set_r(c_idx["ang"], (vec_dot(ci, cj) - vec_dot(ci + cj, v) + vec_dot(v, v))/(ri*rj) - 1)
-
-        self.radius = np.linalg.norm(self.v0 - (self.bf + df[:,None]*self.ncf), axis=1)
+        self.set_r(c_idx["ang"], ri**2 + rj**2 - d**2 - 2*ri*rj) 
 
         
         

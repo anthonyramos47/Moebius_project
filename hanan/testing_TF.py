@@ -32,6 +32,7 @@ from hanan.optimization.LineCong_Fairness import LineCong_Fair
 from hanan.optimization.Torsal import Torsal
 from hanan.optimization.Torsal_fairness import Torsal_Fair
 from hanan.optimization.Torsal_angle import Torsal_angle
+from hanan.optimization.Sphere_angle import Sphere_angle
 
 
 np.random.seed(0)
@@ -108,11 +109,11 @@ signs = np.sign(np.sum(n * ([0,0,-1]), axis=1))
 n = n * signs[:, None]
 
 # compute line congruence
-
+offset = 50
 
 # Offset
 if Type_Init == 1:
-    e = 20 * n
+    e = offset * n
 else:
     # Random 
     # a = 15
@@ -171,7 +172,8 @@ var_idx = {     "e"     : np.arange( 0            , 3*nV),  # Line congruence
                 "nt1"   : np.arange( 3*nV +  6*nF , 3*nV +  9*nF),  # Normal torsal plane t1 
                 "nt2"   : np.arange( 3*nV +  9*nF , 3*nV +  12*nF),  # Normal torsal plane t2
                 "u"     : np.arange( 3*nV +  12*nF , 3*nV + 12*nF + 3*nIE),  # Normal torsal plane t2
-                "alpha" : np.arange( 3*nV +  12*nF + 3*nIE , 3*nV +  13*nF + 3*nIE )  # Angle between nt1 and nt2
+                "alpha" : np.arange( 3*nV +  12*nF + 3*nIE , 3*nV +  13*nF + 3*nIE ),  # Angle between nt1 and nt2
+                "le"    : np.arange( 3*nV +  13*nF + 3*nIE , 4*nV +  13*nF + 3*nIE  )  # Line Congruence length control
         }
 
 
@@ -183,6 +185,7 @@ X[var_idx["e"]]      = e.flatten()
 X[var_idx["sph_c"]]  = sph_c.flatten()
 X[var_idx["sph_r"]]  = sph_r
 X[var_idx["alpha"]]  = 0.5
+X[var_idx["le"]]     = offset
 
 t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
 
@@ -211,8 +214,12 @@ torsal = Torsal()
 torsal.initialize_constraint(X, var_idx, v, f)
 torsal.set_weigth(weights["torsal"])
 
-# Init Torsal angle
+# Init Sphere angle
+smooth = Sphere_angle()
+smooth.initialize_constraint(X, var_idx, v, f)
+smooth.set_weigth(weights["smoothness"])
 
+# Init Torsal angle
 tang = Torsal_angle()
 tang.initialize_constraint(X, var_idx, v, f)
 tang.set_weigth(weights["torsal_angle"])
@@ -233,17 +240,17 @@ for _ in range(IT):
     optimizer.unitize_variable("nt2", 3)
     
     optimizer.get_gradients(sphericity)
+    optimizer.get_gradients(smooth)
     optimizer.get_gradients(linecong)
     optimizer.get_gradients(torsal)
     optimizer.get_gradients(line_fair)
     optimizer.get_gradients(tang)
-
     optimizer.get_gradients(torsal_fair)
     optimizer.optimize()
 
 
 ## Extract variables
-ne, nc, nr, th, phi, nt1, nt2 = optimizer.uncurry_X("e", "sph_c", "sph_r", "th", "phi", "nt1", "nt2")
+ne, nc, nr, th, phi, nt1, nt2, le = optimizer.uncurry_X("e", "sph_c", "sph_r", "th", "phi", "nt1", "nt2", "le")
 
 ne = ne.reshape((-1,3))
 nc = nc.reshape((-1,3))
@@ -258,8 +265,6 @@ vi, vj, vk = v[i], v[j], v[k]
 
 vij = vj - vi 
 vki = vk - vi
-
-
 
 
 # Compute planarity
@@ -286,16 +291,29 @@ avg_planarity = (planarity1 + planarity2)/2
 
 torsal_angles = np.arccos(abs(vec_dot(unit(nt1), unit(nt2))))*180/np.pi
 
+
+# Add one column to nc 
+sph = np.hstack((nc, nr[:,None]))
+
+# Export sph_c and sph_r in a file
+np.savetxt("sph_c.dat", sph)
+
 ## Visualize
 ps.init()
 ps.remove_all_structures()
 
 # Show boundary spheres
-for id in range(len(boundary_faces)):
-    i = boundary_faces[id]
-    c = nc[i] 
-    sphere = ps.register_point_cloud(f"sphere_c{i}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.5)
-    sphere.set_radius(nr[i], relative=False)
+# for id in range(len(boundary_faces)):
+#     i = boundary_faces[id]
+#     c = nc[i] 
+#     sphere = ps.register_point_cloud(f"sphere_c{i}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.5)
+#     sphere.set_radius(nr[i], relative=False)
+
+for id in range(len(nc)//10):
+
+    c = nc[id] 
+    sphere = ps.register_point_cloud(f"sphere_c{id}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.5)
+    sphere.set_radius(nr[id], relative=False)
 
 edges_i, edges_j = mesh.edge_vertices()
 
@@ -304,11 +322,10 @@ l = (e[edges_i] + e[edges_j])/2
 m_v = (v[edges_i] + v[edges_j])/2
 
 
-
 ps.register_point_cloud("cr", ct, enabled=True, radius=0.001, color=(0,0,0))
 mesh = ps.register_surface_mesh("mesh", v, f)
 mesh2 = ps.register_surface_mesh("mesh 2", vv, f)
-mesh.add_vector_quantity("line", ne, length=1, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
+mesh.add_vector_quantity("line", ne, length=3, enabled=True, radius=0.0005, color=(0,0,0))
 mesh.add_vector_quantity("line-e", -ne, length=1, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
 
 
@@ -327,6 +344,7 @@ mesh.add_scalar_quantity("planarity1", planarity1, defined_on="faces", enabled=T
 mesh.add_scalar_quantity("planarity2", planarity2, defined_on="faces", enabled=True, cmap="coolwarm")
 mesh.add_scalar_quantity("Avg planarity", avg_planarity, defined_on="faces", enabled=True, cmap="coolwarm")
 mesh.add_scalar_quantity("Torsal angles", torsal_angles, defined_on="faces", enabled=True, cmap="coolwarm")
+mesh.add_scalar_quantity("LC Lenght", le, enabled=True, cmap="coolwarm")
 
 # Visualize sphere radius as scalar quantity
 mesh.add_scalar_quantity("radius sphere", nr, defined_on="faces", enabled=True, cmap="coolwarm")

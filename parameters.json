@@ -2,13 +2,14 @@
     "weights_Opt" : {"sphericity" : 1, 
            "linecong" : 0, 
            "torsal" : 0,
-           "line_fair" : 0, 
+           "line_fair" : 0.001,
+           "smoothness" : 0,
            "torsal_fair" : 0,
            "torsal_angle": 0
            },
     "iterations" : 100,
     "show" : true,
-    "analytical_torsal" : false,
+    "analytical_torsal" : true,
 
     "iterations_QR": 200,
     "weights_QR" : 
