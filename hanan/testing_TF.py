@@ -36,17 +36,6 @@ from hanan.optimization.Sphere_angle import Sphere_angle
 
 
 np.random.seed(0)
-# IT = 2
-# weights = {"sphericity" : 1, 
-#            "linecong" : 1, 
-#            "torsal" : 1,
-#            "line_fair" : 0.1, 
-#            "torsal_fair" : 2,
-#            "torsal_angle": 1
-#            }
-# Show = True
-# Show_Analytical_Torsal = True
-
 import json
 import argparse
 
