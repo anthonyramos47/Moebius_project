@@ -285,7 +285,8 @@ torsal_angles = np.arccos(abs(vec_dot(unit(nt1), unit(nt2))))*180/np.pi
 sph = np.hstack((nc, nr[:,None]))
 
 # Export sph_c and sph_r in a file
-np.savetxt("sph_c.dat", sph)
+np.savetxt("sph_c.dat", sph, delimiter="\t", fmt="%1.7f")
+
 
 ## Visualize
 ps.init()
