@@ -1,6 +1,6 @@
 import numpy as np
 import polyscope as ps
-from scipy.optimize import minimize
+from scipy.optimize import minimize, least_squares
 
 def unit(v):
     """normalize a list of vectors v
@@ -60,6 +60,20 @@ def barycentric_coordinates_app(vi, vj, vk, vl):
     b1, b2, b3 = result.x
 
     return b1, b2, b3 
+
+
+def fit_sphere(pts, sph_c, sph_r):
+
+    # Initial guess
+    init = np.zeros(4)
+    init[:3] = np.mean(pts, axis=0)
+    init[3] = np.mean(np.linalg.norm(pts - init[:3], axis=1))
+
+    # Perform the optimization
+    result = minimize(fit_sphere_energy, init, args=(pts))
+
+    return result.x[:3], result.x[3]
+
 
 def barycentric_coordinates(vi, vj, vk, vl):
     """ Function to find the barycentric coordinates of a point vl 
@@ -315,11 +329,21 @@ def find_initial_torsal_th_phi(t1, t2, vij, vik):
     for i in range(len(t1)):
         # Compute theta
         theta[i]   = find_angles(0, t1[i], vij[i], vik[i])
+
+        if t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]) < 0.8:
+            print( t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]))
+
         alpha[i]   = find_angles(0, t2[i], vij[i], vik[i])
+
+        if t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]) < 0.8:
+            print( t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]))
 
         # Compute phi
         phi[i] = alpha[i] - theta[i]
+        if t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]) < 0.8:
+            print( t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]))
     
+
     return theta, phi, alpha
 
 
@@ -546,13 +570,13 @@ def find_angles(init, t, vij, vik):
     # Perform the optimization
     result = minimize(quadratic_equation_angle, init, args=(t, vij, vik))
 
+
     return result.x
 
 # Define the quadratic equation to be minimized
 def quadratic_equation_angle(x, t, vij, vik):
     l = x
     t_th = np.cos(l)*vij + np.sin(l)*vik
-
     return (unit(t)@unit(t_th) - 1)**2
 
 
@@ -563,6 +587,11 @@ def approximate_torsal(init, g0, g1, g2):
 
     return result.x
 
+def fit_sphere_energy(init, pts):
+    c = init[:3]
+    r = init[3]
+    return np.sum((np.linalg.norm(pts - c, axis=1)**2 - r**2)**2)
+
 # Define the quadratic equation to be minimized
 def quadratic_equation(x, g0, g1, g2):
     l = x
@@ -571,3 +600,72 @@ def quadratic_equation(x, g0, g1, g2):
 # Function to be minimized
 def objective_function(x, g0, g1, g2):
     return (quadratic_equation(x, g0, g1, g2))**2
+
+
+def compute_barycenter_coord_proj(v, vv, inner_edges, l, ie_i, ie_j, ie_k, ie_l):
+    # Get vertices
+    vi = v[ie_i]
+    vj = v[ie_j]
+    vk = v[ie_k]
+    vl = v[ie_l]
+
+    # Get envelope 2 vertices
+    vvi = vv[ie_i]
+    vvj = vv[ie_j]
+    vvk = vv[ie_k]
+    vvl = vv[ie_l]
+
+
+    vbi = orth_proj(vi, l)
+    vbj = orth_proj(vj, l)
+    vbk = orth_proj(vk, l)
+    vbl = orth_proj(vl, l)
+
+    vvb_i = orth_proj(vvi, l)
+    vvb_j = orth_proj(vvj, l)
+    vvb_k = orth_proj(vvk, l)
+    vvb_l = orth_proj(vvl, l)
+
+    Diff = 0
+
+    # Compute the barycentric coordinates of the vertices 
+    for i in range(len(inner_edges)):
+        
+        u1, u2, u3 = barycentric_coordinates_app(vbi[i], vbj[i], vbk[i], vbl[i])
+        
+        uu1, uu2, uu3 = barycentric_coordinates_app(vvb_i[i], vvb_j[i], vvb_k[i], vvb_l[i])
+
+        #print(f"u1 : {u1} u2 : {u2} u3 : {u3}\n uu1 : {uu1} uu2 : {uu2} uu3 : {uu3} \n")
+        Diff += np.linalg.norm(np.array([u1, u2, u3]) - np.array([uu1, uu2, uu3]))**2
+
+    print(f"Diff : {Diff}")
+
+def residuals(params, x):
+    # params contains the center coordinates (cx, cy, cz) and the radius (r)
+    cx, cy, cz, r = params
+    # Compute distances from each point to the center of the sphere
+    distances = np.sqrt((x[:, 0] - cx)**2 + (x[:, 1] - cy)**2 + (x[:, 2] - cz)**2)
+    # Compute residuals: differences between distances and the radius
+    return distances - r
+
+
+def fit_to_sphere(points, initial_guess):
+    
+    # Perform optimization
+    result = least_squares(residuals, initial_guess, args=(points,))
+    # Extract optimized parameters
+    cx, cy, cz, r = result.x
+    return (cx, cy, cz), r
+# # Example points
+# points = np.array([
+#     [1, 2, 3],
+#     [4, 5, 6],
+#     [7, 8, 9],
+#     [10, 11, 12],
+#     [13, 14, 15],
+#     [16, 17, 18]
+# ])
+# # Fit points to sphere
+# center, radius = fit_to_sphere(points)
+# print("Center:", center)
+# print("Radius:", radius)

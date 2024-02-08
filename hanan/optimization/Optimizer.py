@@ -5,6 +5,7 @@ import pandas as pd
 from hanan.optimization.Unit import Unit
 from scipy.sparse import csc_matrix,diags, vstack
 from scipy.sparse.linalg import splu, spsolve
+import matplotlib.pyplot as plt
 
 
 class Optimizer():
@@ -34,8 +35,40 @@ class Optimizer():
         self.step = None # Step size
         self.method = None # Method used to solve the problem
         self.energy = [] # Energy vector
+        self.energy_dic = {} # Energy dictionary
         self.var_idx = None # Variable indices
         self.verbose = False # Verbose
+    
+    def get_energy_per_constraint(self):
+        for name, energy in self.energy_dic.items():
+            print(f"{name}: {energy}")
+
+    
+        
+    def report_energy(self, name="Final_Energy_plot"):
+        # Save energy per constraint to a file
+        with open(name+"_energy_per_constraint.data", "w") as file:
+            file.write(f"ENERGY REPORT\n")
+            file.write("===========================================\n")
+            for en_name, energy in self.energy_dic.items():
+                file.write(f"{en_name}: {energy}\n")
+            file.write("===========================================\n")
+            file.write("=============Final Energy ==================\n")
+
+            file.write(f"Final Energy: {self.energy[-1]}\n")
+            file.write(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
+
+
+        print(f"Final Energy: {self.energy[-1]}")
+        plot = plt.plot(self.energy)
+        plt.xlabel('Iteration')
+        plt.ylabel('Energy')
+        plt.title('Energy per iteration')
+        plt.xlim(0, len(self.energy))
+        plt.grid()
+        # Put point markers on the plot
+        plt.scatter(range(len(self.energy)), self.energy, color='r')
+        plt.savefig(name)
 
     def unitize_variable(self, var_name, dim) -> None:
         """
@@ -48,7 +81,7 @@ class Optimizer():
         # Initialize constraint
         unit = Unit()
         unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
-
+        self.energy_vector = np.zeros(len(self.X))
         # Add constraint
         self.get_gradients(unit)
 
@@ -89,18 +122,22 @@ class Optimizer():
         
         # Add J, r to the optimizer
         if constraint.w != 0:
-            
+
             # Compute J, r for the constraint
             constraint._compute(self.X)
+
 
             # Add J, r to the optimizer
             if self.J is None:
                 self.J =  np.sqrt(constraint.w) * constraint.J
-                self.r =  np.sqrt(constraint.w) * constraint.r
+                self.r =  np.sqrt(constraint.w) * constraint.r          
             else:
                 self.J = vstack((self.J, np.sqrt(constraint.w) * constraint.J))
                 self.r = np.concatenate((self.r, np.sqrt(constraint.w) * constraint.r))
-        
+                
+            # Add energy to the energy dictionary
+            if constraint.name is not None:
+                    self.energy_dic[constraint.name] = constraint.w * np.sum(constraint.r**2)
 
  
     def optimize(self):
@@ -141,7 +178,7 @@ class Optimizer():
         dx = spsolve(H, b)
 
         # Store previous dx norm
-        self.prevdx = np.linalg.norm(dx)
+        self.prevdx = np.linalg.norm(self.step*dx)
 
         # Compute energy
         energy = self.r.T@self.r
@@ -205,8 +242,8 @@ class Optimizer():
     def update_variables(self, arg) -> None:
         # Update variables
 
-        if self.it%10 ==0:
-            self.step *= 0.9
+        # if self.it%10 ==0:
+        #     self.step *= 0.9
         
         if self.method == "LM":
             self.X += self.step*arg

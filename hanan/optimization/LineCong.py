@@ -7,6 +7,7 @@ class LineCong(Constraint):
 
     def __init__(self) -> None:
         super().__init__()
+        self.name = "LineCong" # Name of the constraint
         self.ei_dim = None # Number of edges per face
         self.ei_norms = None # Norms of the edges
         self.num_edge_const = None # Number of edge constraints
@@ -24,6 +25,7 @@ class LineCong(Constraint):
 
 
         self.var_idx = var_indices
+
 
         # Vector dimension
         self.ei_dim = ei_dim
@@ -80,7 +82,9 @@ class LineCong(Constraint):
         max_E = self.const_idx["E"][-1][-1]         
 
         self.const_idx["Length"] = np.arange(max_E + 1, max_E + 1 + len(e))
-        self.const = max_E +1 + len(e)
+
+        self.const = max_E + 1 + len(e)
+        
 
             
 
@@ -130,23 +134,20 @@ class LineCong(Constraint):
             idx_c_j = self.var_idx["sph_c"][j_idx]
 
                        
-            # d dci || e_f (cj - ci)/|| cj - ci|||e_f|  ||^2 =>  - ef.ni
-            #J[range(i,i + len(face)), ii] = -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten()
+            # d ci || e_f (cj - ci)/|| cj - ci|||e_f|  ||^2 =>  - ef
             self.add_derivatives(self.const_idx["E"][idx_f].repeat(3), idx_c_i, -(en[f] / np.array(cij_norms[idx_f])).flatten())
             
-            #d dcj
-            #J[range(i,i + len(face)), jj] = np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten()
+            #d cj => ef
             self.add_derivatives(self.const_idx["E"][idx_f].repeat(3), idx_c_j, (en[f] / np.array(cij_norms[idx_f])).flatten())
 
             # Get norms of ei                    
             e_norm = self.ei_norms[f]
 
-            # d ei
+            # d ef = > (cicjnor/e_norm)
             row_indices = self.const_idx["E"][idx_f].repeat(3)
             col_indices = e_idx[np.tile(np.arange(3*f, 3*f + 3), len(face))]
 
             self.add_derivatives(row_indices, col_indices, (cicjnor/e_norm).flatten() )
-
 
             # Define residual
             self.set_r(self.const_idx["E"][idx_f], vec_dot(en[f], cicjnor) )
@@ -160,6 +161,10 @@ class LineCong(Constraint):
         # d le => -2le
         self.add_derivatives(self.const_idx["Length"], self.var_idx["le"], -2*le)
 
-        self.set_r(self.const_idx["Length"], np.linalg.norm(e, axis=1)**2 - le**2)
+        self.set_r(self.const_idx["Length"], np.linalg.norm(e, axis=1)**2 -  5**2 - le**2)
 
-        print("Lenght Energy: ", self.r[self.const_idx["Length"]]@self.r[self.const_idx["Length"]])
+        
+
+       
+
+        

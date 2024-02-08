@@ -8,6 +8,7 @@ from scipy.sparse import csc_matrix
 
 class Constraint():
     def __init__(self) -> None:
+        self.name = None # Name of the constraint
         self.w = 1 # Weight
         self.J = None # Jacobian matrix
         self.J0 = None # Constant Jacobian

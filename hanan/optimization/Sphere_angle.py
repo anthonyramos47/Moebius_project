@@ -12,11 +12,10 @@ class Sphere_angle(Constraint):
         E = \sum{adj(ci, cj) \in E} || ri^2 + rj^2 - d^2 - 2*r1*r2 ||^2; d**2 =  <cj - ci, cj - ci>
         where, 
             ci, cj,- center of the spheres i and j that are adjacent to a given edge
-            v.- is a random vertex in the choosen edge
             ri, rj.- sphere radius 
         """
         super().__init__()
-        
+        self.name = "Sphere_Angles" # Name of the constraint
         self.nE = None # Edges number
         self.f1 = None # First face of the edge
         self.f2 = None # Second face of the edge

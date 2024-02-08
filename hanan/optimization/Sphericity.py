@@ -15,6 +15,7 @@ class Sphericity(Constraint):
                 U is the set of vertices of the second envelope face f
         """
         super().__init__()
+        self.name = "Sphericty" # Name of the constraint
         self.faces = None # List of faces
         self.v = None # List of vertices
 
@@ -60,7 +61,6 @@ class Sphericity(Constraint):
         # Get vertices
         v = self.v
 
-
         # get i j k indices per face
         i, j, k = f[:,0], f[:,1], f[:,2]
 
@@ -72,12 +72,10 @@ class Sphericity(Constraint):
         j_e = self.var_idx["e"][3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
         k_e = self.var_idx["e"][3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
 
-
         # Env1 
         cf_vi = np.vstack( (s_c - v[i], s_c - v[j], s_c - v[k] ))
         # Check lenght indices
        
-
         # d sph_c =>   2*(c_f - v_i)
         self.add_derivatives(self.const_idx["Env1"].repeat(3), np.tile(self.var_idx["sph_c"],3), 2*cf_vi.flatten())
         
@@ -90,7 +88,6 @@ class Sphericity(Constraint):
         self.set_r(self.const_idx["Env1"], np.sum(cf_vi*cf_vi, axis=1) - np.tile(s_r*s_r, 3))
 
         
-
         # Env2
         cf_vvi = np.vstack( (s_c - vv[i], s_c - vv[j], s_c - vv[k] ))
         

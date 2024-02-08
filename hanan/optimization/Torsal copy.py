@@ -22,7 +22,7 @@ class Torsal(Constraint):
             e_c .- direction of the line congruence at the barycenter of the face.
         """
         super().__init__()
-        self.name = "Torsal" # Name of the constraint
+        self.name = "Torsal_Dir"
         self.nV = None # Number of vertices
         self.F = None # Faces
         self.nF = None # Number of faces
@@ -65,9 +65,7 @@ class Torsal(Constraint):
                             "nt1.tt1" : np.arange( 2*self.nF          , 3*self.nF),
                             "nt2.ec"  : np.arange( 3*self.nF          , 4*self.nF),
                             "nt2.t2"  : np.arange( 4*self.nF          , 5*self.nF),
-                            "nt2.tt2" : np.arange( 5*self.nF          , 6*self.nF),
-                            "ut1"     : np.arange( 6*self.nF          , 7*self.nF),
-                            "ut2"     : np.arange( 7*self.nF          , 8*self.nF)                            
+                            "nt2.tt2" : np.arange( 5*self.nF          , 6*self.nF)                 
                         }
         
         # Number of variables
@@ -113,35 +111,52 @@ class Torsal(Constraint):
         X[var_indices["th"]] = th
         X[var_indices["phi"]] = phi
 
-
-
         # Compute torsal directions with respec to angle
-        t1 = np.cos(th)[:,None]*self.fvij[:,0] + np.sin(th)[:,None]*self.fvij[:,1]
-        t2 = np.cos(th + phi)[:,None]*self.fvij[:,0] + np.sin(th + phi)[:,None]*self.fvij[:,1]
-
+        at1 = np.cos(th)[:,None]*vij + np.sin(th)[:,None]*vik
+        at2 = np.cos(th + phi)[:,None]*vij + np.sin(th + phi)[:,None]*vik
+ 
         # Compute torsal norms
-        self.tnorms1 = np.linalg.norm(t1, axis=1)
-        self.tnorms2 = np.linalg.norm(t2, axis=1)
+        self.tnorms1 = np.linalg.norm(at1, axis=1)
+        self.tnorms2 = np.linalg.norm(at2, axis=1)
 
         # Compute torsal in second envelope
         vvi = vi + e[i]
         vvj = vj + e[j]
         vvk = vk + e[k]
 
-        tt1 =       np.cos(th)[:,None]*(vvj - vvi) + np.sin(th)[:,None]*(vvk - vvi)
-        tt2 = np.cos(th + phi)[:,None]*(vvj - vvi) + np.sin(th + phi)[:,None]*(vvk - vvi)
+        tt1 = unit(a1[:,None]* (vvj - vvi) + b[:,None] * (vvk - vvi))
+        tt2 = unit(a2[:,None] * (vvj - vvi) + b[:,None] * (vvk - vvi))
+
+        att1 =       np.cos(th)[:,None]*(vvj - vvi) + np.sin(th)[:,None]*(vvk - vvi)
+        att2 = np.cos(th + phi)[:,None]*(vvj - vvi) + np.sin(th + phi)[:,None]*(vvk - vvi)
 
         # Compute torsal norms
-        self.ttnorms1 = np.linalg.norm(tt1, axis=1)
-        self.ttnorms2 = np.linalg.norm(tt2, axis=1)
+        self.ttnorms1 = np.linalg.norm(att1, axis=1)
+        self.ttnorms2 = np.linalg.norm(att2, axis=1)
 
         # Set initial normals to torsal planes
 
-        nt1 = unit(np.cross(t1, ec))
-        nt2 = unit(np.cross(t2, ec))
+        nt1 = unit(np.cross(unit(at1), unit(att1)))
+        nt2 = unit(np.cross(unit(at2), unit(att2)))
+
+        # t1_tt1 = np.cross(unit(at1), unit(att1))
+        # t2_tt2 = np.cross(unit(at2), unit(att2))
+
+        # print("planar t1 :", np.sum(abs(vec_dot(t1_tt1, unit(ec))))/self.nF)
+        # print("planar t2 :", np.sum(abs(vec_dot(t2_tt2, unit(ec))))/self.nF)
+
+        # print("nt1ec: ", np.sum(vec_dot(nt1, ec)/self.ecnorms)/self.nF)
+        # print("nt2ec: ", np.sum(vec_dot(nt2, ec)/self.ecnorms)/self.nF)
+        # print("nt1t1: ", np.sum(vec_dot(nt1, at1)/self.tnorms1)/self.nF)
+        # print("nt2t2: ", np.sum(vec_dot(nt2, at2)/self.tnorms2)/self.nF)
+        # print("nt1tt1: ", np.sum(vec_dot(nt1, att1)/self.ttnorms1)/self.nF)
+        # print("nt2tt2: ", np.sum(vec_dot(nt2, att2)/self.ttnorms2)/self.nF)
 
         X[self.var_idx["nt1"]] = nt1.flatten()
         X[self.var_idx["nt2"]] = nt2.flatten()
+
+        
+
 
 
     def compute(self, X) -> None:
@@ -184,11 +199,12 @@ class Torsal(Constraint):
 
         # d nt1 => ec/||ec||
         self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), self.var_idx["nt1"], (ec/self.ecnorms[:, None]).flatten())
-
+        
+        deijk = (nt1/self.ecnorms[:, None]).flatten()
         # d ei,j,k => 1/3 nt1.ec/||ec||
-        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_i, (nt1/self.ecnorms[:, None]).flatten()/3)
-        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_j, (nt1/self.ecnorms[:, None]).flatten()/3)
-        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_k, (nt1/self.ecnorms[:, None]).flatten()/3)
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_i, deijk/3)
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_j, deijk/3)
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_k, deijk/3)
 
         # Set r
         self.set_r(self.const_idx["nt1.ec"], vec_dot(nt1, ec)/self.ecnorms)
@@ -196,16 +212,14 @@ class Torsal(Constraint):
         # d nt2 => ec/||ec||
         self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), self.var_idx["nt2"], (ec/self.ecnorms[:, None]).flatten())
 
+        deijk2 = (nt2/self.ecnorms[:, None]).flatten()
         # d ei,j,k => 1/3 nt2.ec/||ec||
-        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_i, (nt2/self.ecnorms[:, None]).flatten()/3)
-        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_j, (nt2/self.ecnorms[:, None]).flatten()/3)
-        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_k, (nt2/self.ecnorms[:, None]).flatten()/3)
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_i, deijk2/3)
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_j, deijk2/3)
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_k, deijk2/3)
 
         # Set r
         self.set_r(self.const_idx["nt2.ec"], vec_dot(nt2, ec)/self.ecnorms)
-
-        # print("nt1ec: ", self.r[self.const_idx["nt1.ec"]]@self.r[self.const_idx["nt1.ec"]])
-        # print("nt2ec: ", self.r[self.const_idx["nt2.ec"]]@self.r[self.const_idx["nt2.ec"]])
 
     def energy_nt_t(self, nt1, nt2, th, phi):
         """ Function to set up the derivatives and residual for
@@ -218,8 +232,8 @@ class Torsal(Constraint):
 
         alpha = th + phi
 
-        t1  =     np.cos(th)[:,None]*vij + np.sin(th)[:,None]*vik
-        t2  =  np.cos(alpha)[:,None]*vij + np.sin(alpha)[:,None]*vik
+        t1 =    np.cos(th)[:,None]*vij + np.sin(th)[:,None]*vik
+        t2 = np.cos(alpha)[:,None]*vij + np.sin(alpha)[:,None]*vik
 
         dt1 =    -np.sin(th)[:,None]*vij + np.cos(th)[:,None]*vik
         dt2 = -np.sin(alpha)[:,None]*vij + np.cos(alpha)[:,None]*vik
@@ -234,8 +248,6 @@ class Torsal(Constraint):
         # r 
         self.set_r(self.const_idx["nt1.t1"], vec_dot(nt1, t1)/self.tnorms1)
 
-        # print("nt1t1: ", self.r[self.const_idx["nt1.t1"]]@self.r[self.const_idx["nt1.t1"]])
-
         # E: ||nt2.t2||; t2 = cos(alpha) vij + sin(alpha) vik
         self.add_derivatives(self.const_idx["nt2.t2"].repeat(3), self.var_idx["nt2"], (t2/self.tnorms2[:, None]).flatten())
 
@@ -248,7 +260,6 @@ class Torsal(Constraint):
         # r
         self.set_r(self.const_idx["nt2.t2"], vec_dot(nt2, t2)/self.tnorms2)
 
-        # print("nt2t2: ", self.r[self.const_idx["nt2.t2"]]@self.r[self.const_idx["nt2.t2"]])
         # update torsal norms
         self.tnorms1 = np.linalg.norm(t1, axis=1)
         self.tnorms2 = np.linalg.norm(t2, axis=1)
@@ -282,13 +293,13 @@ class Torsal(Constraint):
         alpha = th + phi
 
         # Compute torsal directions in the second envelope
-        tt1 =    np.cos(th)[:,None]*vvij +    np.sin(th)[:,None]*vvik
+        tt1 =    np.cos(th)[:,None]*vvij +    np.sin(th)[:,None]*vik
         tt2 = np.cos(alpha)[:,None]*vvij + np.sin(alpha)[:,None]*vvik
 
-        dtt1_th =    -np.sin(th)[:,None]*vvij + np.cos(th)[:,None]*vvik
-        dtt2_th = -np.sin(alpha)[:,None]*vvij + np.cos(alpha)[:,None]*vvik
+        dtt1_th =    -np.sin(th)[:,None]*vij + np.cos(th)[:,None]*vik
+        dtt2_th = -np.sin(alpha)[:,None]*vij + np.cos(alpha)[:,None]*vik
 
-        nt1nor = nt1/self.ttnorms1[:, None]
+        nt1nor = nt1/self.tnorms1[:, None]
 
         # E : ||nt1.tt1||; tt1 = cos(th) (vvj - vvi) + sin(th) (vvk - vvi)
         # d nt1 => tt1/||tt1||
@@ -309,9 +320,7 @@ class Torsal(Constraint):
         # r
         self.set_r(self.const_idx["nt1.tt1"], vec_dot(nt1, tt1)/self.ttnorms1)
 
-        ## print("nt1tt1", self.r[self.const_idx["nt1.tt1"]]@self.r[self.const_idx["nt1.tt1"]])
-
-        nt2nor = nt2/self.ttnorms2[:, None]
+        nt2nor = nt2/self.tnorms2[:, None]
 
         # E : ||nt2.tt2||; tt2 = cos(alpha) (vvj - vvi) + sin(alpha) (vvk - vvi)
         # d nt2 => tt2/||tt2||
@@ -335,7 +344,7 @@ class Torsal(Constraint):
         # r
         self.set_r(self.const_idx["nt2.tt2"], vec_dot(nt2, tt2)/self.ttnorms2)
 
-        ## print("nt2tt2", self.r[self.const_idx["nt2.tt2"]]@self.r[self.const_idx["nt2.tt2"]])
+
         # update torsal norms
         self.ttnorms1 = np.linalg.norm(tt1, axis=1)
         self.ttnorms2 = np.linalg.norm(tt2, axis=1)

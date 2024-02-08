@@ -176,7 +176,6 @@ def run_optimization(it, data):
     X[var_idx["e"]]  = e_i.flatten() 
     X[var_idx["df"]] = df
     X[var_idx["u"]]  = 0.1
-    
 
 
     # Init LineCong

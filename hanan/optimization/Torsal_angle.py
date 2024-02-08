@@ -15,6 +15,7 @@ class Torsal_angle(Constraint):
             e_c .- direction of the line congruence at the barycenter of the face.
         """
         super().__init__()
+        self.name = "Torsal_Angles" 
         self.nV = None # Number of vertices
         self.nF = None # Number of faces
         self.var_idx = None # Dictionary of indices of variables
