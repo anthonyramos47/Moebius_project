@@ -50,18 +50,23 @@ if __name__ == '__main__':
     # -------------------------------------------------------------------------
     # Open the file containing the pickled object. The 'rb' parameter denotes 'read binary'
     # Open a file for writing. The 'wb' parameter denotes 'write binary'
-    with open('torsal_opt.pkl', 'rb') as file:
-        V, F, t1, t2 = pickle.load(file)
+   
 
     # Crear el analizador de argumentos
     parser = argparse.ArgumentParser(description='Get a json file with parameters for the optimization.')
     # Añadir un argumento posicional
     parser.add_argument('json', type=str, help='Json with parameters for the optimization file path')
+    parser.add_argument('pkl_name', type=str, help='output file name')
     parser.add_argument('file_name', type=str, help='output file name')
+
 
     # Analizar los argumentos de la línea de comandos
     args = parser.parse_args()
     
+    
+    with open(args.pkl_name, 'rb') as file:
+        V, F, t1, t2, _, _, _, _, _, _, _  = pickle.load(file)
+
     # Open json file
     with open(args.json, 'r') as f:
         parameters = json.load(f)
