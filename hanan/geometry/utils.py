@@ -656,16 +656,63 @@ def fit_to_sphere(points, initial_guess):
     # Extract optimized parameters
     cx, cy, cz, r = result.x
     return (cx, cy, cz), r
-# # Example points
-# points = np.array([
-#     [1, 2, 3],
-#     [4, 5, 6],
-#     [7, 8, 9],
-#     [10, 11, 12],
-#     [13, 14, 15],
-#     [16, 17, 18]
-# ])
-# # Fit points to sphere
-# center, radius = fit_to_sphere(points)
-# print("Center:", center)
-# print("Radius:", radius)
+
+def initialize_Line_Congruence(v, f, v_f_adj, n, H ):
+    """ Function to initialize the line congruence. 
+    Input:
+        v: vertices
+        f: faces
+        v_f_adj: vertex face adjacency
+        n: normals
+        faces_top: topology of faces
+        H: Mean curvature per vertex
+    """
+
+    # Compute central sphere radius
+    r = 1/H 
+
+    # Per vertex take centers of mean curvature spheres 
+    mid = v + r[:,None]*n
+
+    # Compute the barycenters of the faces at midpoints
+    bary_mid = np.mean(mid[f], axis=1)
+
+    # Compute the normals of midpoint triangles
+    n_mid = unit(np.cross(mid[f[:,1]] - mid[f[:,0]], mid[f[:,2]] - mid[f[:,0]]))
+
+    av_n = np.zeros_like(v)
+
+    print("Redoo the computation of the edge directions by using actual sphere centers")
+  
+    # # Compute the edge directions by averaging the normals of neighboring faces per vertex
+    # for i in range(len(v)):
+    #     if len(v_f_adj[i]) <= 3:
+    #         av_n[i] = n[i]
+    #     else:
+    #         av_n[i] = unit(np.sum(n_mid[v_f_adj[i]], axis=0))
+
+    print(f"av_n : {av_n}")
+
+    # Reflect v with respect e_i 
+    v_ref = mid + (v-mid) - 2*proj((v-mid), av_n)
+
+    print(f"v_ref : {v_ref}")
+
+    # Compute the e  
+    e = v_ref - v 
+
+    return e, av_n, mid, bary_mid, r
+
+
+
+
+    
+
+    
+
+
+
+
+
+
+

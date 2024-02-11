@@ -1,0 +1,14 @@
+{
+    "name_mesh": "static.obj",
+    "weights": {
+        "sphericity": 1,
+        "linecong": 1,
+        "torsal": 1,
+        "line_fair": 0.0001,
+        "smoothness": 0.0001,
+        "torsal_fair": 0,
+        "torsal_angle": 0
+    },
+    "iterations": 100,
+    "offset": -10
+}
