@@ -27,20 +27,18 @@ class Unit(Constraint):
             dim: Dimension of the variable
         """
 
-        self.var_idx = var_indices
+        
         self.v_name = var_name
         self.dim = dim
 
         # Setup constraints
         const_dim = len(var_indices[self.v_name])//dim  # Number of constraints
-        self.const_idx = {"unit" : np.arange(const_dim)} # Constraint indices
 
-        # Setup dimensions
-        self.const = const_dim
-        self.var = len(X)
+        self.add_constraint("unit", const_dim) # Add constraint (unit vector constraint
+        
   
 
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ 
         Function that compute the gradients and the residuals of the constraint.
         Input:
@@ -48,14 +46,11 @@ class Unit(Constraint):
         """
         
         # Get variable
-        xv = self.uncurry_X(X, self.v_name) # flattened variable
+        xv = self.uncurry_X(X, var_idx, self.v_name) # flattened variable
         xs = xv.reshape(-1, self.dim) # reshaped variable
 
-        # var indices
-        var_idx = self.var_idx[self.v_name]
-
         # Compute Jacobian for || e_f . e_f - 1||^2
-        self.add_derivatives(self.const_idx["unit"].repeat(self.dim), var_idx, xv)
+        self.add_derivatives(self.const_idx["unit"].repeat(self.dim), var_idx[self.v_name], 2*xv)
 
         # Update residual  
         self.set_r(self.const_idx["unit"], np.sum ( xs*xs,  axis=1) - 1)

@@ -155,13 +155,18 @@ class Torsal_Fair(Constraint):
         
         # L/L^2
         Ln = L/L_2[:,None]
+
+        # ux indices
+        ux = var_idx["u"][3*np.arange(0, n_ie)].repeat(3)
+        uy = var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3)
+        uz = var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3)
         
         # Dui => -vi + vi.l/l^2 l
-        self.add_derivatives(self.const_idx["T1"], var_idx["u"][3*np.arange(0, n_ie)].repeat(3), (-v[i] + (viL/L_2)[:,None]*L).flatten())
+        self.add_derivatives(self.const_idx["T1"], ux, (-v[i] + (viL/L_2)[:,None]*L).flatten())
         # Duj => -vj + vj.l/l^2 l
-        self.add_derivatives(self.const_idx["T1"], var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), (-v[j] + (vjL/L_2)[:,None]*L).flatten())
+        self.add_derivatives(self.const_idx["T1"], uy, (-v[j] + (vjL/L_2)[:,None]*L).flatten())
         # Duk => -vk - vk.l/l^2 l
-        self.add_derivatives(self.const_idx["T1"], var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), (-v[k] + (vkL/L_2)[:,None]*L).flatten())
+        self.add_derivatives(self.const_idx["T1"], uz, (-v[k] + (vkL/L_2)[:,None]*L).flatten())
 
         # # Projection
         proj = (vec_dot(vl, L) - ui*viL - uj*vjL - uk*vkL)/L_2
@@ -213,22 +218,22 @@ class Torsal_Fair(Constraint):
         vvlL = vec_dot(vvl, L)
 
         # ei.l 
-        eiL = vec_dot(ei, L)
-        ejL = vec_dot(ej, L)
-        ekL = vec_dot(ek, L)
-        elL = vec_dot(el, L)
+        # eiL = vec_dot(ei, L)
+        # ejL = vec_dot(ej, L)
+        # ekL = vec_dot(ek, L)
+        # elL = vec_dot(el, L)
 
         # Dui => - vvi + vvi.l/l^2 l
         self.add_derivatives(self.const_idx["T2"], 
-                             var_idx["u"][3*np.arange(0, n_ie)].repeat(3),
+                             ux,
                              (-vvi + (vviL/L_2)[:,None]*L).flatten())
         # Duj => - ej + ej.l/l^2 l
         self.add_derivatives(self.const_idx["T2"], 
-                             var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), 
+                             uy, 
                              (-vvj + (vvjL/L_2)[:,None]*L).flatten())
         # Duk => - ek - ek.l/l^2 l
         self.add_derivatives(self.const_idx["T2"], 
-                             var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), 
+                             uz, 
                              (-vvk + (vvkL/L_2)[:,None]*L).flatten())
 
         # # # Projection ( vl.l/l^2 - sum(ui vi.l/l^2 ))l
@@ -288,7 +293,6 @@ class Torsal_Fair(Constraint):
         
         #print("E T2:", self.r[self.const_idx["T2"]]@self.r[self.const_idx["T2"]])
         #print("Torsal Fair Energy: ", self.r@self.r)
-        
         self.L_norm = np.linalg.norm(L, axis=1)
 
 

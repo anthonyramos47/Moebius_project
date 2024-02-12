@@ -85,9 +85,6 @@ igl.write_triangle_mesh("original_mesh.obj", v, f)
 n = igl.per_vertex_normals(v, f)
 
 
-
-
-
 # # Compute the mean curvature
 # h = 0.5*abs(k1 + k2)
 # mean_r = 1/h
@@ -107,15 +104,15 @@ f_f_adj = mesh.face_face_adjacency_list()
 d_f = mesh.dual_top()
 
 auxf1, auxf2      = mesh.edge_faces()
-ev1  , ev2        = mesh.edge_vertices()
+auxev1  , auxev2        = mesh.edge_vertices()
 
 # Faces of the edges
 f1 = auxf1[inner_edges]
 f2 = auxf2[inner_edges]
 
 # Vertices of the edges
-ev1 = ev1[inner_edges]
-ev2 = ev2[inner_edges]
+ev1 = auxev1[inner_edges]
+ev2 = auxev2[inner_edges]
 
 # Normals at the edges
 ne = n[ev1] + n[ev2]
@@ -191,24 +188,6 @@ sph_c = ct + lamb[:,None]*nt
 sph_r = offset/2*np.ones(len(f))
 
 
-energy = 0
-# Measure sphericity
-for sph_i in range(len(sph_c)):
-    # Get vertices of the face
-    v_f = v[f[sph_i]]
-    # Get vertices of the second envelope face
-    vv_f = vv[f[sph_i]]
-
-    # Compute the distance of each vertex to the sphere
-    dist = np.linalg.norm(sph_c[sph_i] - v_f, axis=1)
-    dist2 = np.linalg.norm(sph_c[sph_i] - vv_f, axis=1)
-
-    # Compute the energy
-    energy += np.sum((dist - sph_r[sph_i])**2) + np.sum((dist2 - sph_r[sph_i])**2)
-
-print(f"Initial energy: {energy}")
-
-
 # Compute number of variables
 nV = len(v)
 nF = len(f)
@@ -227,152 +206,127 @@ optimizer.add_variable("nt1", 3*nF)
 optimizer.add_variable("nt2", 3*nF)
 optimizer.add_variable("u", 3*nIE)
 optimizer.add_variable("alpha", nF)
-optimizer.add_variable("le", nV)
 
 # Initialize Optimizer
-optimizer.initialize_optimizer("LM", 0.5, 1)
+optimizer.initialize_optimizer("LM", 0.8, 0)
 
 # Initialize variables
 optimizer.init_variable("e", e.flatten())
 optimizer.init_variable("sph_c", sph_c.flatten())
 optimizer.init_variable("sph_r", sph_r)
-optimizer.init_variable("le", offset)
 optimizer.init_variable("alpha", 0.5)
 
 # Define Sphericity
 sphericity = Sphericity()
-optimizer.add_constraint(sphericity,  args=(f, v), w=2 )
+optimizer.add_constraint(sphericity,  args=(f, v, 1), w= 2) 
 
-# Define Line Congruence Fairnes
-line_fair = LineCong_Fair()
-optimizer.add_constraint(line_fair, args=(vertex_adj, inner_vertices, n), w=weights["line_fair"])
 
-# Define Line Cong
-linecong = LineCong()
-optimizer.add_constraint(linecong, args=(len(v),  dual_top, inner_vertices, n), w=weights["linecong"])
+print("Pre-Optimization started================================")
+for _ in range(100):
+    optimizer.get_gradients()
+    optimizer.optimize()
+
+optimizer.get_energy_per_constraint()
+
+sph_c, sph_r = optimizer.uncurry_X("sph_c", "sph_r")
+
+sph_c = sph_c.reshape((-1,3))
+
+nr = np.abs(sph_r)
+# Add one column to nc 
+sph = np.hstack((sph_c, sph_r[:,None]))
+
+# Export sph_c and sph_r in a file
+np.savetxt("Init_c.dat", sph, delimiter="\t", fmt="%1.7f")
+
+# X pre-optimization
+xpre = optimizer.X.copy()
+
+#  Optimizer
+optimizer = Optimizer()
+# Define the variables
+optimizer.add_variable("e", 3*nV)
+optimizer.add_variable("sph_c", 3*nF)
+optimizer.add_variable("sph_r", nF)
+optimizer.add_variable("th", nF)
+optimizer.add_variable("phi", nF)
+optimizer.add_variable("nt1", 3*nF)
+optimizer.add_variable("nt2", 3*nF)
+optimizer.add_variable("u", 3*nIE)
+optimizer.add_variable("alpha", nF)
+
+# Initialize Optimizer
+optimizer.initialize_optimizer("LM", 0.8, 1)
+
+optimizer.init_variables(xpre)
+
+optimizer.reset_it_optimizer()
+
+# Define Sphericity
+# sphericity = Sphericity()
+# optimizer.add_constraint(sphericity,  args=(f, v), w=weights["sphericity"]) 
+
+# # Define Line Congruence Fairnes
+# line_fair = LineCong_Fair()
+# optimizer.add_constraint(line_fair, args=(vertex_adj, inner_vertices, n), w=weights["line_fair"])
+
+# # Define Line Cong
+# linecong = LineCong()
+# optimizer.add_constraint(linecong, args=(len(v),  dual_top, inner_vertices, n), w=weights["linecong"])
 
 # Define Torsal 
 torsal = Torsal()
 optimizer.add_constraint(torsal, args=(v, f), w=weights["torsal"])
 
-# Define Smoothness
-smooth = Sphere_angle()
-optimizer.add_constraint(smooth, args=(ne, v[ev1], v[ev2], inner_edges, f1, f2), w=weights["smoothness"]) 
-
 # Define Torsal angle
 tang = Torsal_angle()
-optimizer.add_constraint(tang, args=(v, f), w=weights["torsal_angle"])
+optimizer.add_constraint(tang, args=(v, f, data["targe_t_angle"]), w=weights["torsal_angle"])
 
 # Define Torsal Fairness
 torsal_fair = Torsal_Fair()
 optimizer.add_constraint(torsal_fair, args=(v, inner_edges, ed_i, ed_j, ed_k, ed_l), w=weights["torsal_fair"])
 
 
-print("Test-Optimization started")
-for _ in range(100):
+# # Define Smoothness
+# smooth = Sphere_angle()
+# optimizer.add_constraint(smooth, args=(ne, v[ev1], v[ev2], inner_edges, f1, f2), w=weights["smoothness"]) 
+
+
+# Unitizing energies
+optimizer.unitize_variable("nt1", 3)
+optimizer.unitize_variable("nt2", 3)
+
+print("Torsal Optimization =======================================")
+for _ in range(IT):
     optimizer.get_gradients()
     optimizer.optimize()
 
-print("Test Optimization finished")
-
 optimizer.get_energy_per_constraint()
 
+# # optimizer.reset_it_optimizer()
+# optimizer.clear_energy()
+# optimizer.bestit = None
+# optimizer.bestX = None
+# optimizer.it = 0
+# optimizer.prevdx = None
 
 
-# t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
+# print("Smoothness Optimization =======================================")
+# for _ in range(IT):
+#     optimizer.get_gradients()
+#     optimizer.optimize()
 
-# tt1 = unit(a1[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
-# tt2 = unit(a2[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
+# optimizer.get_energy_per_constraint()
 
-ec = np.sum(e[f], axis=1)/3
-
-
-
-
-#  pre_Optimizer
-pre_Opt = Optimizer()
-pre_Opt.initialize_optimizer(X, var_idx, "LM", 0.8, 1)
-
-
-print("Pre-Optimization started")
-for _ in range(100):
-    pre_Opt.get_gradients()
-    pre_Opt.optimize()
-
-print("Pre Optimization finished")
-X = pre_Opt.bestX
-
-sph_c, sph_r = pre_Opt.uncurry_X("sph_c", "sph_r")
-
-sph_c = sph_c.reshape((-1,3))
-sph_r = np.abs(sph_r)
-# Add one column to nc 
-sph = np.hstack((sph_c, sph_r[:,None]))
-# Export sph_c and sph_r in a file
-np.savetxt("Init_sph_c.dat", sph, delimiter="\t", fmt="%1.7f")
-
-print("Second Optimization")
-# Init Sphericity
-sphericity = Sphericity()
-sphericity.initialize_constraint(X, var_idx, f, v)
-sphericity.set_weigth(weights["sphericity"])
-
-# Init Line Congruence Fairnes
-line_fair = LineCong_Fair()
-line_fair.initialize_constraint(X, var_idx, vertex_adj, inner_vertices, n) 
-line_fair.set_weigth(weights["line_fair"])
-
-# Init Line Cong
-linecong = LineCong()
-linecong.initialize_constraint(X, var_idx, len(v),  dual_top, inner_vertices, n)
-linecong.set_weigth(weights["linecong"])
-
-# Init Torsal 
-torsal = Torsal()
-torsal.initialize_constraint(X, var_idx, v, f)
-torsal.set_weigth(weights["torsal"])
-
-# Init Sphere angle
-smooth = Sphere_angle() 
-smooth.initialize_constraint(X, var_idx, ne, v[ev1], v[ev2], inner_edges, f1, f2)
-smooth.set_weigth(weights["smoothness"])
-
-# Init Torsal angle
-tang = Torsal_angle()
-tang.initialize_constraint(X, var_idx, v, f)
-tang.set_weigth(weights["torsal_angle"])
-
-# Init Torsal 
-torsal_fair = Torsal_Fair()
-torsal_fair.initialize_constraint(X, var_idx, v, inner_edges, ed_i, ed_j, ed_k, ed_l)
-torsal_fair.set_weigth(weights["torsal_fair"])
-
-
-
-for _ in range(IT):
-    optimizer.unitize_variable("nt1", 3)
-    optimizer.unitize_variable("nt2", 3)
-    
-    optimizer.get_gradients(sphericity)
-    optimizer.get_gradients(torsal)
-    optimizer.get_gradients(linecong)
-    optimizer.get_gradients(line_fair)
-    optimizer.get_gradients(smooth)
-    optimizer.get_gradients(tang)
-    optimizer.get_gradients(torsal_fair)
-
-    optimizer.optimize()
-
-optimizer.get_energy_per_constraint()
-optimizer.report_energy()
-
-## Extract variables
-ne, nc, nr, th, phi, nt1, nt2, le = optimizer.uncurry_X("e", "sph_c", "sph_r", "th", "phi", "nt1", "nt2", "le")
+# Extract variables
+ne, nc, nr, th, phi, nt1, nt2, u = optimizer.uncurry_X("e", "sph_c", "sph_r", "th", "phi", "nt1", "nt2", "u")
 
 ne = ne.reshape((-1,3))
 nc = nc.reshape((-1,3))
 nt1 = nt1.reshape((-1,3))
 nt2 = nt2.reshape((-1,3))
+u = u.reshape((-1,3))
+
 
 ec = np.sum(ne[f], axis=1)/3
 
@@ -415,6 +369,8 @@ avg_planarity = (planarity1 + planarity2)/2
 
 torsal_angles = np.arccos(abs(vec_dot(unit(nt1), unit(nt2))))*180/np.pi
 
+
+
 nr = np.abs(nr)
 # Add one column to nc 
 sph = np.hstack((nc, nr[:,None]))
@@ -423,9 +379,78 @@ sph = np.hstack((nc, nr[:,None]))
 np.savetxt("sph_c.dat", sph, delimiter="\t", fmt="%1.7f")
 
 
+                    
 ## Visualize
 ps.init()
 ps.remove_all_structures()
+
+
+if data["show_plane"]:
+
+    # Draw planes 
+    m_edge = data["edge"]
+    m_pt = (v[auxev1[m_edge]]  + v[auxev2[m_edge]])/2
+    e_m  = (ne[auxev1[m_edge]] + ne[auxev2[m_edge]])/2
+
+    # Faces 
+    f1 = auxf1[m_edge]
+    f2 = auxf2[m_edge]
+
+    # Get torsal directions
+    t1f1 = at1[f1]
+    t2f1 = at2[f1]
+
+    t1f2 = at1[f2]
+    t2f2 = at2[f2]
+
+    index = np.where(inner_edges == 568)
+
+    uf1 = u[index][0]
+
+    print("uf1", uf1)
+
+    vi, vj = v[ed_i[index]], v[ed_j[index]]
+    vk, vl = v[ed_k[index]], v[ed_l[index]]
+
+    # Project 
+    pvi = orth_proj(vi, e_m)
+    pvj = orth_proj(vj, e_m)
+    pvk = orth_proj(vk, e_m)
+    pvl = orth_proj(vl, e_m)
+
+    # Second envelope
+    vvi, vvj = vv[ed_i[index]], vv[ed_j[index]]
+    vvk, vvl = vv[ed_k[index]], vv[ed_l[index]]
+
+    # Project
+    pvvi = orth_proj(vvi, e_m)
+    pvvj = orth_proj(vvj, e_m)
+    pvvk = orth_proj(vvk, e_m)
+    pvvl = orth_proj(vvl, e_m)
+
+    # barycetner of faces
+    bf1 = (vi + vj + vk)/3
+    bf2 = (vi + vj + vl)/3
+
+    # check directions torsal
+    t1f1 *= np.sign(vec_dot(t1f1,  bf1 -  m_pt)) 
+    t2f1 *= np.sign(vec_dot(t2f1,  bf1 -  m_pt))
+
+    t1f2 *= np.sign(vec_dot(t1f2,  bf2 -  m_pt))
+    t2f2 *= np.sign(vec_dot(t2f2,  bf2 -  m_pt))
+
+    # Check barycentric coordinates
+    print("Envelope 1:", pvl - uf1[0]*pvi - uf1[1]*pvj - uf1[2]*pvk)
+    print("Envelope 2:", pvvl - uf1[0]*pvvi - uf1[1]*pvvj - uf1[2]*pvvk)
+
+    e_m = -unit(e_m)
+    # Draw planes
+    draw_polygon(np.array([m_pt, m_pt + t1f1, m_pt + t1f1 + e_m, m_pt + e_m]), (0,0,0), "plane1_f1")
+    draw_polygon(np.array([m_pt, m_pt + t2f1, m_pt + t2f1 + e_m, m_pt + e_m]), (0,0,0), "plane2_f1")
+
+    draw_polygon(np.array([m_pt, m_pt + t1f2, m_pt + t1f2 + e_m, m_pt + e_m]), (1,1,1), "plane1_f2")
+    draw_polygon(np.array([m_pt, m_pt + t2f2, m_pt + t2f2 + e_m, m_pt + e_m]), (1,1,1), "plane2_f2")
+
 
 # Show boundary spheres
 # for id in range(len(boundary_faces)):
@@ -465,8 +490,8 @@ mesh.add_scalar_quantity("HRad", 1/(0.5*(k1 + k2)), defined_on="vertices", enabl
 #mid_edges.add_vector_quantity("l", - l, length=0.01, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
 
 # Show sphere circumcircle axis
-#mesh.add_vector_quantity(  "n",   nt, defined_on="faces", length=0.5, radius=0.0005, enabled=True,  color=(0.5,0,0.8))
-#mesh2.add_vector_quantity("n2", -nt2, defined_on="faces", length=0.5, radius=0.0005, enabled=True,  color=(0,0.5,0))
+# mesh.add_vector_quantity(  "n",   nt, defined_on="faces", length=0.005, radius=0.0005, enabled=True,  color=(0.5,0,0.8))
+# mesh2.add_vector_quantity("n2", -nt2, defined_on="faces", length=0.005, radius=0.0005, enabled=True,  color=(0,0.5,0))
 
 # Visualize planarity as scalar quantity
 # mesh.add_scalar_quantity("Validity", validity, defined_on="faces", enabled=True, cmap="jet")
@@ -482,20 +507,20 @@ mesh.add_scalar_quantity("radius sphere", abs(nr), defined_on="faces", enabled=T
 
 
 # Torsal directions
-mesh.add_vector_quantity("t1",   t1, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(0,0,0))
-mesh.add_vector_quantity("t2",   t2, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(0,0,0))
-mesh.add_vector_quantity("-t1", -t1, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(0,0,0))
-mesh.add_vector_quantity("-t2", -t2, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(0,0,0))
+mesh.add_vector_quantity("t1",   t1, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(0,0,0))
+mesh.add_vector_quantity("t2",   t2, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(0,0,0))
+mesh.add_vector_quantity("-t1", -t1, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(0,0,0))
+mesh.add_vector_quantity("-t2", -t2, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(0,0,0))
 
 # Torsal Normals
 # mesh.add_vector_quantity("nt1",   nt1, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(1,0,0))
 # mesh.add_vector_quantity("nt2",   nt2, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(1,0,0))
 
 if Show_Analytical_Torsal:
-    mesh.add_vector_quantity("at1",   at1, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(1,1,1))
-    mesh.add_vector_quantity("at2",   at2, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(1,1,1))
-    mesh.add_vector_quantity("a-t1", -at1, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(1,1,1))
-    mesh.add_vector_quantity("a-t2", -at2, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(1,1,1))
+    mesh.add_vector_quantity("at1",   at1, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(1,1,1))
+    mesh.add_vector_quantity("at2",   at2, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(1,1,1))
+    mesh.add_vector_quantity("a-t1", -at1, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(1,1,1))
+    mesh.add_vector_quantity("a-t2", -at2, defined_on="faces", length=0.005, radius=0.001, enabled=True,  color=(1,1,1))
 
 # Principa Culvature Directions
 # mesh.add_vector_quantity("v1",   v1, defined_on="vertices", length=0.01, radius=0.002, enabled=True,  color=(1,0,0))
@@ -511,17 +536,17 @@ if Show_Analytical_Torsal:
 if Show:
     ps.show()
 
-# Optimization_Output = [v, f, t1, t2, tt1, tt2, ne, nc, nr, nt1, nt2 ]
+Optimization_Output = [v, inner_edges, f, t1, t2, tt1, tt2, ne, nc, nr, nt1, nt2, u, auxf1, auxf2, auxev1, auxev2, ed_i, ed_j, ed_k, ed_l]
 
-# output_path = data["exp_dir"]
+output_path = data["exp_dir"]
 
-# output_path += data["out_name"]
+output_path += data["out_name"]
 
-# optimizer.report_energy(output_path)
+#optimizer.report_energy(output_path)
 
-# # Open a file for writing. The 'wb' parameter denotes 'write binary'
-# with open(output_path+'_Optimization.pkl', 'wb') as file:
-#     pickle.dump(Optimization_Output, file)
+# Open a file for writing. The 'wb' parameter denotes 'write binary'
+with open(output_path+'_Optimization.pkl', 'wb') as file:
+    pickle.dump(Optimization_Output, file)
 
 # # Save weights and iterations used in file 
 # save_param = {

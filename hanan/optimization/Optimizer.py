@@ -3,6 +3,7 @@ import numpy as np
 import time as tm
 import pandas as pd
 from hanan.optimization.Unit import Unit
+from hanan.geometry.utils import unit
 from scipy.sparse import csc_matrix,diags, vstack
 from scipy.sparse.linalg import splu, spsolve
 import matplotlib.pyplot as plt
@@ -47,12 +48,26 @@ class Optimizer():
         Method to clear the energy
         """
         self.energy = []
+        self.bestit = None
+        self.bestX = None
 
     def clear_constraints(self):
         """
         Method to clear the constraints
         """
         self.constraints = []
+
+    def reset_it_optimizer(self):
+        """
+        Method to reset the optimizer
+        """
+        self.clear_energy()
+        self.clear_constraints()
+        #self.X = self.X0.copy()
+        self.prevdx = None
+        self.it = 0
+        self.bestX = None
+        self.bestit = None
     
 
     def report_energy(self, name="Final_Energy_plot"):
@@ -67,6 +82,7 @@ class Optimizer():
 
             file.write(f"Final Energy: {self.energy[-1]}\n")
             file.write(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
+
 
 
         print(f"Final Energy: {self.energy[-1]}")
@@ -88,7 +104,7 @@ class Optimizer():
         print("===========================================\n")
         print("=============Final Energy ==================\n")
         print(f"Final Energy: {self.energy[-1]}\n")
-        print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
+        print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}\n\n")
 
     def add_variable(self, var_name, dim) -> None:
         """
@@ -147,9 +163,9 @@ class Optimizer():
         # Initialize constraint
         unit = Unit()
         #unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
-        unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
+        unit._initialize_constraint(self.X, self.var_idx, var_name, dim)
         unit.name = var_name + "_unit"
-        self.energy_vector = np.zeros(len(self.X))
+        #self.energy_vector = np.zeros(len(self.X))
         self.constraints.append(unit)
         # Add constraint
         #self.get_gradients(unit)
@@ -189,13 +205,19 @@ class Optimizer():
         """
         stacked_J = []
         stacked_r = []
-        for constraint in self.constraints:
 
+        total = 0
+        for constraint in self.constraints:
+            
             # Add J, r to the optimizer
             if constraint.w != 0:
-
+                
+                #initial_time = tm.time()
                 # Compute J, r for the constraint
                 constraint._compute(self.X, self.var_idx)
+                final_time = tm.time()
+                #total += final_time - initial_time
+                #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
 
                 # Add J, r to the optimizer                
                 stacked_J.append(np.sqrt(constraint.w) * constraint.J)
@@ -204,7 +226,7 @@ class Optimizer():
                 # Add energy to the energy dictionary
                 if constraint.name is not None:
                         self.energy_dic[constraint.name] = constraint.w * np.sum(constraint.r**2)
-
+        #print(f"\nTotal time to compute constraints: {total}")
         
         if len(stacked_J) == 1:
             self.J = stacked_J[0]
@@ -348,4 +370,12 @@ class Optimizer():
         self.clear_constraints()
 
 
+    def force_unit_variable(self, v_name, dim):
+        """ Function that forces the variables to be unit vectors.
+            Input:
+                v_name: Name of the variable
+                dim: Dimension of the variable
+        """
+
+        self.X[self.var_idx[v_name]] = unit(self.X[self.var_idx[v_name]].reshape(-1, dim)).flatten()
 

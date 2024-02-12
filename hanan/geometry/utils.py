@@ -237,11 +237,11 @@ def torsal_dir_vec(tv, tf, e_i):
 
 # ====================== Polyscope Functions =================
 
-def draw_polygon(vertices, name="_"):
+def draw_polygon(vertices, color, name="_"):
     """
         Register a polygon as a surface
     """
-    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]])
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=color, transparency=0.6)
     
 def draw_plane(p0, n, size=(1,1), name="_"):
     """
@@ -251,7 +251,6 @@ def draw_plane(p0, n, size=(1,1), name="_"):
 
     v1 = unit(orth_proj(aux, n))
 
-    print(v1@aux)
     v2 = unit(np.cross(n, v1))
 
     v1 *= size[0]
@@ -259,7 +258,7 @@ def draw_plane(p0, n, size=(1,1), name="_"):
 
     vertices = np.array([p0 + v1 + v2, p0 + v1 - v2, p0 - v1 - v2, p0 - v1 + v2])
 
-    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.2)
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.6)
 
 
 def read_obj(filename):

@@ -18,8 +18,9 @@ class Torsal_angle(Constraint):
         self.name = "Torsal_Angles" 
         self.nV = None # Number of vertices
         self.nF = None # Number of faces
+        self.t_ang = None # Torsal angle target
     
-    def initialize_constraint(self, X, var_indices, V, F, w=1 ) -> np.array:
+    def initialize_constraint(self, X, var_indices, V, F, t_ang, w=1 ) -> np.array:
         # Input
         # X: variables 
         # var_indices: dictionary of indices of variables
@@ -36,6 +37,9 @@ class Torsal_angle(Constraint):
 
         # Number of constraints 4*|F|
         self.const = 2*self.nF
+
+        # Torsal angle target
+        self.t_ang = t_ang
 
         # E1 = || nt1.nt2^2  - cos(60) + u^2 ||^2  <=> nt1.nt2 <= cos(60)
         self.add_constraint("E1", self.nF)
@@ -71,7 +75,6 @@ class Torsal_angle(Constraint):
 
         # d u (E1) = d nt2(nt1.nt2 - cos(60) + u^2) = 2u
         #self.add_derivatives(c_idx["E1"], v_idx["alpha"], 2*u)
-
         #self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(65*np.pi/180)**2 + u**2 )
-        self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(70*np.pi/180)**2  )
+        self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(self.t_ang*np.pi/180)**2  )
 
