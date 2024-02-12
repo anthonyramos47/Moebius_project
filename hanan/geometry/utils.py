@@ -648,60 +648,139 @@ def residuals(params, x):
     # Compute residuals: differences between distances and the radius
     return distances - r
 
-
-def fit_to_sphere(points, initial_guess):
-    
-    # Perform optimization
-    result = least_squares(residuals, initial_guess, args=(points,))
-    # Extract optimized parameters
-    cx, cy, cz, r = result.x
-    return (cx, cy, cz), r
-
-def initialize_Line_Congruence(v, f, v_f_adj, n, H ):
-    """ Function to initialize the line congruence. 
-    Input:
-        v: vertices
-        f: faces
-        v_f_adj: vertex face adjacency
-        n: normals
-        faces_top: topology of faces
-        H: Mean curvature per vertex
-    """
-
-    # Compute central sphere radius
-    r = 1/H 
-
-    # Per vertex take centers of mean curvature spheres 
-    mid = v + r[:,None]*n
-
-    # Compute the barycenters of the faces at midpoints
-    bary_mid = np.mean(mid[f], axis=1)
-
-    # Compute the normals of midpoint triangles
-    n_mid = unit(np.cross(mid[f[:,1]] - mid[f[:,0]], mid[f[:,2]] - mid[f[:,0]]))
-
-    av_n = np.zeros_like(v)
-
-    print("Redoo the computation of the edge directions by using actual sphere centers")
   
-    # # Compute the edge directions by averaging the normals of neighboring faces per vertex
-    # for i in range(len(v)):
-    #     if len(v_f_adj[i]) <= 3:
-    #         av_n[i] = n[i]
-    #     else:
-    #         av_n[i] = unit(np.sum(n_mid[v_f_adj[i]], axis=0))
+def sphere_initialization(v, f, e):
+    """
+    Function to find the best fitting spheres to two envelopes.
 
-    print(f"av_n : {av_n}")
+    Args:
+        v (numpy.ndarray): Vertices
+        f (numpy.ndarray): Faces
+        e (numpy.ndarray): Line congruence
+    
+    Returns:
+        numpy.ndarray: The midpoint of the closest points between the two envelopes.
+    """
+    
+    # Points in second envelope
+    vv = v + e 
 
-    # Reflect v with respect e_i 
-    v_ref = mid + (v-mid) - 2*proj((v-mid), av_n)
+    # Get vi, vj, vk 
+    vi  ,  vj, vk  = v[f[:,0]], v[f[:, 1]], v[f[:, 2]]
+    # Get vvi, vvj, vvk 
+    vvi , vvj, vvk = vv[f[:,0]], vv[f[:, 1]], vv[f[:, 2]]
 
-    print(f"v_ref : {v_ref}")
+    # Get circum circles for both envelopes
+    p1,  cr,  v1 = circle_3pts(vi, vj, vk)
+    p2, cr2,  v2 = circle_3pts(vvi, vvj, vvk)
 
-    # Compute the e  
-    e = v_ref - v 
+    # Compute intersection of circumcenter axis
+    l = unit(np.cross(v1,v2))  # Normal direction between lines
 
-    return e, av_n, mid, bary_mid, r
+    # Compute rejection vector bettwen p2-p1
+    rej = (p2-p1) - proj(p2-p1, v1) - proj(p2-p1, l)
+
+    print((np.linalg.norm(rej, axis= 1)/vec_dot(p2-p1,v2)))
+
+    # Closest point l2 
+    cls2 = p2 - (np.linalg.norm(rej, axis= 1)/vec_dot(p2-p1,v2))[:,None]*v2
+
+    print("cls2:", cls2.shape)
+    # Closest point to l2
+    cls = cls2 - proj(p2-p1, l)
+
+    print("cls:", cls.shape)
+
+    mid = 0.5*(cls + cls2)
+
+    return mid
+
+
+
+
+ 
+
+# def initialize_Line_Congruence(v, f, v_f_adj, n, H ):
+#     """ Function to initialize the line congruence. 
+#     Input:
+#         v: vertices
+#         f: faces
+#         v_f_adj: vertex face adjacency
+#         n: normals
+#         faces_top: topology of faces
+#         H: Mean curvature per vertex
+#     """
+
+#     # Compute central sphere radius
+#     r = 1/H 
+
+#     # Per vertex take centers of mean curvature spheres 
+#     mid = v + r[:,None]*n
+
+#     # Average mean radius per face
+#     r_m = np.mean(1/H[f], axis=1)
+
+#     # # Get circumcircles of the faces
+#     # cc, c_r, c_n = circle_3pts(v[f[:,0]], v[f[:,1]], v[f[:,2]])
+
+#     # # Compute distance from the circumcenter to the center of the sphere
+#     # d = np.sqrt(r_m**2 - c_r**2)
+
+#     # # # Compute the centers of the spheres
+#     # sph_c = cc + d[:,None]*c_n
+    
+#     # # Compute the average of the sphere centers per face
+#     # sph_n = np.zeros((len(v),3))    
+#     # sph_mid = np.zeros((len(v),3))
+#     # for i in range(len(v)):
+#     #     sphi = sph_c[v_f_adj[i]]
+#     #     sphj = sph_c[np.roll(v_f_adj[i], -1)]
+
+
+#     #     sph_mid[i] = np.mean(sph_c[v_f_adj[i]], axis=0)
+
+#     #     sph_n[i] = unit(np.mean( np.cross( unit(sphj - sph_mid[i]), unit(sphi - sph_mid[i])), axis=0))
+
+#     # sph_m_normals = np.zeros((len(v),3))
+#     # for i in range(len(v)):
+#     #     sphi = sph_c[v_f_adj[i]]
+#     #     sphj = sph_c[np.roll(v_f_adj[i], -1)]
+
+#     #     if np.linalg.norm(np.mean(np.cross(sphi - sph_m[i], sphj - sph_m[i]),axis=0)) > 1e-7:
+#     #         sph_m_normals[i] = unit(np.mean(np.cross( unit(sphi - sph_m[i]), unit(sphj - sph_m[i])),axis=0))
+#     #     else:
+#     #         print(f"normal {v}: {unit(np.cross( sphi[0] - sph_m[i], sphj[0] - sph_m[i]))}")
+#     #         sph_m_normals[i] = unit(np.cross( sphi[0] - sph_m[i], sphj[0] - sph_m[i]))
+
+   
+#     # # Compute the normals of midpoint triangles
+#     n_mid = unit(np.cross(mid[f[:,1]] - mid[f[:,0]], mid[f[:,2]] - mid[f[:,0]]))
+
+#     av_n = np.zeros_like(v)
+
+#     print("Redoo the computation of the edge directions by using actual sphere centers")
+  
+#     # Compute the edge directions by averaging the normals of neighboring faces per vertex
+#     for i in range(len(v)):
+#         if len(v_f_adj[i]) <= 3:
+#             av_n[i] = n[i]
+#         else:
+#             av_n[i] = unit(np.sum(n_mid[v_f_adj[i]], axis=0))
+
+#     print(f"av_n : {av_n}")
+
+#     # Face mid 
+    
+    
+#     # Reflect v with respect e_i 
+#     v_ref = mid + (v-mid) - 2*proj((v- mid), av_n)
+
+#     #print(f"v_ref : {v_ref}")
+
+#     # Compute the e  
+#     e = v_ref - v 
+
+#     return e, mid, np.mean(mid[f], axis=1), r_m
 
 
 

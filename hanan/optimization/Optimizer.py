@@ -40,8 +40,14 @@ class Optimizer():
         self.verbose = False # Verbose
     
     def get_energy_per_constraint(self):
+        print(f"ENERGY REPORT\n")
+        print("===========================================\n")
         for name, energy in self.energy_dic.items():
             print(f"{name}: {energy}")
+        print("===========================================\n")
+        print("=============Final Energy ==================\n")
+        print(f"Final Energy: {self.energy[-1]}\n")
+        print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
 
     
         

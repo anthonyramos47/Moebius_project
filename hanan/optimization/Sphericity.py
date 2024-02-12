@@ -18,8 +18,9 @@ class Sphericity(Constraint):
         self.name = "Sphericty" # Name of the constraint
         self.faces = None # List of faces
         self.v = None # List of vertices
+        self.init = 0 # Initialization opt or regular opt
 
-    def initialize_constraint(self, X, var_indices, F, V) -> None:
+    def initialize_constraint(self, X, var_indices, F, V, initalization=0) -> None:
         # Input
         # X : Variables
         # var_indices: Dictionary with the indices of the variables
@@ -30,6 +31,8 @@ class Sphericity(Constraint):
         self.var_idx = var_indices
         self.var = len(X)
 
+        # Set if initalization or not
+        self.init = initalization
         
         self.const_idx = {"Env1": np.arange(0         , 3*len(F)), # || (c_f - v_i)^2 - r_f ||^2 1st envelope
                           "Env2": np.arange(3*len(F)  , 6*len(F))  # || (c_f - v_i - ei)^2 - r_f ||^2 2st envelope
@@ -94,9 +97,10 @@ class Sphericity(Constraint):
         # d sph_c =>   2*(c_f - vv_i)
         self.add_derivatives(self.const_idx["Env2"].repeat(3), np.tile(self.var_idx["sph_c"],3), 2*cf_vvi.flatten())
 
+        if not self.init:
+            # d e_i,j,k =>  -(2*sph_c-2*v_i-2*e_i)
+            self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
         
-        # d e_i,j,k =>  -(2*sph_c-2*v_i-2*e_i)
-        self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
 
         # d r =>  -2*r
         self.add_derivatives(self.const_idx["Env2"], np.tile(self.var_idx["sph_r"],3), -2*np.tile(s_r,3))

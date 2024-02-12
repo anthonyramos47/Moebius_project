@@ -1,6 +1,6 @@
 import os 
 import sys
-from tqdm import tqdm
+#from tqdm import tqdm
 
 # Add hananLab to path
 # #path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(os.getcwd()))))
@@ -46,7 +46,6 @@ parser.add_argument('json', type=str, help='Json with parameters for the optimiz
 # Analizar los argumentos de la línea de comandos
 args = parser.parse_args()
 
-
 with open(args.json, 'r') as f:
     data = json.load(f)
 
@@ -62,7 +61,6 @@ dir = -np.array([0,0,1])
 data_path = dir_path+"/approximation/data/" # data path
 
 # Load test mesh
-#v, f = igl.read_triangle_mesh(os.path.join(data_path, "New_Tri_mesh.obj"))
 v, f = igl.read_triangle_mesh(os.path.join(data_path, data["name_mesh"]))
 
 # Compute normals
@@ -71,9 +69,9 @@ n = igl.per_vertex_normals(v, f)
 # Principal directions
 v1, v2, k1, k2 = igl.principal_curvature(v, f)
 
-# Compute the mean curvature
-h = 0.5*abs(k1 + k2)
-mean_r = 1/h
+# # Compute the mean curvature
+# h = 0.5*abs(k1 + k2)
+# mean_r = 1/h
 
 # Create mesh
 mesh = Mesh()
@@ -90,28 +88,24 @@ inner_edges       = mesh.inner_edges()
 # Get vertex indices of each edge
 ed_i, ed_j = mesh.edge_vertices()
 
+# Get inner edge data only
 ed_i = ed_i[inner_edges]
 ed_j = ed_j[inner_edges]
 
 # Get oposite vertex indices of each edge
 ed_k, ed_l = mesh.edge_oposite_vertices()
 
+# Get inner edge data only
 ed_k = ed_k[inner_edges]
 ed_l = ed_l[inner_edges]
 
 
-init_type = data["init_type"]
-
-# Fix direction
-if init_type == 1:
-    signs = np.sign(np.sum(n * (dir), axis=1))
-    n = n * signs[:, None]
-    # compute line congruence
-    offset = data["offset"]
-    # Offset
-    e = offset * n
-else:
-    e = mean_r[:,None] * n 
+signs = np.sign(np.sum(n * (dir), axis=1))
+n = n * signs[:, None]
+# compute line congruence
+offset = data["offset"]
+# Offset
+e = offset * n
 
 # Compute second envelope
 vv = v + e
@@ -139,28 +133,10 @@ nt = nt * signs[:, None]
 
 dct2_ct1 = np.linalg.norm(ct2 - ct,axis=1)
 
-#sph_c = ct + ((0.5*dct2_ct1**2)/vec_dot(ct2 - ct, nt))[:,None]*nt
 sph_c = ct + 0.5*dct2_ct1[:,None]*nt
+
 # Compute sphere radius
 sph_r = np.linalg.norm(sph_c - v[j], axis=1)
-
-# sph_c = np.zeros((len(f), 3))
-# sph_r = np.zeros(len(f))
-
-# for idx_f in range(len(f)):
-    
-#     # Get points and join then in one list
-#     vv_pts = vv[f[idx_f]]
-#     v_pts = v[f[idx_f]]
-
-#     pts = np.vstack((vv_pts, v_pts))
-
-#     len_pts = len(pts)
-#     # Compute the sphere
-#     c, r = fit_to_sphere(pts, np.hstack((sph_oc[idx_f], sph_or[idx_f])))
-    
-#     sph_c[i] = c
-#     sph_r[i] = r
 
 
 energy = 0
@@ -207,10 +183,7 @@ X = np.zeros(sum(len(arr) for arr in var_idx.values()))
 X[var_idx["e"]]      = e.flatten()
 X[var_idx["sph_c"]]  = sph_c.flatten()
 X[var_idx["sph_r"]]  = sph_r
-if init_type == 1:
-    X[var_idx["le"]]     = offset
-else:
-    X[var_idx["le"]]     = h 
+X[var_idx["le"]]     = offset
 X[var_idx["alpha"]]  = 0.5
 
 t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
@@ -220,6 +193,27 @@ tt2 = unit(a2[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
 
 ec = np.sum(e[f], axis=1)/3
 
+# Init Sphericity
+sphericity = Sphericity()
+sphericity.initialize_constraint(X, var_idx, f, v, 1)
+sphericity.set_weigth(1)
+
+#  pre_Optimizer
+pre_Opt = Optimizer()
+pre_Opt.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
+
+
+print("Pre-Optimization started")
+for _ in range(100):
+    
+    pre_Opt.get_gradients(sphericity)
+    pre_Opt.optimize()
+
+print("Pre Optimization finished")
+X = pre_Opt.bestX
+
+
+print("Second Optimization")
 # Init Sphericity
 sphericity = Sphericity()
 sphericity.initialize_constraint(X, var_idx, f, v)
@@ -251,7 +245,6 @@ tang.initialize_constraint(X, var_idx, v, f)
 tang.set_weigth(weights["torsal_angle"])
 
 # Init Torsal 
-
 torsal_fair = Torsal_Fair()
 torsal_fair.initialize_constraint(X, var_idx, v, inner_edges, ed_i, ed_j, ed_k, ed_l)
 torsal_fair.set_weigth(weights["torsal_fair"])
@@ -260,21 +253,23 @@ torsal_fair.set_weigth(weights["torsal_fair"])
 optimizer = Optimizer()
 optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
 
-print("Optimization started")
-for _ in range(IT):
+for _ in range(100):
     optimizer.unitize_variable("nt1", 3)
     optimizer.unitize_variable("nt2", 3)
+
     
     optimizer.get_gradients(sphericity)
-    optimizer.get_gradients(smooth)
-    optimizer.get_gradients(linecong)
     optimizer.get_gradients(torsal)
+    optimizer.get_gradients(linecong)
     optimizer.get_gradients(line_fair)
+    optimizer.get_gradients(smooth)
     optimizer.get_gradients(tang)
     optimizer.get_gradients(torsal_fair)
+
     optimizer.optimize()
 
 optimizer.get_energy_per_constraint()
+optimizer.report_energy()
 
 ## Extract variables
 ne, nc, nr, th, phi, nt1, nt2, le = optimizer.uncurry_X("e", "sph_c", "sph_r", "th", "phi", "nt1", "nt2", "le")
@@ -386,8 +381,8 @@ mesh.add_scalar_quantity("Torsal angles", torsal_angles, defined_on="faces", ena
 mesh.add_scalar_quantity("LC Lenght", abs(le), enabled=True, cmap="coolwarm")
 
 # Visualize sphere radius as scalar quantity
-mesh.add_scalar_quantity("radius sphere", nr, defined_on="faces", enabled=True, cmap="coolwarm")
-mesh.add_scalar_quantity("H", h, defined_on="vertices", enabled=True, cmap="coolwarm")
+mesh.add_scalar_quantity("radius sphere", abs(nr), defined_on="faces", enabled=True, cmap="coolwarm")
+
 
 # Torsal directions
 mesh.add_vector_quantity("t1",   t1, defined_on="faces", length=0.01, radius=0.001, enabled=True,  color=(0,0,0))
@@ -419,25 +414,25 @@ if Show_Analytical_Torsal:
 if Show:
     ps.show()
 
-Optimization_Output = [v, f, t1, t2, tt1, tt2, ne, nc, nr, nt1, nt2 ]
+# Optimization_Output = [v, f, t1, t2, tt1, tt2, ne, nc, nr, nt1, nt2 ]
 
-output_path = data["exp_dir"]
+# output_path = data["exp_dir"]
 
-output_path += data["out_name"]
+# output_path += data["out_name"]
 
-optimizer.report_energy(output_path)
+# optimizer.report_energy(output_path)
 
-# Open a file for writing. The 'wb' parameter denotes 'write binary'
-with open(output_path+'_Optimization.pkl', 'wb') as file:
-    pickle.dump(Optimization_Output, file)
+# # Open a file for writing. The 'wb' parameter denotes 'write binary'
+# with open(output_path+'_Optimization.pkl', 'wb') as file:
+#     pickle.dump(Optimization_Output, file)
 
-# Save weights and iterations used in file 
-save_param = {
-    "name_mesh": data["name_mesh"],
-    "weights": weights,
-    "iterations": IT,
-    "offset": offset 
-}
-with open(output_path+'_weights.json', 'w') as file:
-    json.dump(save_param, file, indent=4)
+# # Save weights and iterations used in file 
+# save_param = {
+#     "name_mesh": data["name_mesh"],
+#     "weights": weights,
+#     "iterations": IT,
+#     "offset": offset 
+# }
+# with open(output_path+'_weights.json', 'w') as file:
+#     json.dump(save_param, file, indent=4)
     
