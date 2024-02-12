@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import splipy as sp
 import json
 from scipy.interpolate import bisplev, bisplrep
-
+from geomdl.fitting import approximate_surface
+import splipy as sp
 from geometry.utils import *
 
 
@@ -125,6 +126,8 @@ def read_bspline_json(dir):
     order_v = data["degreeV"] + 1
     
     # Print the order of the surface in each direction
+    # 
+    print("Reading B-Spline from Json:")
     print("U dir order: ", order_u )
     print("V dir order: ", order_v)
 
@@ -141,7 +144,7 @@ def read_bspline_json(dir):
     knots_v = np.array(knots_v) / knots_v[-1]
 
     # Get the control points
-    control_points = np.array(data["controlPoints"]).reshape(order_u*order_v,4)
+    control_points = np.array(data["controlPoints"]).reshape(-1,4)
     control_points = np.array(control_points[:,:3])
 
     # Return data
@@ -171,20 +174,27 @@ def central_spheres(bsp1, u_vals, v_vals):
     # Compute mean curvature
     _, H, n = curvatures_par(bsp1, u_vals, v_vals)
 
+    mean_H = np.mean(H)
+
+    # Search for H close to zero
+    idx = np.where(H < 0.0001)
+
+    print("idx len", len(idx[0]))
+
+    H0 = H.copy()
+
+    H[idx[0]] = mean_H
+
     # Compute the radius
     r_H = 1/H
 
     # Evaluate surface
     s_uv = bsp1(u_vals, v_vals)
 
-    print("s(u,v): ", s_uv.shape)
-    print("r_H: ", r_H[:, :, None].shape)
-    print("n(u,v):, ",n.shape)
-
     # Compute the center
     c = s_uv + r_H[:,:,None]*n
 
-    return c, r_H, n
+    return c, r_H, H0, n
 
 def line_congruence_uv(bsp, r_uv, u_vals, v_vals):
     """
@@ -332,7 +342,9 @@ def plot_scalar_value(ax, Surface, scalar, name):
     cmap = plt.cm.RdBu # You can choose any existing colormap as a starting point
     norm = plt.Normalize(vmin=min(scalar_flatten), vmax=max(scalar_flatten))
     
-    ax.plot_surface(Surface[:, :, 0], Surface[:, :, 1], Surface[:, :, 2], cmap =plt.cm.plasma,  facecolors=cmap(norm(scalar)),  vmin=0, vmax=1, alpha=0.8)
+    ax.plot_surface(Surface[:, :, 0], Surface[:, :, 1], Surface[:, :, 2], cmap =plt.cm.plasma,  facecolors=cmap(norm(scalar)), 
+    vmin=0, vmax=1, alpha=0.8)
+
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -373,13 +385,16 @@ def plot_surface(ax, Surface, name):
     print("Surface shape: ", Surface.shape)
 
     # Plot the B-spline surface
-    ax.plot_surface(Surface[:, :, 0], Surface[:, :, 1], Surface[:, :, 2], alpha=0.8)
+    ax.plot_surface(Surface[:, :, 0], Surface[:, :, 1], Surface[:, :, 2], alpha=0.8,
+    label=name)
+
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    ax.legend()
+    #ax.legend()
 
-    ax.set_title('B-spline surface '+name)
+    #ax.set_title('B-spline surface '+name)
+    
 
 
 def drawSphere(xCenter, yCenter, zCenter, r):
@@ -394,3 +409,52 @@ def drawSphere(xCenter, yCenter, zCenter, r):
     z = r*z + zCenter
 
     return x, y, z
+
+
+def approx_surface_from_data(file,box_size=2):
+    """
+    Function to approximate the surface from the data. 
+    Input:
+        file: File with the data
+    """
+    print("Reading data from file: ", file)
+
+    # Read the data
+    data = np.loadtxt(file)
+
+    # Number of u, v pts 
+    u_pts = int(data[0,0])
+    v_pts = int(data[0,1])
+
+    # Degree of u,v 
+    u_degree = int(data[1,0])
+    v_degree = int(data[1,1])
+
+    # Points fitting
+    pts = normalize_vertices(data[2:], 2)
+
+    geom_bsp = approximate_surface(pts, u_pts+1, v_pts+1, u_degree, v_degree)
+
+
+    # Get controp points
+    ctrl_pts = geom_bsp.ctrlpts
+
+    # Knots
+    u_knots = geom_bsp.knotvector_u
+    v_knots = geom_bsp.knotvector_v
+
+    # Order 
+    u_order = geom_bsp.order_u
+    v_order = geom_bsp.order_v
+
+
+    # Create Bspline basis 
+    basis_u = sp.BSplineBasis(u_order, u_knots)
+    basis_v = sp.BSplineBasis(v_order, v_knots)
+
+    # Create the B-spline surface
+    bsp = sp.Surface(basis_u, basis_v, ctrl_pts)
+
+    return bsp
+
+    

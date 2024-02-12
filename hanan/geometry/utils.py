@@ -579,12 +579,58 @@ def quadratic_equation_angle(x, t, vij, vik):
     return (unit(t)@unit(t_th) - 1)**2
 
 
-def approximate_torsal(init, g0, g1, g2):
+def approximate_torsal(lc, lu, lv, du, dv):
+    """
+    Function to approximate the torsal direction.
+    Input:
+        lc: Lince congruence joining barycenters of the faces
+        lu: Line congruence u direction
+        lv: Line congruence v direction
+        du: surface u direction
+        dv: surface v direction
+    """
 
-    # Perform the optimization
-    result = minimize(objective_function, init, args=(g0, g1, g2))
 
-    return result.x
+    # Define a minimization of the function
+    # ut^2 [du, lu, lc] + (ut vt) ([du, lv, lc] + [dv, lu, lc]) + vt^2 [dv, lv, lc] = 0
+    # variables ut and vt
+    def torsal_energy(X, lc, lu, lv, du, dv):
+        X = X.reshape(-1, 2)
+        ut, vt = X[:,0], X[:,1]
+
+        # Energy
+        E = ut**2 * np.sum(du*np.cross(lu, lc), axis=1) + (ut * vt) * (np.sum(du* np.cross(lv, lc), axis=1)   + np.sum(dv*np.cross(lu, lc), axis=1))+  vt**2    *  np.sum(dv* np.cross(lv, lc), axis=1)
+
+        return np.sum( E**2)
+
+    # Define the constraints: ut du + vt dv = 1
+    cons = {'type': 'eq', 'fun': lambda X: np.sum((np.linalg.norm((X[0]*du + X[1]*dv),axis=1)**2 - 1))}
+
+    # T1 initial guess
+    X0 = np.zeros((len(lc)*2)) 
+    X0[::2] = 1
+
+    res1 = minimize(torsal_energy, X0, args=(lc, lu, lv, du, dv), constraints=cons)
+
+    # T2 initial guess
+    X0 = np.zeros((len(lc)*2)) 
+    X0[1::2] = 1
+    
+    res2 = minimize(torsal_energy, X0, args=(lc, lu, lv, du, dv), constraints=cons)
+
+    # X = res.x.reshape(-1, 2)
+    # print(res)
+
+    # ut, vt = X[:,0], X[:,1]
+
+    # lt = ut[:,None]*lu + vt[:,None]*lv
+    # vt = ut[:,None]*du + vt[:,None]*dv
+
+    # lt_lc = np.cross(lt, lc)
+
+    # print("Unitarity vt", np.linalg.norm(vt, axis=1)**2 - 1)
+    # print("Planarity", np.sum(vt*lt_lc, axis=1))
+    return res1.x.reshape(-1, 2), res2.x.reshape(-1, 2)
 
 def fit_sphere_energy(init, pts):
     c = init[:3]
@@ -735,3 +781,135 @@ def create_hex_face(radius, offset, n=6):
     h_f = np.vstack((np.array([[i, (i + 1)%7, 0] for i in range(1, 6)]), np.array([6,1,0])))
 
     return h_v, h_f
+
+
+def torsal_directions(lc, lu, lv, du, dv):
+    """
+    Function to compute the torsal directions.
+    This is going to compute the torsal directions at a point vc on the surface with 
+    line lc. We use the determinant of 
+    [vt, lt, lc] = 0; vt = ut du + vt dv; lt = ut lu + vt lv
+    We will find ut:vt
+    Input:
+        lc : Line at computation place (np.array)
+        lu : Line derivative u (np.array)
+        lv : Line derivative v (np.array)
+        du : Surface derivative u (np.array)
+        dv : Surface derivative v (np.array)
+    """
+   
+    # t = ut/vt
+    # We solve the quadratic equation
+    # ut^2[vu, lu, lc] + ut vt ([vu, lv, lc] + [dv, lu, lc]) + vt^2 [lv, dv, lc] = 0
+    # <=> ut^2 g0 + ut vt g1 + vt^2 g2 = 0
+    lc = unit(lc)
+    
+    g0 = vec_dot(du, np.cross(lu, lc))
+    g1 = vec_dot(du, np.cross(lv, lc)) + vec_dot(dv, np.cross(lu, lc))
+    g2 = vec_dot(dv, np.cross(lv, lc))
+
+    # Discriminant
+    disc = g1**2 - 4*g0*g2
+
+    # Init torsal directions
+    ut1 = np.zeros(len(lc))
+    vt1  = np.zeros(len(lc))
+    vt2 = np.zeros(len(lc))
+    ut2 = np.zeros(len(lc))
+
+    # ut/vt =(-g1 +/- sqrt(g1^2 - 4*g0*g2))/2*g0
+    # ut = (-g1 +/- sqrt(g1^2 - 4*g0*g2))
+    # vt = 2*g0
+
+    # For disc > 0
+    idx = np.where(disc > 1e-8)[0]
+    ut1[idx] = (-g1[idx] + np.sqrt(disc[idx]))
+    ut2[idx] = (-g1[idx] - np.sqrt(disc[idx]))
+    vt1[idx]  = vt2[idx] =  2*g0[idx]
+    
+    # For disc < 0
+    idx = np.where(disc <= 1e-8)[0]
+    print(f"Disc < 0 : {len(idx)}")
+    if idx.size > 0:
+        opt_t1, opt_t2 = approximate_torsal(lc[idx], lu[idx], lv[idx], du[idx], dv[idx])
+
+        ut1[idx]  = opt_t1[:,0]
+        vt1[idx]  = opt_t1[:,1]
+
+        ut2[idx]  = opt_t2[:,0]
+        vt2[idx]  = opt_t2[:,1]
+
+
+    t1 = ut1[:,None]*du + vt1[:,None]*dv
+    t2 = ut2[:,None]*du + vt2[:,None]*dv
+
+    ut1 /= np.linalg.norm(t1, axis=1)
+    vt1 /= np.linalg.norm(t1, axis=1)
+
+    ut2 /= np.linalg.norm(t2, axis=1)
+    vt2 /= np.linalg.norm(t2, axis=1)
+   
+    return t1, t2, ut1, vt1, ut2, vt2, idx
+    
+    
+def lc_info_at_grid_points(l):
+    """ Function to compute the line congruence information for torsal computations.
+    Input:
+        l: Line congruence (u,v,3)
+        n: Normals direction (u,v,3)
+        r_uv: radius of the spheres (u,v,3)
+    Return:
+        lc: Line congruence at the baricenter of the faces
+        lu: Line congruence u direction
+        lv: Line congruence v direction
+    """
+    # Get line congruence at grid points
+    l0 = l[:-1,:-1]
+    l1 = l[:-1,1:]
+    l2 = l[1:,1:]
+    l3 = l[1:,:-1]
+
+    lc = (l0 + l1 + l2 + l3)/4
+
+    # lu 
+    lu = l2 - l0 
+    lv = l1 - l3
+
+    return lc, lu, lv
+
+
+def flat_array_variables(arr, n=3):
+    # Multiply elements by 3
+    multiplied = arr * n
+    # Create a sequence for each element and reshape for concatenation
+    for i in range(1, n):
+        multiplied = np.vstack([multiplied, arr * n + i])
+    
+    # Flatten the array to match the desired output format
+    transformed = multiplied.flatten('F')
+    return transformed
+
+def torsal_dir_show(baricenter, t1, t2, size=0.005, rad=0.0005,  color=(1,1,1), name=""):
+
+    # Torsal directions t1
+    t1_dir_i = baricenter.reshape(-1,3) + size*t1
+    t1_dir_f = baricenter.reshape(-1,3) - size*t1
+
+    # Torsal directions t2 
+    t2_dir_i = baricenter.reshape(-1,3) + size*t2
+    t2_dir_f = baricenter.reshape(-1,3) - size*t2
+    
+    t2_nodes = np.concatenate((t2_dir_i, t2_dir_f), axis=0)
+    t1_nodes = np.concatenate((t1_dir_i, t1_dir_f), axis=0)
+
+    t1_edges = np.array([[i, i + len(t1_dir_i)] for i in range(len(t1_dir_i))])
+
+    t1_net = ps.register_curve_network(name+"t1", 
+                                       t1_nodes, 
+                                       t1_edges, 
+                                       color=color)
+    t2_net = ps.register_curve_network(name+"t2", t2_nodes, t1_edges, 
+                                        color=color)
+    t1_net.set_radius(rad, relative=False) 
+    t2_net.set_radius(rad, relative=False)
+

@@ -164,6 +164,12 @@ class Constraint():
 
 
 
+    def print_per_const_energy(self):
+
+        print("\n")
+        for const in self.const_idx:
+            print(f"{const}: {np.sum(self._r[self.const_idx[const]]**2)}")
+            
         
 
     

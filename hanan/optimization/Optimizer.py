@@ -48,8 +48,10 @@ class Optimizer():
         Method to clear the energy
         """
         self.energy = []
+        self.it = 0
         self.bestit = None
         self.bestX = None
+        self.prevdx = None
 
     def clear_constraints(self):
         """
@@ -152,7 +154,7 @@ class Optimizer():
 
 
 
-    def unitize_variable(self, var_name, dim) -> None:
+    def unitize_variable(self, var_name, dim, w) -> None:
         """
             Method to add a unit constraint to the optimizer. The unit constraint is a constraint that forces the variable to be unit.
             Input:
@@ -164,6 +166,7 @@ class Optimizer():
         unit = Unit()
         #unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
         unit._initialize_constraint(self.X, self.var_idx, var_name, dim)
+        unit.w = w
         unit.name = var_name + "_unit"
         #self.energy_vector = np.zeros(len(self.X))
         self.constraints.append(unit)
