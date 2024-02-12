@@ -1,6 +1,6 @@
 # Planarity constraint implementation
 import numpy as np
-from hanan.optimization.constraint import Constraint
+from optimization.constraint import Constraint
 
 class Unit(Constraint):
 

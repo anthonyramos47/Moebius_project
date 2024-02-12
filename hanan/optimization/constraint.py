@@ -2,7 +2,7 @@
 # This is meant to be a template to compute constraints
 # The main idea is to pass a mesh and return a residual and a Jacobian
 import numpy as np
-import hanan.geometry as geo
+import geometry as geo
 from scipy.sparse import csc_matrix
 
 

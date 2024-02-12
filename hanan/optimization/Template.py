@@ -1,7 +1,7 @@
 # Template constraint
 
 # Call parent class
-from hanan.optimization.constraint import Constraint
+from optimization.constraint import Constraint
 
 # Import any other library that you need ...
 # Example:

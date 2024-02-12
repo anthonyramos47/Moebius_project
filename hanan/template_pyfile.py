@@ -53,7 +53,7 @@ dir_path = os.path.join(path, 'hanan')
 
 # Example of optimization
 # Load mesh data
-v, f = create_hex_faces(2, 1, 1)
+v, f = create_hex_face(2, 1, 1)
 
 # Get any other data that you need ...
 nV = v.shape[0]
@@ -63,8 +63,8 @@ opt = Optimizer()
 
 # Add variables to the optimizer
 # Example:
-opt.add_variable("sph_c", (nV, 3)) # Sphere center
-opt.add_variable("v", (nV, 3)) # Sphere radius
+opt.add_variable("sph_c", nV) # Sphere center
+opt.add_variable("v", nV) # Sphere radius
 
 # Initialize Optimizer ("Method", step, verbosity)
 opt.initialize_optimizer("LM", 0.8, 0)
@@ -73,7 +73,7 @@ opt.initialize_optimizer("LM", 0.8, 0)
 # Example:
 temp = Template() 
 # add_constraint(name, args, weight)
-opt.add_constraint(temp, args=(nV), w=1.0)
+opt.add_constraint(temp, args=[nV], w=1.0)
 
 # Optimize loop
 for i in range(10):

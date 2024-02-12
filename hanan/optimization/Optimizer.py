@@ -2,8 +2,8 @@
 import numpy as np
 import time as tm
 import pandas as pd
-from hanan.optimization.Unit import Unit
-from hanan.geometry.utils import unit
+from optimization.Unit import Unit
+from geometry.utils import unit
 from scipy.sparse import diags, vstack
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
