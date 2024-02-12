@@ -42,6 +42,11 @@ class Template(Constraint):
         # Name, dimension of the constraint or number of equations
         # self.add_constraint("E1", self.nF)
 
+        # Add rows and indices of the positions in the J matrix
+        # Example:
+        # self.i = np.tile(np.arange(self.nF), 3)
+        # self.j = np.repeat(np.arange(self.nF), 3)
+
         # Add any other initialization that you need
         # Example:
         # self.t_ang = t_ang # Torsal angle target

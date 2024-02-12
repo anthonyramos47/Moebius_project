@@ -220,12 +220,12 @@ class Optimizer():
                 #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
 
                 # Add J, r to the optimizer                
-                stacked_J.append(np.sqrt(constraint.w) * constraint.J)
-                stacked_r.append(np.sqrt(constraint.w) * constraint.r)          
+                stacked_J.append(np.sqrt(constraint.w) * constraint._J)
+                stacked_r.append(np.sqrt(constraint.w) * constraint._r)          
 
                 # Add energy to the energy dictionary
                 if constraint.name is not None:
-                        self.energy_dic[constraint.name] = constraint.w * np.sum(constraint.r**2)
+                        self.energy_dic[constraint.name] = constraint.w * np.sum(constraint._r**2)
         #print(f"\nTotal time to compute constraints: {total}")
         
         if len(stacked_J) == 1:

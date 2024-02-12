@@ -10,14 +10,15 @@ class Constraint():
     def __init__(self) -> None:
         self.name = None # Name of the constraint
         self.w = 1 # Weight
-        self.J = None # Jacobian matrix
-        self.J0 = None # Constant Jacobian
-        self.i = [] # Row index
-        self.j = [] # Column index
-        self.values = [] # Values
-        self.r = None # Residual vector
+        self._J = None # Jacobian matrix
+        self._J0 = None # Constant Jacobian
+        self._i = [] # Row index
+        self._j = [] # Column index
+        self._values = [] # Values
+        self._r = None # Residual vector
         self.const = 0 # Num Constraints
         self.var = None # Num Variables
+        self.sparse = True # Sparse matrix
         self.const_idx = {} # Dic to store the index of the constraints
 
     def initialize_constraint(self, X, var_indices, *args) -> None:
@@ -45,6 +46,8 @@ class Constraint():
 
         # Initialization function
         self.initialize_constraint(X, var_indices, *args)
+
+        # Compute the indices for rows and columns of the Jacobian, since those remain constant
     
         # Get the number of variables
         self.var = len(X)
@@ -57,10 +60,19 @@ class Constraint():
         """
         self.reset()    
 
+
         self.compute(X, var_idx)
 
-        self.J = csc_matrix((np.array(self.values), (self.i, self.j)), shape=(self.const, self.var))
-        pass
+
+        # print("shape i:", len(self._i)) 
+        # print("shape j:", len(self._j))
+        # print("shape values:", len(self._values))
+        if self.sparse:
+            self._J = csc_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+        else:
+            self._J = csc_matrix(self._J)
+
+        #print("Jacobian", self.J.toarray())
 
     def compute(self, X) -> None:
         """ Function to compute the residual and the Jacobian of the constraint
@@ -70,47 +82,51 @@ class Constraint():
         """
         pass
 
-    def add_derivatives(self, c_idx, v_idx, values):
-        """ Function to fill a row of the Jacobian
+    def define_rows_cols_J(self, c_idx, v_idx):
+        """ Function to define the rows and columns of the Jacobian
             Input:
                 c_idx: Constraint indices
                 v_idx: Variable indices
-                values: Values of J
         """
-        
-        # # Check if v_idx is a list or a np.array
-        # if isinstance(v_idx, list):
-        #     # Check size of v_idx and c_idx
-        #     assert len(v_idx) == len(c_idx), "Size of v_idx and c_idx must be the same"
+        self._i = c_idx
+        self._j = v_idx
 
-        #     # Replicate the corresponding c_idx acoording to the length of the elements in v_idx
-        #     c_idx = [np.array([c_idx[i]] * len(sublist)) for i, sublist in enumerate(v_idx)]
-            
-        #     # flatten v_idx
-        #     v_idx = np.concatenate(v_idx)
+    def set_derivatives(self, values, c_idx=None, v_idx=None):
+        """ Function to set the derivatives of the constraint
+            Input:
+                values: Values of the derivatives
+                c_idx: Constraint indices
+                v_idx: Variable indices
+        """
+        if c_idx is None or v_idx is None:
+            self._values = values
+        else:
+            self._i = c_idx
+            self._j = v_idx
+            self._values = values
 
-        # # Check if v_idx is a np.array
-        # elif isinstance(v_idx, np.ndarray) and len(v_idx.shape) == 2:
-
-        #     # Get shape of v_idx
-        #     shape = v_idx.shape
-
-        #     # Replicate the corresponding c_idx acoording to the length of the elements in v_idx
-        #     c_idx = c_idx.repeat(shape[1])
-        #     v_idx = v_idx.flatten()
-
+    def add_derivatives(self,  c_idx, v_idx, values):
+        """ Function to add the derivatives of the constraint
+            Input:
+                values: Values of the derivatives
+                c_idx: Constraint indices
+                v_idx: Variable indices
+        """
         # Fill row
-        self.i.extend(c_idx)
-        self.j.extend(v_idx)
-        self.values.extend(values)
+        self._i.extend(c_idx)
+        self._j.extend(v_idx)
+        self._values.extend(values)
 
-    def set_r(self, c_idx, values):
+    def set_r(self, c_idx,  values):
         """ Function to set the residual
             Input:
                 c_idx: Constraint indices
                 values: Values of r
         """
-        self.r[c_idx] = values
+        if c_idx is None:
+            self._r = values
+        else:
+            self._r[c_idx] = values
 
     def set_weigth(self, w):
         """ Function to set the weight
@@ -139,11 +155,11 @@ class Constraint():
     def reset(self):
         """ Function to clear the Jacobian
         """
-        self.i = []
-        self.j = []
-        self.values = [] 
-        self.J = None
-        self.r = np.zeros(self.const, dtype=np.float64)
+        self._i = []
+        self._j = []
+        self._values = [] 
+        self._J = None
+        self._r = np.zeros(self.const, dtype=np.float64)
 
 
 

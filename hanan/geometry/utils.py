@@ -1,7 +1,6 @@
 import numpy as np
 import polyscope as ps
 from scipy.optimize import minimize
-from scipy.interpolate import BSpline, bisplev, bisplrep
 
 def unit(v):
     """normalize a list of vectors v
@@ -96,13 +95,13 @@ def orth_proj(v, u):
     """
     return v - proj(v, u)
 
-def vec_dot(v1, v2):
+def vec_dot(v1, v2, ax=1):
     """ Dot product between two lists of vectors v1, v2
     """
     if len(v1.shape) == 1 and len(v2.shape) == 1:
         dot =  v1@v2
     else: 
-        dot = np.sum(v1*v2, axis=1) 
+        dot = np.sum(v1*v2, axis=ax) 
 
     return dot
 
@@ -714,6 +713,7 @@ def normalize_vertices(v, factor=1):
 
     return normalized_vertices
 
+
 def create_hex_face(radius, offset, n=6):
     """
         Function to create a hexagon face
@@ -735,67 +735,3 @@ def create_hex_face(radius, offset, n=6):
     h_f = np.vstack((np.array([[i, (i + 1)%7, 0] for i in range(1, 6)]), np.array([6,1,0])))
 
     return h_v, h_f
-
-
-def normals_bsp(bsp, u_pts, v_pts):
-    """
-    Function to compute the normals of the surface
-    Input:
-        bsp: B-spline surface
-        u_pts: u points
-        v_pts: v points
-    """
-
-    # Compute the first and second derivatives
-    du  = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=1, dy=0).flatten()
-    dv  = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=0, dy=1).flatten()
-
-    print(du[:5])
-    
-    du  = np.hstack((np.ones_like(u_pts.flatten())[:,None], v_pts.flatten()[:, None], du[:, None]))
-    dv  = np.hstack((u_pts.flatten()[:, None], np.ones_like(v_pts.flatten())[:, None], dv[:, None]))
-    
-    # Compute the normal
-    n = np.cross(du, dv)
-    print(np.where(np.linalg.norm(n, axis=1) == 0))
-    n = n/np.linalg.norm(n, axis=1)[:, None]
-
-    return n
-
-
-def curvatures(bsp, u_pts, v_pts):
-    """
-    Function to compute the curvatures of the surface
-    """
-
-    # Compute the first and second derivatives
-    fu  = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=1, dy=0).flatten()
-    fv  = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=0, dy=1).flatten()
-    fuu = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=2, dy=0).flatten()
-    fvv = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=0, dy=2).flatten()
-    fuv = bisplev(u_pts[:,0], v_pts[0,:], bsp, dx=1, dy=1).flatten()
-
-  
-    # flatten each
-    # Compute with flatten arrays
-    # Reshape end result
-    
-    # Compute the normal
-    norms_n = np.sqrt(fu**2 + fv**2 + 1)
- 
-    
-    # Gauss curvature
-    K = (fuu*fvv - fuv**2)/(norms_n**4)
-
-    # Mean curvature
-    H = (fuu - 2*fu*fuv*fv + fuu*fv*2 + fvv + fu**2*fvv)/(2*norms_n**3)
-
-    return K, H  
-
-
-
-
-
-
-
-
