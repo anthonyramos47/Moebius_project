@@ -217,6 +217,7 @@ nIE = len(inner_edges)
 
 #  Optimizer
 optimizer = Optimizer()
+# Define the variables
 optimizer.add_variable("e", 3*nV)
 optimizer.add_variable("sph_c", 3*nF)
 optimizer.add_variable("sph_r", nF)
@@ -228,23 +229,39 @@ optimizer.add_variable("u", 3*nIE)
 optimizer.add_variable("alpha", nF)
 optimizer.add_variable("le", nV)
 
-optimizer.init_variables()
+
+# Init X 
+X = np.zeros(optimizer.var)
+
+
+X[optimizer.var_idx["e"]]      = e.flatten()
+X[optimizer.var_idx["sph_c"]]  = sph_c.flatten()
+X[optimizer.var_idx["sph_r"]]  = sph_r
+X[optimizer.var_idx["le"]]     = offset
+X[optimizer.var_idx["alpha"]]  = 0.5
+
+# Initialize the variables
+optimizer.initialize_optimizer(X, "LM", 0.5, 1)
+
+# Define the constraints
+# Init Sphericity
+sphericity = Sphericity()
+optimizer.add_constraint(sphericity,  args=(f, v), w=2 )
 
 
 #optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
 
+print(optimizer.uncurry_X("sph_c")[:5])
 
+print("Test-Optimization started")
+for _ in range(100):
+    optimizer.get_gradients()
+    optimizer.optimize()
 
+print("Test Optimization finished")
 
-# Init X 
-X = np.zeros(sum(len(arr) for arr in var_idx.values()))
+print(optimizer.uncurry_X("sph_c")[:5])
 
-
-X[var_idx["e"]]      = e.flatten()
-X[var_idx["sph_c"]]  = sph_c.flatten()
-X[var_idx["sph_r"]]  = sph_r
-X[var_idx["le"]]     = offset
-X[var_idx["alpha"]]  = 0.5
 
 # t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
 
@@ -253,10 +270,7 @@ X[var_idx["alpha"]]  = 0.5
 
 ec = np.sum(e[f], axis=1)/3
 
-# Init Sphericity
-sphericity = Sphericity()
-sphericity.initialize_constraint(X, var_idx, f, v)
-sphericity.set_weigth(1)
+
 
 
 #  pre_Optimizer
@@ -266,8 +280,7 @@ pre_Opt.initialize_optimizer(X, var_idx, "LM", 0.8, 1)
 
 print("Pre-Optimization started")
 for _ in range(100):
-    
-    pre_Opt.get_gradients(sphericity)
+    pre_Opt.get_gradients()
     pre_Opt.optimize()
 
 print("Pre Optimization finished")

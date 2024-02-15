@@ -37,7 +37,8 @@ class Optimizer():
         self.energy = [] # Energy vector
         self.energy_dic = {} # Energy dictionary
         self.var_idx = {} # Variable indices
-        self.variables_dim = {} # Variables and their dimensions
+        self.var = 0 # Number of variables
+        self.constraints = [] # List of constraints objects
         self.verbose = False # Verbose
     
     def get_energy_per_constraint(self):
@@ -57,18 +58,26 @@ class Optimizer():
                 var_name: Name of the variable
                 dim: Dimension of the variable
         """
-        self.variables_dim[var_name] = dim
+        self.var_idx[var_name] = np.arange(self.var, self.var + dim)
+        self.var += dim
 
-    def init_variables(self) -> None:
-        """
-            Method to initialize the variables of the optimizer
-        """
-        prev = 0
-        for name, dim in self.variables_dim.items():
-            self.var_idx[name] = np.arange(prev, prev + dim)
-            prev += dim
+            
 
-    
+    def add_constraint(self, constraint, args, w=1) -> None:
+        """
+            Method to add a constraint to the optimizer
+            Input:
+                constraint: Constraint class
+                w: Weight of the constraint
+                args: arguments of the constraint
+        """
+
+        # Add constraint to the optimizer
+        constraint._initialize_constraint(self.X, self.var_idx, *args)
+        constraint.set_weigth(w)
+
+        self.constraints.append(constraint)
+
 
     def report_energy(self, name="Final_Energy_plot"):
         # Save energy per constraint to a file
@@ -105,10 +114,13 @@ class Optimizer():
         """
         # Initialize constraint
         unit = Unit()
+        #unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
         unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
+        unit.name = var_name + "_unit"
         self.energy_vector = np.zeros(len(self.X))
+        self.constraints.append(unit)
         # Add constraint
-        self.get_gradients(unit)
+        #self.get_gradients(unit)
 
     def fix_vertices(self, fix_vertices) -> None:
         """
@@ -124,45 +136,51 @@ class Optimizer():
         pass
 
 
-
-    def initialize_optimizer(self, X, var_dic, method= "LM", step = 0.8, print=0) -> None:
+    def initialize_optimizer(self, X, method= "LM", step = 0.8, print=0) -> None:
         """
         Initialize the optimizer( variables, step size)
         """
         # Initialize variables
         self.X = X
-        self.var_idx = var_dic
         self.X0 = X.copy()
         self.it = 0
         self.step = step
         self.method = method
         self.verbose = print
 
-    def get_gradients(self, constraint) -> None:
+
+    def get_gradients(self) -> None:
         """ Add constraint to the optimizer
             Input:
                 constraint: Constraint class
                 args: arguments of the constraint
         """
-        
-        # Add J, r to the optimizer
-        if constraint.w != 0:
-
-            # Compute J, r for the constraint
-            constraint._compute(self.X)
-
+        stacked_J = []
+        stacked_r = []
+        for constraint in self.constraints:
 
             # Add J, r to the optimizer
-            if self.J is None:
-                self.J =  np.sqrt(constraint.w) * constraint.J
-                self.r =  np.sqrt(constraint.w) * constraint.r          
-            else:
-                self.J = vstack((self.J, np.sqrt(constraint.w) * constraint.J))
-                self.r = np.concatenate((self.r, np.sqrt(constraint.w) * constraint.r))
-                
-            # Add energy to the energy dictionary
-            if constraint.name is not None:
-                    self.energy_dic[constraint.name] = constraint.w * np.sum(constraint.r**2)
+            if constraint.w != 0:
+
+                # Compute J, r for the constraint
+                constraint._compute(self.X, self.var_idx)
+
+                # Add J, r to the optimizer                
+                stacked_J.append(np.sqrt(constraint.w) * constraint.J)
+                stacked_r.append(np.sqrt(constraint.w) * constraint.r)          
+
+                # Add energy to the energy dictionary
+                if constraint.name is not None:
+                        self.energy_dic[constraint.name] = constraint.w * np.sum(constraint.r**2)
+
+        
+        if len(stacked_J) == 1:
+            self.J = stacked_J[0]
+            self.r = stacked_r[0]
+        else:
+            self.J = np.vstack(stacked_J)
+            self.r = np.vstack(stacked_r)
+
 
  
     def optimize(self):
@@ -230,8 +248,6 @@ class Optimizer():
             # Print energy
             print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
 
-        # Clear constraints
-        self.clear_constraints()
 
     def get_variables(self):
         # Return variables
@@ -285,11 +301,6 @@ class Optimizer():
             return self.X[self.var_idx[v_idx[0]]]
         else:
             return [self.X[self.var_idx[k]] for k in v_idx]
-
-    def clear_constraints(self):
-        # Clear Jacobian and residual
-        self.J = None
-        self.r = None
 
     def reset(self):
         """ Function that resets the optimizer to the initial state.

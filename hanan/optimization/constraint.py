@@ -18,22 +18,48 @@ class Constraint():
         self.r = None # Residual vector
         self.const = None # Num Constraints
         self.var = None # Num Variables
-        self.var_idx = None # Dic to store the index of the variables
-        self.const_idx = None # Dic to store the index of the constraints
+        self.const_idx = {} # Dic to store the index of the constraints
 
-    def initialize_constraint(self) -> None:
-        """
-        Method to initialize the all initial data for the constraint
+    def initialize_constraint(self, X, var_indices, *args) -> None:
+        """ Method to initialize the constraint
+            Input:
+                X: Variables
+                var_indices: Indices of the variables
+                args: Arguments of the constraint
         """
         pass
 
-    def _compute(self, X) -> None:
+    def add_constraint(self, name, dim):
+        """ Method to add a constraint
+            Input:
+                name: Name of the constraint
+                dim: Dimension of the constraint
+        """
+        self.const_idx[name] = np.arange(self.const, self.const + dim)
+        self.const += dim
+
+    def _initialize_constraint(self, X, var_indices, *args) -> None:
+        """
+        Method to initialize the all initial data for the constraint
+        """
+
+        # Initialization function
+        self.initialize_constraint(X, var_indices, *args)
+    
+        # Get the number of variables
+        self.var = len(X)
+        
+        # Get the max number in the dictionary
+        self.const = max([max(v) for k, v in self.const_idx.items()]) + 1
+
+
+    def _compute(self, X, var_idx) -> None:
         """
         Method to compute the residual and the Jacobian
         """
         self.reset()    
 
-        self.compute(X)
+        self.compute(X, var_idx)
 
         self.J = csc_matrix((np.array(self.values), (self.i, self.j)), shape=(self.const, self.var))
         pass
@@ -95,7 +121,7 @@ class Constraint():
         """
         self.w = w
 
-    def uncurry_X(self, X, *v_idx):
+    def uncurry_X(self, X, var_idx, *v_idx):
         """ Function to uncurry the variables
             Input:
                 X: Variables
@@ -103,16 +129,15 @@ class Constraint():
         """
 
         if len(v_idx) == 1:
-            return X[self.var_idx[v_idx[0]]]
+            return X[var_idx[v_idx[0]]]
         else:
-            return [X[self.var_idx[k]] for k in v_idx]
+            return [X[var_idx[k]] for k in v_idx]
         
     def set_X(self, X, var, values):
 
         X[self.var_idx[var]] = values
 
-        
-
+    
     def reset(self):
         """ Function to clear the Jacobian
         """

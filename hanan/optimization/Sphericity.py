@@ -20,16 +20,11 @@ class Sphericity(Constraint):
         self.v = None # List of vertices
         self.init = 0 # Initialization opt or regular opt
 
-    def initialize_constraint(self, X, var_indices, F, V, initalization=0) -> None:
+    def initialize_constraint(self, X, var_idx, F, V, initalization=0) -> None:
         # Input
         # X : Variables
-        # var_indices: Dictionary with the indices of the variables
         # F: List of faces
         # V: List of vertices
-
-        # Initialize variables and constraints
-        self.var_idx = var_indices
-        self.var = len(X)
 
         # Set if initalization or not
         self.init = initalization
@@ -37,6 +32,8 @@ class Sphericity(Constraint):
         self.const_idx = {"Env1": np.arange(0         , 3*len(F)), # || (c_f - v_i)^2 - r_f ||^2 1st envelope
                           "Env2": np.arange(3*len(F)  , 6*len(F))  # || (c_f - v_i - ei)^2 - r_f ||^2 2st envelope
                           }
+        
+
         self.const = 6*len(F) 
         
         # Set faces
@@ -45,15 +42,14 @@ class Sphericity(Constraint):
         self.v = V
 
 
-
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
         """
 
         # Get variables
-        s_c, s_r, e = self.uncurry_X(X, "sph_c", "sph_r", "e")      
+        s_c, s_r, e = self.uncurry_X(X, var_idx, "sph_c", "sph_r", "e")      
 
         s_c = s_c.reshape(-1, 3)
         e = e.reshape(-1, 3)
@@ -71,20 +67,20 @@ class Sphericity(Constraint):
         vv = v + e 
 
         # Set e indices
-        i_e = self.var_idx["e"][3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
-        j_e = self.var_idx["e"][3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
-        k_e = self.var_idx["e"][3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
+        i_e = var_idx["e"][3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
+        j_e = var_idx["e"][3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
+        k_e = var_idx["e"][3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
 
         # Env1 
         cf_vi = np.vstack( (s_c - v[i], s_c - v[j], s_c - v[k] ))
         # Check lenght indices
        
         # d sph_c =>   2*(c_f - v_i)
-        self.add_derivatives(self.const_idx["Env1"].repeat(3), np.tile(self.var_idx["sph_c"],3), 2*cf_vi.flatten())
+        self.add_derivatives(self.const_idx["Env1"].repeat(3), np.tile(var_idx["sph_c"],3), 2*cf_vi.flatten())
         
         
         # d r =>  -2*r 
-        self.add_derivatives(self.const_idx["Env1"], np.tile(self.var_idx["sph_r"],3), -2*np.tile(s_r,3) )
+        self.add_derivatives(self.const_idx["Env1"], np.tile(var_idx["sph_r"],3), -2*np.tile(s_r,3) )
 
         
         # set r
@@ -97,14 +93,14 @@ class Sphericity(Constraint):
       
         
         # d sph_c =>   2*(c_f - vv_i)
-        self.add_derivatives(self.const_idx["Env2"].repeat(3), np.tile(self.var_idx["sph_c"],3), 2*cf_vvi.flatten())
+        self.add_derivatives(self.const_idx["Env2"].repeat(3), np.tile(var_idx["sph_c"],3), 2*cf_vvi.flatten())
 
         if not self.init:
             # d e_i,j,k =>  -2*(sph_c - v_i - e_i)
             self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
         
         # d r =>  -2*r
-        self.add_derivatives(self.const_idx["Env2"], np.tile(self.var_idx["sph_r"],3), -(2*np.tile(s_r,3)))
+        self.add_derivatives(self.const_idx["Env2"], np.tile(var_idx["sph_r"],3), -(2*np.tile(s_r,3)))
 
         # set r
         self.set_r(self.const_idx["Env2"], (np.sum(cf_vvi*cf_vvi, axis=1) - np.tile(s_r*s_r, 3)))
