@@ -93,20 +93,21 @@ class Sphericity(Constraint):
         
         # Env2
         cf_vvi = np.vstack( (s_c - vv[i], s_c - vv[j], s_c - vv[k] ))
+
+      
         
         # d sph_c =>   2*(c_f - vv_i)
         self.add_derivatives(self.const_idx["Env2"].repeat(3), np.tile(self.var_idx["sph_c"],3), 2*cf_vvi.flatten())
 
         if not self.init:
-            # d e_i,j,k =>  -(2*sph_c-2*v_i-2*e_i)
+            # d e_i,j,k =>  -2*(sph_c - v_i - e_i)
             self.add_derivatives(self.const_idx["Env2"].repeat(3), np.hstack((i_e, j_e, k_e)), -2*cf_vvi.flatten())
         
-
         # d r =>  -2*r
-        self.add_derivatives(self.const_idx["Env2"], np.tile(self.var_idx["sph_r"],3), -2*np.tile(s_r,3))
+        self.add_derivatives(self.const_idx["Env2"], np.tile(self.var_idx["sph_r"],3), -(2*np.tile(s_r,3)))
 
         # set r
-        self.set_r(self.const_idx["Env2"], np.sum(cf_vvi*cf_vvi, axis=1) - np.tile(s_r*s_r, 3))
+        self.set_r(self.const_idx["Env2"], (np.sum(cf_vvi*cf_vvi, axis=1) - np.tile(s_r*s_r, 3)))
 
         
                 

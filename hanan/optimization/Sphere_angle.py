@@ -2,7 +2,7 @@
 
 import numpy as np
 from hanan.geometry.mesh import Mesh
-from hanan.geometry.utils import vec_dot
+from hanan.geometry.utils import vec_dot, unit
 from hanan.optimization.constraint import Constraint
 
 class Sphere_angle(Constraint):
@@ -19,38 +19,38 @@ class Sphere_angle(Constraint):
         self.nE = None # Edges number
         self.f1 = None # First face of the edge
         self.f2 = None # Second face of the edge
+        self.ne = None # Normal of the edge
 
-    def initialize_constraint(self, X, var_indices, V, F) -> np.array:
+    def initialize_constraint(self, X, var_indices, ne, evi, evj, inner_edges, f1, f2) -> np.array:
         # Input
         # X: variables 
         # var_indices: indices of the variables
         # V: Vertices
         # F: Faces
     
-        # create mesh 
-        mesh = Mesh()
-        mesh.make_mesh(V, F)
-
-        inner_edges = mesh.inner_edges()
-
         # Number of edges
         self.nE = len(inner_edges)
+        
+        # Set edges normals
+        self.ne = ne 
 
-        # Number of constraints |IE| inner edges
-        self.const = self.nE 
+        # Set direction of the edges
+        self.dire = unit(evj - evi)
 
-        # Get adjacent faces
-        auxf1, auxf2 = mesh.edge_faces() 
-
-        self.f1 = auxf1[inner_edges]
-        self.f2 = auxf2[inner_edges]
-
+        
+        self.f1 = f1
+        self.f2 = f2
+        
         # Define indices indices
         self.var_idx = var_indices
     
-        self.const_idx = {  "ang"  : np.arange( 0                  , self.nE)
+        self.const_idx = {  "ang"  : np.arange( 0                  , self.nE),
+                            #"reg"  : np.arange( self.nE            , 2*self.nE)
                         }
-        
+        # Number of constraints |IE| inner edges
+        self.const = self.nE 
+
+
         # Number of variables
         self.var = len(X)
 
@@ -89,18 +89,34 @@ class Sphere_angle(Constraint):
         
         i =  3 * np.repeat(self.f1, 3) + np.tile(range(3), len(self.f1))
         j =  3 * np.repeat(self.f2, 3) + np.tile(range(3), len(self.f2))
-        
-        # E : || ri^2 + rj^2 - d^2 - 2r1r2||^2; d**2 =  <cj - ci, cj - ci>
-        # d ci => 2*(cj - ci).flatten
-        self.add_derivatives(c_idx["ang"].repeat(3), sph_idx[i], 2*(cj - ci).flatten())
-        # d cj => -2*(cj - ci).flatten
-        self.add_derivatives(c_idx["ang"].repeat(3), sph_idx[j], -2*(cj - ci).flatten())
-        # d ri => 2*ri - 2*rj
-        self.add_derivatives(c_idx["ang"], var_idx["sph_r"][self.f1], 2*ri - 2*rj)
-        # d rj => 2*rj - 2*ri
-        self.add_derivatives(c_idx["ang"], var_idx["sph_r"][self.f2], 2*rj - 2*ri)
 
-        self.set_r(c_idx["ang"], ri**2 + rj**2 - d**2 - 2*ri*rj) 
+
+        # E : || ri^2 + rj^2 - d^2 - 2r1r2||^2; d**2 =  <cj - ci, cj - ci>
+        # d ci 
+        self.add_derivatives(c_idx["ang"].repeat(3),     sph_idx[i],  (4*(ri**2 + rj**2 - d**2)[:,None]*(cj - ci)).flatten())
+        # d cj 
+        self.add_derivatives(c_idx["ang"].repeat(3),     sph_idx[j],  (-4*(ri**2 + rj**2 - d**2)[:,None]*(cj - ci)).flatten())
+        # d ri 
+        self.add_derivatives(c_idx["ang"], var_idx["sph_r"][self.f1], (4*(ri**2 + rj**2 - d**2)*ri - 8 * ri * rj**2) )
+        # d rj
+        self.add_derivatives(c_idx["ang"], var_idx["sph_r"][self.f2], (4*(ri**2 + rj**2 - d**2)*rj - 8 * ri**2 * rj) )
+
+        self.set_r(c_idx["ang"], ((ri**2 + rj**2 - d**2)**2 - 4*ri**2*rj**2) ) 
+
+
+        # E : || ne.(cj - ci)  + dire.(cj - ci) ||^2
+
+        # print("ne", self.ne)
+        # print("dire", self.dire)
+        
+        # # d ci
+        # self.add_derivatives(c_idx["reg"].repeat(3), sph_idx[i], (- self.ne - self.dire).flatten())
+        # # d cj
+        # self.add_derivatives(c_idx["reg"].repeat(3), sph_idx[j], (self.ne + self.dire).flatten())
+
+        # self.set_r(c_idx["reg"], (vec_dot(self.ne, (cj - ci)) + vec_dot(self.dire, (cj - ci))) )
+
+
 
         
         

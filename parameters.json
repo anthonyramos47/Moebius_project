@@ -1,20 +1,20 @@
 {   
-    "name_mesh" : "static.obj",
+    "name_mesh" : "Coarse_Tri_mesh.obj",
     "weights_Opt" : {
         "sphericity"   : 1, 
         "linecong"     : 1, 
-        "torsal"       : 1,
-        "line_fair"    : 0.0001,
-        "smoothness"   : 0.0001,
-        "torsal_fair"  : 0.0001,
+        "torsal"       : 500,
+        "line_fair"    : 0.01,
+        "smoothness"   : 0.00001,
+        "torsal_fair"  : 5,
         "torsal_angle" : 1
            },
-    "iterations" : 1,
+    "iterations" : 100,
     "show" : true,
     "analytical_torsal" : true,
     "show_spheres" : true, 
-    "offset": -10,
-    "out_name": "static_1",
+    "offset": 1.5,
+    "out_name": "CTM_1",
     "exp_dir": "/Users/cisneras/hanan/hananLab/hanan/approximation/experiments/Coarse_Tri/",
     
 

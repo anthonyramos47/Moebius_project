@@ -679,26 +679,41 @@ def sphere_initialization(v, f, e):
 
     # Compute rejection vector bettwen p2-p1
     rej = (p2-p1) - proj(p2-p1, v1) - proj(p2-p1, l)
-
-    print((np.linalg.norm(rej, axis= 1)/vec_dot(p2-p1,v2)))
-
+    
     # Closest point l2 
     cls2 = p2 - (np.linalg.norm(rej, axis= 1)/vec_dot(p2-p1,v2))[:,None]*v2
 
-    print("cls2:", cls2.shape)
     # Closest point to l2
     cls = cls2 - proj(p2-p1, l)
-
-    print("cls:", cls.shape)
 
     mid = 0.5*(cls + cls2)
 
     return mid
 
+def normalize_vertices(v, factor=1):
+    """ Function set the mesh into the a bounding box.
+    """
 
+    # Get the bounding box
+    min_v = np.min(v, axis=0)
+    max_v = np.max(v, axis=0)
+    
+    # Compute the center
+    size = max_v - min_v
 
+    max_dimension = max(size)
 
- 
+    # Compute scale factors for each dimension
+    scale_factors = factor / max_dimension
+
+    # Translate by the negative of the min_coords
+    translated_vertices = v - min_v
+
+    # Scale vertices to fit into the unit bounding box
+    normalized_vertices = translated_vertices * scale_factors
+
+    return normalized_vertices
+
 
 # def initialize_Line_Congruence(v, f, v_f_adj, n, H ):
 #     """ Function to initialize the line congruence. 

@@ -60,12 +60,23 @@ dir = -np.array([0,0,1])
 
 data_path = dir_path+"/approximation/data/" # data path
 
-# Load test mesh
-v, f = igl.read_triangle_mesh(os.path.join(data_path, data["name_mesh"]))
+# Hex test mesh
+radius = 3
+center = np.array([0, 0, 0])
+off = 4
 
-v = normalize_vertices(v, 3)
+# Calculate the coordinates of the hexagon vertices
+v = np.array([center + radius * np.array([np.cos(2 * np.pi * k / 6), np.sin(2 * np.pi * k / 6), off + 2*np.random.random()]) for k in range(6)])
 
-igl.write_triangle_mesh("original_mesh.obj", v, f)
+center = center +  np.array([0, 0, np.mean(v[:,2])])
+
+# Include the center as a vertex
+v = np.vstack((center, v)) 
+
+# Define the face list with triangle indices
+f = np.vstack((np.array([[i, (i + 1)%7, 0] for i in range(1, 6)]), np.array([6,1,0])))
+
+
 
 # v = np.array([
 #     [ 1, 0, 0],
@@ -85,7 +96,8 @@ igl.write_triangle_mesh("original_mesh.obj", v, f)
 n = igl.per_vertex_normals(v, f)
 
 
-
+# # Principal directions
+# v1, v2, k1, k2 = igl.principal_curvature(v, f)
 
 
 # # Compute the mean curvature
@@ -103,8 +115,7 @@ vertex_adj        = mesh.vertex_adjacency_list()
 boundary_faces    = mesh.boundary_faces()
 boundary_vertices = mesh.boundary_vertices()
 inner_edges       = mesh.inner_edges()
-f_f_adj = mesh.face_face_adjacency_list()
-d_f = mesh.dual_top()
+f_f_adj           = mesh.face_face_adjacency_list() 
 
 auxf1, auxf2      = mesh.edge_faces()
 ev1  , ev2        = mesh.edge_vertices()
@@ -148,15 +159,9 @@ ed_l = ed_l[inner_edges]
 
 signs = np.sign(np.sum(n * (dir), axis=1))
 n = n * signs[:, None]
-
-
-_, _, k1, k2 = igl.principal_curvature(v, f)
-
-# # compute line congruence
+# compute line congruence
 offset = data["offset"]
-# # Offset
-#e = -(4/(k1+k2))[:, None] * n
-
+# Offset
 e = offset * n
 
 # Compute second envelope
@@ -170,7 +175,7 @@ vc  = np.sum(v[f], axis=1)/3
 vvc = np.sum(vv[f], axis=1)/3
 
 # Compute guess for sphere
-ct, cr, nt = circle_3pts(v[i], v[j], v[k])
+ct, _, nt = circle_3pts(v[i], v[j], v[k])
 ct2, _, nt2 = circle_3pts(vv[i], vv[j], vv[k])
 
 for bf in boundary_faces:
@@ -183,12 +188,12 @@ for bf in boundary_faces:
 signs = np.sign(np.sum(nt * (dir), axis=1))
 nt = nt * signs[:, None]
 
-lamb = np.sign(offset)*np.sqrt((offset/2)**2 - cr**2)
+dct2_ct1 = ct2 - ct
 
-sph_c = ct + lamb[:,None]*nt
+sph_c = ct + 0.5*proj(dct2_ct1, nt)
 
 # Compute sphere radius
-sph_r = offset/2*np.ones(len(f))
+sph_r = np.linalg.norm(sph_c - v[j], axis=1)
 
 
 energy = 0
@@ -238,16 +243,16 @@ X[var_idx["sph_r"]]  = sph_r
 X[var_idx["le"]]     = offset
 X[var_idx["alpha"]]  = 0.5
 
-# t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
+t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])
 
-# tt1 = unit(a1[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
-# tt2 = unit(a2[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
+tt1 = unit(a1[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
+tt2 = unit(a2[:,None]*(vv[j] - vv[i]) + b[:,None]*(vv[k] - vv[i]))
 
 ec = np.sum(e[f], axis=1)/3
 
 # Init Sphericity
 sphericity = Sphericity()
-sphericity.initialize_constraint(X, var_idx, f, v)
+sphericity.initialize_constraint(X, var_idx, f, v, 1)
 sphericity.set_weigth(1)
 
 
@@ -275,10 +280,12 @@ sph = np.hstack((sph_c, sph_r[:,None]))
 np.savetxt("Init_sph_c.dat", sph, delimiter="\t", fmt="%1.7f")
 
 print("Second Optimization")
+
 # Init Sphericity
 sphericity = Sphericity()
 sphericity.initialize_constraint(X, var_idx, f, v)
 sphericity.set_weigth(weights["sphericity"])
+
 
 # Init Line Congruence Fairnes
 line_fair = LineCong_Fair()
@@ -287,7 +294,7 @@ line_fair.set_weigth(weights["line_fair"])
 
 # Init Line Cong
 linecong = LineCong()
-linecong.initialize_constraint(X, var_idx, len(v),  dual_top, inner_vertices, n)
+linecong.initialize_constraint(X, var_idx, len(v),  dual_top, inner_vertices)
 linecong.set_weigth(weights["linecong"])
 
 # Init Torsal 
@@ -295,10 +302,6 @@ torsal = Torsal()
 torsal.initialize_constraint(X, var_idx, v, f)
 torsal.set_weigth(weights["torsal"])
 
-# Init Sphere angle
-smooth = Sphere_angle() 
-smooth.initialize_constraint(X, var_idx, ne, v[ev1], v[ev2], inner_edges, f1, f2)
-smooth.set_weigth(weights["smoothness"])
 
 # Init Torsal angle
 tang = Torsal_angle()
@@ -317,16 +320,45 @@ optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
 for _ in range(IT):
     optimizer.unitize_variable("nt1", 3)
     optimizer.unitize_variable("nt2", 3)
-    
+
     optimizer.get_gradients(sphericity)
     optimizer.get_gradients(torsal)
     optimizer.get_gradients(linecong)
     optimizer.get_gradients(line_fair)
-    optimizer.get_gradients(smooth)
     optimizer.get_gradients(tang)
     optimizer.get_gradients(torsal_fair)
 
     optimizer.optimize()
+
+
+optimizer.get_energy_per_constraint()
+
+
+X = optimizer.bestX
+
+# Init Sphere angle
+smooth = Sphere_angle() 
+smooth.initialize_constraint(X, var_idx, ne, v[ev1], v[ev2], inner_edges, f1, f2)
+smooth.set_weigth(weights["smoothness"])
+
+
+#  Optimizer
+optimizer = Optimizer()
+optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
+
+for _ in range(IT):
+    optimizer.unitize_variable("nt1", 3)
+    optimizer.unitize_variable("nt2", 3)
+    optimizer.get_gradients(sphericity)
+    optimizer.get_gradients(torsal)
+    optimizer.get_gradients(linecong)
+    optimizer.get_gradients(line_fair)
+    optimizer.get_gradients(tang)
+    optimizer.get_gradients(torsal_fair)
+    optimizer.get_gradients(smooth)
+
+    optimizer.optimize()
+
 
 optimizer.get_energy_per_constraint()
 optimizer.report_energy()
@@ -348,6 +380,14 @@ vi, vj, vk = v[i], v[j], v[k]
 vij = vj - vi 
 vki = vk - vi
 
+# sph_c = nc
+# sph_r = nr
+# energy_init = 0
+# for id_v in range(3):
+#     energy_init += (np.linalg.norm(sph_c - v[f[:,id_v]], axis=1) - sph_r)@(np.linalg.norm(sph_c - v[f[:,id_v]], axis=1) - sph_r) 
+#     energy_init += (np.linalg.norm(sph_c - vv[f[:,id_v]], axis=1) - sph_r)@(np.linalg.norm(sph_c - vv[f[:,id_v]], axis=1) - sph_r) 
+
+# print(f"Final energy: {energy_init}")
 
 # Compute planarity
 #if Show_Analytical_Torsal:
@@ -369,12 +409,6 @@ planarity1 = planarity_check(t1, tt1, ec)
 
 planarity2 = planarity_check(t2, tt2, ec)
 
-aplanarity1 = planarity_check(at1, att1, ec)
-aplanarity2 = planarity_check(at2, att2, ec)
-
-# Compute average planarity
-aavg_planarity = (aplanarity1 + aplanarity2)/2
-
 
 avg_planarity = (planarity1 + planarity2)/2
 
@@ -384,8 +418,11 @@ nr = np.abs(nr)
 # Add one column to nc 
 sph = np.hstack((nc, nr[:,None]))
 
+
+
 # Export sph_c and sph_r in a file
 np.savetxt("sph_c.dat", sph, delimiter="\t", fmt="%1.7f")
+
 
 
 ## Visualize
@@ -399,12 +436,11 @@ ps.remove_all_structures()
 #     sphere = ps.register_point_cloud(f"sphere_c{i}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.5)
 #     sphere.set_radius(nr[i], relative=False)
 
-if Show_spheres:
-    for _ in range(10):
-        id = np.random.randint(0, len(nc))
-        c = nc[id] 
-        sphere = ps.register_point_cloud(f"sphere_c{id}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.2)
-        sphere.set_radius(nr[id], relative=False)
+
+for id in range(len(nc)):
+    c = nc[id] 
+    sphere = ps.register_point_cloud(f"sphere_c{id}", np.array([c]), enabled=True, color=(0,0,0), transparency=0.2)
+    sphere.set_radius(nr[id], relative=False)
 
 # edges_i, edges_j = mesh.edge_vertices()
 
@@ -421,8 +457,6 @@ mesh = ps.register_surface_mesh("mesh", v, f, enabled=True, edge_color = (0,0,0)
 mesh2 = ps.register_surface_mesh("mesh 2", vv, f, enabled=True, edge_color = (0,0,0), edge_width=1.7)
 mesh.add_vector_quantity("line", ne, length=1, vectortype="ambient", enabled=True, radius=0.0005, color=(0,0,0))
 ps.register_surface_mesh("Center Mesh", nc, d_f)
-mesh.add_scalar_quantity("H", 0.5*(k1 + k2), defined_on="vertices", enabled=True, cmap="jet")
-mesh.add_scalar_quantity("HRad", 1/(0.5*(k1 + k2)), defined_on="vertices", enabled=True, cmap="jet")
 #mesh.add_vector_quantity("line-e", -ne, length=1, enabled=True, vectortype="ambient", radius=0.0005, color=(0,0,0))
 
 #mid_edges = ps.register_point_cloud("mid_points", m_v, enabled=True, radius=0.001, color=(0,0,0))
@@ -438,9 +472,8 @@ mesh.add_scalar_quantity("HRad", 1/(0.5*(k1 + k2)), defined_on="vertices", enabl
 mesh.add_scalar_quantity("planarity1", planarity1, defined_on="faces", enabled=True, cmap="coolwarm")
 mesh.add_scalar_quantity("planarity2", planarity2, defined_on="faces", enabled=True, cmap="coolwarm")
 mesh.add_scalar_quantity("Avg planarity", avg_planarity, defined_on="faces", enabled=True, cmap="coolwarm")
-mesh.add_scalar_quantity("A Avg planarity", aavg_planarity, defined_on="faces", enabled=True, cmap="coolwarm")
 mesh.add_scalar_quantity("Torsal angles", torsal_angles, defined_on="faces", enabled=True, cmap="coolwarm")
-#mesh.add_scalar_quantity("LC Lenght", abs(le), enabled=True, cmap="coolwarm")
+mesh.add_scalar_quantity("LC Lenght", abs(le), enabled=True, cmap="coolwarm")
 
 # Visualize sphere radius as scalar quantity
 mesh.add_scalar_quantity("radius sphere", abs(nr), defined_on="faces", enabled=True, cmap="coolwarm")

@@ -1,6 +1,6 @@
-source /home/anthony/anaconda3/etc/profile.d/conda.sh
+#source /home/anthony/anaconda3/etc/profile.d/conda.sh
 
-conda activate hananJ
+#conda activate hananJ
 python hanan/testing_TF.py parameters.json
 
 #conda activate geo

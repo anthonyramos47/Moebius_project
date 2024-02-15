@@ -83,9 +83,10 @@ class Torsal_angle(Constraint):
         self.add_derivatives(c_idx["E1"].repeat(3), v_idx["nt2"], (2*dotnt1_nt2[:,None]*nt1uf).flatten())
 
         # d u (E1) = d nt2(nt1.nt2 - cos(60) + u^2) = 2u
-        self.add_derivatives(c_idx["E1"], v_idx["alpha"], 2*u)
+        #self.add_derivatives(c_idx["E1"], v_idx["alpha"], 2*u)
 
-        self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(65*np.pi/180)**2 + u**2 )
+        #self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(65*np.pi/180)**2 + u**2 )
+        self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(70*np.pi/180)**2  )
 
 
         # # d nt1 (E2) = d nt1(nt1.nt2 - v^2) = nt2
