@@ -214,18 +214,26 @@ nV = len(v)
 nF = len(f)
 nIE = len(inner_edges)
 
-# Define variable indices
-var_idx = {     "e"     : np.arange( 0            , 3*nV),  # Line congruence
-                "sph_c" : np.arange( 3*nV         , 3*nV +  3*nF),  # Sphere centers
-                "sph_r" : np.arange( 3*nV +  3*nF , 3*nV +  4*nF),  # Sphere radius
-                "th"    : np.arange( 3*nV +  4*nF , 3*nV +  5*nF),  # theta  angle <t1, vji
-                "phi"   : np.arange( 3*nV +  5*nF , 3*nV +  6*nF),  # phi  angel < t1, t2
-                "nt1"   : np.arange( 3*nV +  6*nF , 3*nV +  9*nF),  # Normal torsal plane t1 
-                "nt2"   : np.arange( 3*nV +  9*nF , 3*nV +  12*nF),  # Normal torsal plane t2
-                "u"     : np.arange( 3*nV +  12*nF , 3*nV + 12*nF + 3*nIE),  # Normal torsal plane t2
-                "alpha" : np.arange( 3*nV +  12*nF + 3*nIE , 3*nV +  13*nF + 3*nIE ),  # Angle between nt1 and nt2
-                "le"    : np.arange( 3*nV +  13*nF + 3*nIE , 4*nV +  13*nF + 3*nIE  )  # Line Congruence length control
-        }
+
+#  Optimizer
+optimizer = Optimizer()
+optimizer.add_variable("e", 3*nV)
+optimizer.add_variable("sph_c", 3*nF)
+optimizer.add_variable("sph_r", nF)
+optimizer.add_variable("th", nF)
+optimizer.add_variable("phi", nF)
+optimizer.add_variable("nt1", 3*nF)
+optimizer.add_variable("nt2", 3*nF)
+optimizer.add_variable("u", 3*nIE)
+optimizer.add_variable("alpha", nF)
+optimizer.add_variable("le", nV)
+
+optimizer.init_variables()
+
+
+#optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
+
+
 
 
 # Init X 
@@ -310,9 +318,7 @@ torsal_fair = Torsal_Fair()
 torsal_fair.initialize_constraint(X, var_idx, v, inner_edges, ed_i, ed_j, ed_k, ed_l)
 torsal_fair.set_weigth(weights["torsal_fair"])
 
-#  Optimizer
-optimizer = Optimizer()
-optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
+
 
 for _ in range(IT):
     optimizer.unitize_variable("nt1", 3)

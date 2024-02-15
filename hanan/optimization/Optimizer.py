@@ -36,7 +36,8 @@ class Optimizer():
         self.method = None # Method used to solve the problem
         self.energy = [] # Energy vector
         self.energy_dic = {} # Energy dictionary
-        self.var_idx = None # Variable indices
+        self.var_idx = {} # Variable indices
+        self.variables_dim = {} # Variables and their dimensions
         self.verbose = False # Verbose
     
     def get_energy_per_constraint(self):
@@ -49,8 +50,26 @@ class Optimizer():
         print(f"Final Energy: {self.energy[-1]}\n")
         print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
 
+    def add_variable(self, var_name, dim) -> None:
+        """
+            Method to add a variable to the optimizer
+            Input:
+                var_name: Name of the variable
+                dim: Dimension of the variable
+        """
+        self.variables_dim[var_name] = dim
+
+    def init_variables(self) -> None:
+        """
+            Method to initialize the variables of the optimizer
+        """
+        prev = 0
+        for name, dim in self.variables_dim.items():
+            self.var_idx[name] = np.arange(prev, prev + dim)
+            prev += dim
+
     
-        
+
     def report_energy(self, name="Final_Energy_plot"):
         # Save energy per constraint to a file
         with open(name+"_energy_per_constraint.data", "w") as file:
