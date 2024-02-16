@@ -27,6 +27,7 @@ class Optimizer():
         self.J = None # Jacobian matrix
         self.r = None # Residual vector
         self.X = None # Variable
+        self.X0 = None # Initial variable 
         self.bestX = None # Best variable
         self.bestit = None # Best iteration
         self.prevdx = None # Previous dx
@@ -40,44 +41,19 @@ class Optimizer():
         self.var = 0 # Number of variables
         self.constraints = [] # List of constraints objects
         self.verbose = False # Verbose
+
+    def clear_energy(self):
+        """
+        Method to clear the energy
+        """
+        self.energy = []
+
+    def clear_constraints(self):
+        """
+        Method to clear the constraints
+        """
+        self.constraints = []
     
-    def get_energy_per_constraint(self):
-        print(f"ENERGY REPORT\n")
-        print("===========================================\n")
-        for name, energy in self.energy_dic.items():
-            print(f"{name}: {energy}")
-        print("===========================================\n")
-        print("=============Final Energy ==================\n")
-        print(f"Final Energy: {self.energy[-1]}\n")
-        print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
-
-    def add_variable(self, var_name, dim) -> None:
-        """
-            Method to add a variable to the optimizer
-            Input:
-                var_name: Name of the variable
-                dim: Dimension of the variable
-        """
-        self.var_idx[var_name] = np.arange(self.var, self.var + dim)
-        self.var += dim
-
-            
-
-    def add_constraint(self, constraint, args, w=1) -> None:
-        """
-            Method to add a constraint to the optimizer
-            Input:
-                constraint: Constraint class
-                w: Weight of the constraint
-                args: arguments of the constraint
-        """
-
-        # Add constraint to the optimizer
-        constraint._initialize_constraint(self.X, self.var_idx, *args)
-        constraint.set_weigth(w)
-
-        self.constraints.append(constraint)
-
 
     def report_energy(self, name="Final_Energy_plot"):
         # Save energy per constraint to a file
@@ -103,6 +79,62 @@ class Optimizer():
         # Put point markers on the plot
         plt.scatter(range(len(self.energy)), self.energy, color='r')
         plt.savefig(name)
+    
+    def get_energy_per_constraint(self):
+        print(f"ENERGY REPORT\n")
+        print("===========================================\n")
+        for name, energy in self.energy_dic.items():
+            print(f"{name}: {energy}")
+        print("===========================================\n")
+        print("=============Final Energy ==================\n")
+        print(f"Final Energy: {self.energy[-1]}\n")
+        print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
+
+    def add_variable(self, var_name, dim) -> None:
+        """
+            Method to add a variable to the optimizer
+            Input:
+                var_name: Name of the variable
+                dim: Dimension of the variable
+        """
+        self.var_idx[var_name] = np.arange(self.var, self.var + dim)
+        self.var += dim
+
+    def init_variables(self, X) -> None:
+        """
+            Method to set the variables of the optimizer
+            Input:
+                X: Variables
+        """
+        self.X = X
+        self.X0 = X.copy()
+
+    def init_variable(self, name, vals):
+        """
+            Method to set the value of a variable
+            Input:
+                name: Name of the variable
+                vals: Value of the variable
+        """
+        self.X[self.var_idx[name]] = vals
+        self.X0[self.var_idx[name]] = vals
+
+    def add_constraint(self, constraint, args, w=1) -> None:
+        """
+            Method to add a constraint to the optimizer
+            Input:
+                constraint: Constraint class
+                w: Weight of the constraint
+                args: arguments of the constraint
+        """
+
+        # Add constraint to the optimizer
+        constraint._initialize_constraint(self.X, self.var_idx, *args)
+        constraint.set_weigth(w)
+
+        self.constraints.append(constraint)
+
+
 
     def unitize_variable(self, var_name, dim) -> None:
         """
@@ -136,13 +168,13 @@ class Optimizer():
         pass
 
 
-    def initialize_optimizer(self, X, method= "LM", step = 0.8, print=0) -> None:
+    def initialize_optimizer(self, method= "LM", step = 0.8, print=0) -> None:
         """
         Initialize the optimizer( variables, step size)
         """
         # Initialize variables
-        self.X = X
-        self.X0 = X.copy()
+        self.X = np.zeros(self.var)
+        self.X0 = np.zeros(self.var)
         self.it = 0
         self.step = step
         self.method = method
@@ -178,8 +210,9 @@ class Optimizer():
             self.J = stacked_J[0]
             self.r = stacked_r[0]
         else:
-            self.J = np.vstack(stacked_J)
-            self.r = np.vstack(stacked_r)
+            
+            self.J = vstack(stacked_J)
+            self.r = np.hstack(stacked_r)
 
 
  

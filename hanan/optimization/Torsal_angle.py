@@ -18,10 +18,6 @@ class Torsal_angle(Constraint):
         self.name = "Torsal_Angles" 
         self.nV = None # Number of vertices
         self.nF = None # Number of faces
-        self.var_idx = None # Dictionary of indices of variables
-        self.const_idx = None # Dictionary of indices of constraints
-
-
     
     def initialize_constraint(self, X, var_indices, V, F, w=1 ) -> np.array:
         # Input
@@ -41,21 +37,12 @@ class Torsal_angle(Constraint):
         # Number of constraints 4*|F|
         self.const = 2*self.nF
 
-        # Define indices indices
-        self.var_idx = var_indices
-
         # E1 = || nt1.nt2^2  - cos(60) + u^2 ||^2  <=> nt1.nt2 <= cos(60)
-        # E2 = || nt1.nt2  - v^2           ||^2  <=> nt1.nt2 >= cos(90)
-        self.const_idx = {  "E1"  : np.arange( 0                  , self.nF)
-                            #"E2"  : np.arange( self.nF            , 2*self.nF),
-                    }
-        
-        # Number of variables
-        self.var = len(X)
+        self.add_constraint("E1", self.nF)
 
        
 
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
@@ -63,12 +50,12 @@ class Torsal_angle(Constraint):
         """
         
         # indices vars
-        v_idx = self.var_idx
+        v_idx = var_idx
         # indices constraints
         c_idx = self.const_idx
 
         # Get variables of interest
-        nt1, nt2, u = self.uncurry_X(X, "nt1", "nt2", "alpha")
+        nt1, nt2, u = self.uncurry_X(X, var_idx, "nt1", "nt2", "alpha")
 
         # Unflatten nt1, nt2
         nt1uf = nt1.reshape(-1, 3)
@@ -88,14 +75,3 @@ class Torsal_angle(Constraint):
         #self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(65*np.pi/180)**2 + u**2 )
         self.set_r(c_idx["E1"], dotnt1_nt2**2 - np.cos(70*np.pi/180)**2  )
 
-
-        # # d nt1 (E2) = d nt1(nt1.nt2 - v^2) = nt2
-        # self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt1"], (2*vec_dot(nt1uf, nt2uf)[:,None]*nt2uf).flatten())
-
-        # # d nt2 (E2) = d nt2(nt1.nt2 - v^2) = nt1
-        # self.add_derivatives(c_idx["E2"].repeat(3), v_idx["nt2"], (2*vec_dot(nt1uf, nt2uf)[:,None]*nt1uf).flatten())
-
-        # # d v (E2) = d v(nt1.nt2 - v^2) = -2v
-        # self.add_derivatives(c_idx["E2"], v_idx["v"], -2*v)
-
-        # self.set_r(c_idx["E2"], vec_dot(nt1uf, nt2uf)**2 - - np.cos(90*np.pi/180)**2 - v**2 )

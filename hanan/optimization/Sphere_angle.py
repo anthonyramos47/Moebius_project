@@ -41,37 +41,24 @@ class Sphere_angle(Constraint):
         self.f1 = f1
         self.f2 = f2
         
-        # Define indices indices
-        self.var_idx = var_indices
-    
-        self.const_idx = {  "ang"  : np.arange( 0                  , self.nE),
-                            #"reg"  : np.arange( self.nE            , 2*self.nE)
-                        }
-        # Number of constraints |IE| inner edges
-        self.const = self.nE 
-
-
-        # Number of variables
-        self.var = len(X)
+        self.add_constraint("ang", self.nE)
+        
 
 
 
         
 
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
                 F: Faces
         """
-        # Get variables indices
-        var_idx = self.var_idx
-
         # Get constraints indices
         c_idx = self.const_idx
 
         # Get distance from baricenters to center of spheres
-        sph_c, sph_r = self.uncurry_X(X, "sph_c", "sph_r")
+        sph_c, sph_r = self.uncurry_X(X, var_idx, "sph_c", "sph_r")
 
         sph_c = sph_c.reshape(-1, 3)
 

@@ -229,29 +229,44 @@ optimizer.add_variable("u", 3*nIE)
 optimizer.add_variable("alpha", nF)
 optimizer.add_variable("le", nV)
 
+# Initialize Optimizer
+optimizer.initialize_optimizer("LM", 0.5, 1)
 
-# Init X 
-X = np.zeros(optimizer.var)
+# Initialize variables
+optimizer.init_variable("e", e.flatten())
+optimizer.init_variable("sph_c", sph_c.flatten())
+optimizer.init_variable("sph_r", sph_r)
+optimizer.init_variable("le", offset)
+optimizer.init_variable("alpha", 0.5)
 
-
-X[optimizer.var_idx["e"]]      = e.flatten()
-X[optimizer.var_idx["sph_c"]]  = sph_c.flatten()
-X[optimizer.var_idx["sph_r"]]  = sph_r
-X[optimizer.var_idx["le"]]     = offset
-X[optimizer.var_idx["alpha"]]  = 0.5
-
-# Initialize the variables
-optimizer.initialize_optimizer(X, "LM", 0.5, 1)
-
-# Define the constraints
-# Init Sphericity
+# Define Sphericity
 sphericity = Sphericity()
 optimizer.add_constraint(sphericity,  args=(f, v), w=2 )
 
+# Define Line Congruence Fairnes
+line_fair = LineCong_Fair()
+optimizer.add_constraint(line_fair, args=(vertex_adj, inner_vertices, n), w=weights["line_fair"])
 
-#optimizer.initialize_optimizer(X, var_idx, "LM", 0.5, 1)
+# Define Line Cong
+linecong = LineCong()
+optimizer.add_constraint(linecong, args=(len(v),  dual_top, inner_vertices, n), w=weights["linecong"])
 
-print(optimizer.uncurry_X("sph_c")[:5])
+# Define Torsal 
+torsal = Torsal()
+optimizer.add_constraint(torsal, args=(v, f), w=weights["torsal"])
+
+# Define Smoothness
+smooth = Sphere_angle()
+optimizer.add_constraint(smooth, args=(ne, v[ev1], v[ev2], inner_edges, f1, f2), w=weights["smoothness"]) 
+
+# Define Torsal angle
+tang = Torsal_angle()
+optimizer.add_constraint(tang, args=(v, f), w=weights["torsal_angle"])
+
+# Define Torsal Fairness
+torsal_fair = Torsal_Fair()
+optimizer.add_constraint(torsal_fair, args=(v, inner_edges, ed_i, ed_j, ed_k, ed_l), w=weights["torsal_fair"])
+
 
 print("Test-Optimization started")
 for _ in range(100):
@@ -260,7 +275,8 @@ for _ in range(100):
 
 print("Test Optimization finished")
 
-print(optimizer.uncurry_X("sph_c")[:5])
+optimizer.get_energy_per_constraint()
+
 
 
 # t1, t2, a1, a2, b, validity = solve_torsal(v[i], v[j], v[k] , e[i], e[j], e[k])

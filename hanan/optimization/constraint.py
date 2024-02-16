@@ -16,7 +16,7 @@ class Constraint():
         self.j = [] # Column index
         self.values = [] # Values
         self.r = None # Residual vector
-        self.const = None # Num Constraints
+        self.const = 0 # Num Constraints
         self.var = None # Num Variables
         self.const_idx = {} # Dic to store the index of the constraints
 
@@ -49,8 +49,6 @@ class Constraint():
         # Get the number of variables
         self.var = len(X)
         
-        # Get the max number in the dictionary
-        self.const = max([max(v) for k, v in self.const_idx.items()]) + 1
 
 
     def _compute(self, X, var_idx) -> None:

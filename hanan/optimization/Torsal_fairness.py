@@ -56,7 +56,7 @@ class Torsal_Fair(Constraint):
         self.var = len(X)
 
         # Set indices of the variables
-        self.var_idx = var_indices
+        var_idx = var_indices
 
         # Vertices
         vi, vj, vk, vl = v[ie_i], v[ie_j], v[ie_k], v[ie_l]
@@ -77,24 +77,18 @@ class Torsal_Fair(Constraint):
             
             u1, u2, u3 = barycentric_coordinates_app(vbi[i], vbj[i], vbk[i], vbl[i])
             
-            X[self.var_idx["u"][3*i]   ] = u1 
-            X[self.var_idx["u"][3*i+1] ] = u2 
-            X[self.var_idx["u"][3*i+2] ] = u3 
-            # X[self.var_idx["u"][3*i]   ] = 1/3
-            # X[self.var_idx["u"][3*i+1] ] = 1/3
-            # X[self.var_idx["u"][3*i+2] ] = 1/3
-
-        # Set number of constraints
-        self.const_idx = {"T1": np.arange(0                   , 3*len(inner_edges)), 
-                          "T2": np.arange(3*len(inner_edges)  , 6*len(inner_edges))  
-                          }
+            X[var_idx["u"][3*i]   ] = u1 
+            X[var_idx["u"][3*i+1] ] = u2 
+            X[var_idx["u"][3*i+2] ] = u3 
+            # X[var_idx["u"][3*i]   ] = 1/3
+            # X[var_idx["u"][3*i+1] ] = 1/3
+            # X[var_idx["u"][3*i+2] ] = 1/3
         
-        self.const = 6*len(inner_edges)
-
-        
+        self.add_constraint("T1", 3*len(inner_edges))
+        self.add_constraint("T2", 3*len(inner_edges))
         
             
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
@@ -105,10 +99,10 @@ class Torsal_Fair(Constraint):
         v = self.v
 
         # Get barycentric coordinates
-        u = X[self.var_idx["u"]].reshape(-1, 3)
+        u = X[var_idx["u"]].reshape(-1, 3)
 
         # Get Lines
-        e = X[self.var_idx["e"]].reshape(-1, 3)
+        e = X[var_idx["e"]].reshape(-1, 3)
 
         # Get inner edges
         inner_edges = self.inner_edges
@@ -132,21 +126,21 @@ class Torsal_Fair(Constraint):
 
         # Get e indices
         # e_i
-        e_idx_i_x = self.var_idx["e"][3*i]
-        e_idx_i_y = self.var_idx["e"][3*i + 1] 
-        e_idx_i_z = self.var_idx["e"][3*i + 2] 
+        e_idx_i_x = var_idx["e"][3*i]
+        e_idx_i_y = var_idx["e"][3*i + 1] 
+        e_idx_i_z = var_idx["e"][3*i + 2] 
         # e_j
-        e_idx_j_x = self.var_idx["e"][3*j]
-        e_idx_j_y = self.var_idx["e"][3*j + 1] 
-        e_idx_j_z = self.var_idx["e"][3*j + 2] 
+        e_idx_j_x = var_idx["e"][3*j]
+        e_idx_j_y = var_idx["e"][3*j + 1] 
+        e_idx_j_z = var_idx["e"][3*j + 2] 
         # e_k
-        e_idx_k_x = self.var_idx["e"][3*k]
-        e_idx_k_y = self.var_idx["e"][3*k + 1] 
-        e_idx_k_z = self.var_idx["e"][3*k + 2] 
+        e_idx_k_x = var_idx["e"][3*k]
+        e_idx_k_y = var_idx["e"][3*k + 1] 
+        e_idx_k_z = var_idx["e"][3*k + 2] 
         # e_l
-        e_idx_l_x = self.var_idx["e"][3*l]
-        e_idx_l_y = self.var_idx["e"][3*l + 1]
-        e_idx_l_z = self.var_idx["e"][3*l + 2]
+        e_idx_l_x = var_idx["e"][3*l]
+        e_idx_l_y = var_idx["e"][3*l + 1]
+        e_idx_l_z = var_idx["e"][3*l + 2]
 
         # Dot product vi L
         viL = vec_dot(vi, L)
@@ -163,11 +157,11 @@ class Torsal_Fair(Constraint):
         Ln = L/L_2[:,None]
         
         # Dui => -vi + vi.l/l^2 l
-        self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie)].repeat(3), (-v[i] + (viL/L_2)[:,None]*L).flatten())
+        self.add_derivatives(self.const_idx["T1"], var_idx["u"][3*np.arange(0, n_ie)].repeat(3), (-v[i] + (viL/L_2)[:,None]*L).flatten())
         # Duj => -vj + vj.l/l^2 l
-        self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), (-v[j] + (vjL/L_2)[:,None]*L).flatten())
+        self.add_derivatives(self.const_idx["T1"], var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), (-v[j] + (vjL/L_2)[:,None]*L).flatten())
         # Duk => -vk - vk.l/l^2 l
-        self.add_derivatives(self.const_idx["T1"], self.var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), (-v[k] + (vkL/L_2)[:,None]*L).flatten())
+        self.add_derivatives(self.const_idx["T1"], var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), (-v[k] + (vkL/L_2)[:,None]*L).flatten())
 
         # # Projection
         proj = (vec_dot(vl, L) - ui*viL - uj*vjL - uk*vkL)/L_2
@@ -226,15 +220,15 @@ class Torsal_Fair(Constraint):
 
         # Dui => - vvi + vvi.l/l^2 l
         self.add_derivatives(self.const_idx["T2"], 
-                             self.var_idx["u"][3*np.arange(0, n_ie)].repeat(3),
+                             var_idx["u"][3*np.arange(0, n_ie)].repeat(3),
                              (-vvi + (vviL/L_2)[:,None]*L).flatten())
         # Duj => - ej + ej.l/l^2 l
         self.add_derivatives(self.const_idx["T2"], 
-                             self.var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), 
+                             var_idx["u"][3*np.arange(0, n_ie) + 1].repeat(3), 
                              (-vvj + (vvjL/L_2)[:,None]*L).flatten())
         # Duk => - ek - ek.l/l^2 l
         self.add_derivatives(self.const_idx["T2"], 
-                             self.var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), 
+                             var_idx["u"][3*np.arange(0, n_ie) + 2].repeat(3), 
                              (-vvk + (vvkL/L_2)[:,None]*L).flatten())
 
         # # # Projection ( vl.l/l^2 - sum(ui vi.l/l^2 ))l

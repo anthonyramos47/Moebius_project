@@ -53,26 +53,16 @@ class Torsal(Constraint):
         
         # Number of faces
         self.nF = len(F)
-
-        # Number of constraints 4*|F|
-        self.const = 8*self.nF
-
-        # Define indices indices
-        self.var_idx = var_indices
-    
-        self.const_idx = {  "nt1.ec"  : np.arange( 0                  , self.nF),
-                            "nt1.t1"  : np.arange( self.nF            , 2*self.nF),
-                            "nt1.tt1" : np.arange( 2*self.nF          , 3*self.nF),
-                            "nt2.ec"  : np.arange( 3*self.nF          , 4*self.nF),
-                            "nt2.t2"  : np.arange( 4*self.nF          , 5*self.nF),
-                            "nt2.tt2" : np.arange( 5*self.nF          , 6*self.nF),
-                            "ut1"     : np.arange( 6*self.nF          , 7*self.nF),
-                            "ut2"     : np.arange( 7*self.nF          , 8*self.nF)                            
-                        }
         
-        # Number of variables
-        self.var = len(X)
-        
+        self.add_constraint("nt1.ec", self.nF)
+        self.add_constraint("nt1.t1", self.nF)
+        self.add_constraint("nt1.tt1", self.nF)
+        self.add_constraint("nt2.ec", self.nF)
+        self.add_constraint("nt2.t2", self.nF)
+        self.add_constraint("nt2.tt2", self.nF)
+        self.add_constraint("ut1", self.nF)
+        self.add_constraint("ut2", self.nF)
+
         # Get ei
         e  = X[var_indices["e"]].reshape(-1, 3)
 
@@ -113,8 +103,6 @@ class Torsal(Constraint):
         X[var_indices["th"]] = th
         X[var_indices["phi"]] = phi
 
-
-
         # Compute torsal directions with respec to angle
         t1 = np.cos(th)[:,None]*self.fvij[:,0] + np.sin(th)[:,None]*self.fvij[:,1]
         t2 = np.cos(th + phi)[:,None]*self.fvij[:,0] + np.sin(th + phi)[:,None]*self.fvij[:,1]
@@ -140,16 +128,16 @@ class Torsal(Constraint):
         nt1 = unit(np.cross(t1, ec))
         nt2 = unit(np.cross(t2, ec))
 
-        X[self.var_idx["nt1"]] = nt1.flatten()
-        X[self.var_idx["nt2"]] = nt2.flatten()
+        X[var_indices["nt1"]] = nt1.flatten()
+        X[var_indices["nt2"]] = nt2.flatten()
 
 
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
         """
-        e, nt1, nt2, th, phi = self.uncurry_X(X, "e", "nt1", "nt2", "th", "phi")
+        e, nt1, nt2, th, phi = self.uncurry_X(X, var_idx, "e", "nt1", "nt2", "th", "phi")
 
         e   = e.reshape(-1, 3)
         nt1 = nt1.reshape(-1, 3)
@@ -158,32 +146,32 @@ class Torsal(Constraint):
         ec = np.sum(e[self.F], axis=1)/3
 
         # Set derivatives || nt1.ec/||ec|| ||^2  + || nt2.ec/||ec|| ||^2
-        self.energy_nt_ec(e, ec, nt1, nt2)
+        self.energy_nt_ec(var_idx,  e, ec, nt1, nt2)
 
         # Set derivatives || nt1.t1/||t1|| ||^2  + || nt2.t2\||t2|| ||^2
-        self.energy_nt_t(nt1, nt2, th, phi)
+        self.energy_nt_t(var_idx, nt1, nt2, th, phi)
 
         # Set derivatives || nt1.tt1/||tt1|| ||^2  + || nt2.tt2/||tt2|| ||^2
-        self.energy_nt_tt(e, nt1, nt2, th, phi)
+        self.energy_nt_tt(var_idx, e, nt1, nt2, th, phi)
         
         self.ecnorms = np.linalg.norm(ec, axis=1)
     
 
-    def energy_nt_ec(self, e, ec, nt1, nt2):
+    def energy_nt_ec(self, var_idx, e, ec, nt1, nt2):
         """ Function to set up the derivatives and residual for
         the energy || nt1.ec/||ec|| ||^2  + || nt2.ec/||ec|| ||^2
         """
 
         i, j, k = self.F[:,0], self.F[:,1], self.F[:,2]
 
-        e_idx = self.var_idx["e"]
+        e_idx = var_idx["e"]
 
         indices_i = e_idx[3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
         indices_j = e_idx[3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
         indices_k = e_idx[3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
 
         # d nt1 => ec/||ec||
-        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), self.var_idx["nt1"], (ec/self.ecnorms[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), var_idx["nt1"], (ec/self.ecnorms[:, None]).flatten())
 
         # d ei,j,k => 1/3 nt1.ec/||ec||
         self.add_derivatives(self.const_idx["nt1.ec"].repeat(3), indices_i, (nt1/self.ecnorms[:, None]).flatten()/3)
@@ -194,7 +182,7 @@ class Torsal(Constraint):
         self.set_r(self.const_idx["nt1.ec"], vec_dot(nt1, ec)/self.ecnorms)
 
         # d nt2 => ec/||ec||
-        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), self.var_idx["nt2"], (ec/self.ecnorms[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), var_idx["nt2"], (ec/self.ecnorms[:, None]).flatten())
 
         # d ei,j,k => 1/3 nt2.ec/||ec||
         self.add_derivatives(self.const_idx["nt2.ec"].repeat(3), indices_i, (nt2/self.ecnorms[:, None]).flatten()/3)
@@ -207,7 +195,7 @@ class Torsal(Constraint):
         # print("nt1ec: ", self.r[self.const_idx["nt1.ec"]]@self.r[self.const_idx["nt1.ec"]])
         # print("nt2ec: ", self.r[self.const_idx["nt2.ec"]]@self.r[self.const_idx["nt2.ec"]])
 
-    def energy_nt_t(self, nt1, nt2, th, phi):
+    def energy_nt_t(self, var_idx, nt1, nt2, th, phi):
         """ Function to set up the derivatives and residual for
         the energy || nt1.t1/||t1|| ||^2  + || nt2.t2\||t2|| ||^2
         """
@@ -226,10 +214,10 @@ class Torsal(Constraint):
 
         # E: ||nt1.t1||; t1 = cos(th) vij + sin(th) vik
         # d nt1 => t1\||t1||
-        self.add_derivatives(self.const_idx["nt1.t1"].repeat(3), self.var_idx["nt1"], (t1/self.tnorms1[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt1.t1"].repeat(3), var_idx["nt1"], (t1/self.tnorms1[:, None]).flatten())
 
         # d th => nt1.(-sin(th) vij + cos(th) vik)\||t1||
-        self.add_derivatives(self.const_idx["nt1.t1"], self.var_idx["th"], vec_dot(nt1, dt1)/self.tnorms1)
+        self.add_derivatives(self.const_idx["nt1.t1"], var_idx["th"], vec_dot(nt1, dt1)/self.tnorms1)
 
         # r 
         self.set_r(self.const_idx["nt1.t1"], vec_dot(nt1, t1)/self.tnorms1)
@@ -237,13 +225,13 @@ class Torsal(Constraint):
         # print("nt1t1: ", self.r[self.const_idx["nt1.t1"]]@self.r[self.const_idx["nt1.t1"]])
 
         # E: ||nt2.t2||; t2 = cos(alpha) vij + sin(alpha) vik
-        self.add_derivatives(self.const_idx["nt2.t2"].repeat(3), self.var_idx["nt2"], (t2/self.tnorms2[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt2.t2"].repeat(3), var_idx["nt2"], (t2/self.tnorms2[:, None]).flatten())
 
         # d th => nt2.(-sin(alpha) vij + cos(alpha) vik)\||t2||
-        self.add_derivatives(self.const_idx["nt2.t2"], self.var_idx["th"], vec_dot(nt2, dt2)/self.tnorms2)
+        self.add_derivatives(self.const_idx["nt2.t2"], var_idx["th"], vec_dot(nt2, dt2)/self.tnorms2)
 
         # d phi => nt2.(-sin(alpha) vij + cos(alpha) vik)\||t2||
-        self.add_derivatives(self.const_idx["nt2.t2"], self.var_idx["phi"], vec_dot(nt2, dt2)/self.tnorms2)
+        self.add_derivatives(self.const_idx["nt2.t2"], var_idx["phi"], vec_dot(nt2, dt2)/self.tnorms2)
 
         # r
         self.set_r(self.const_idx["nt2.t2"], vec_dot(nt2, t2)/self.tnorms2)
@@ -253,7 +241,7 @@ class Torsal(Constraint):
         self.tnorms1 = np.linalg.norm(t1, axis=1)
         self.tnorms2 = np.linalg.norm(t2, axis=1)
 
-    def energy_nt_tt(self, e, nt1, nt2, th, phi):
+    def energy_nt_tt(self, var_idx, e, nt1, nt2, th, phi):
         """ Function to set up the derivatives and residual for
         the energy || nt1.tt1/||tt1|| ||^2  + || nt2.tt2/||tt2|| ||^2
         """
@@ -267,9 +255,9 @@ class Torsal(Constraint):
         
         i, j, k = self.F[:,0], self.F[:,1], self.F[:,2]
 
-        indices_i = self.var_idx["e"][3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
-        indices_j = self.var_idx["e"][3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
-        indices_k = self.var_idx["e"][3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
+        indices_i = var_idx["e"][3 * np.repeat(i, 3) + np.tile(range(3), len(i))]
+        indices_j = var_idx["e"][3 * np.repeat(j, 3) + np.tile(range(3), len(j))]
+        indices_k = var_idx["e"][3 * np.repeat(k, 3) + np.tile(range(3), len(k))]
 
         # compute the second envelope as vvi = vi + e[i]
         vvi = vi + e[i]
@@ -292,10 +280,10 @@ class Torsal(Constraint):
 
         # E : ||nt1.tt1||; tt1 = cos(th) (vvj - vvi) + sin(th) (vvk - vvi)
         # d nt1 => tt1/||tt1||
-        self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), self.var_idx["nt1"], (tt1/self.ttnorms1[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), var_idx["nt1"], (tt1/self.ttnorms1[:, None]).flatten())
 
         # d th => nt1.(-sin(th) (vvj - vvi) + cos(th) (vvk - vvi))/||tt1||
-        self.add_derivatives(self.const_idx["nt1.tt1"], self.var_idx["th"], vec_dot(nt1, dtt1_th)/self.ttnorms1)
+        self.add_derivatives(self.const_idx["nt1.tt1"], var_idx["th"], vec_dot(nt1, dtt1_th)/self.ttnorms1)
 
         # d ei => -nt1*(cos(th) + sin[th])/||tt1||
         self.add_derivatives(self.const_idx["nt1.tt1"].repeat(3), indices_i, (-(np.cos(th) + np.sin(th))[:,None]*nt1nor).flatten())
@@ -315,13 +303,13 @@ class Torsal(Constraint):
 
         # E : ||nt2.tt2||; tt2 = cos(alpha) (vvj - vvi) + sin(alpha) (vvk - vvi)
         # d nt2 => tt2/||tt2||
-        self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), self.var_idx["nt2"], (tt2/self.ttnorms2[:, None]).flatten())
+        self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), var_idx["nt2"], (tt2/self.ttnorms2[:, None]).flatten())
 
         # d th => nt2.(-sin(alpha) (vvj - vvi) + cos(alpha) (vvk - vvi))/||tt2||
-        self.add_derivatives(self.const_idx["nt2.tt2"], self.var_idx["th"], vec_dot(nt2, dtt2_th)/self.ttnorms2)
+        self.add_derivatives(self.const_idx["nt2.tt2"], var_idx["th"], vec_dot(nt2, dtt2_th)/self.ttnorms2)
 
         # d phi => nt2.(-sin(alpha) (vvj - vvi) + cos(alpha) (vvk - vvi))/||tt2||
-        self.add_derivatives(self.const_idx["nt2.tt2"], self.var_idx["phi"], vec_dot(nt2, dtt2_th)/self.ttnorms2)
+        self.add_derivatives(self.const_idx["nt2.tt2"], var_idx["phi"], vec_dot(nt2, dtt2_th)/self.ttnorms2)
 
         # d ei => -nt2*(cos(alpha) + sin[alpha])/||tt2||
         self.add_derivatives(self.const_idx["nt2.tt2"].repeat(3), indices_i, (-(np.cos(alpha) + np.sin(alpha))[:,None]*nt2nor).flatten())

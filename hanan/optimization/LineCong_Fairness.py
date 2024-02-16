@@ -14,7 +14,6 @@ class LineCong_Fair(Constraint):
         self.e_norms = None # Norms of the edges
 
         
-
     def initialize_constraint(self, X, var_indices, vertex_neigh, inner_vertices, nt) -> None:
         # Input
         # X : Variables
@@ -23,9 +22,6 @@ class LineCong_Fair(Constraint):
 
         # Initialize constraint \sum_{f \in F} \sum_{cj,ci \in E(f)} || e_f (cj - ci)/|| cj - ci||  ||^2 ; ci = bi + df * nbi
         # 
-
-        self.var_idx = var_indices
-
         self.vertices_neighbors = vertex_neigh
    
         # Set inner vertices
@@ -33,9 +29,7 @@ class LineCong_Fair(Constraint):
 
         self.nt = nt
         
-        self.var = len(X)
-
-        e = self.uncurry_X(X, "e")
+        e = self.uncurry_X(X, var_indices, "e")
         
         # length of e flattened
         e_flat = len(e)
@@ -44,15 +38,11 @@ class LineCong_Fair(Constraint):
 
         self.e_norms = np.linalg.norm(e, axis=1)
 
-        self.const_idx = {"Fair"  : np.arange(0, e_flat)
-                         # "Orth"  : np.arange(e_flat, e_flat + len(e))
-                          }
-        
-        self.const = e_flat 
+        self.add_constraint("Fair", e_flat)
 
-            
+                
 
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
@@ -60,13 +50,12 @@ class LineCong_Fair(Constraint):
 
         
         # Get variables
-        e = self.uncurry_X(X, "e")
-
+        e = self.uncurry_X(X,var_idx, "e")
         e = e.reshape(-1, 3)
 
-        e_idx = self.var_idx["e"]
+        # Get indices
+        e_idx = var_idx["e"]
 
-        #indices = 3 * np.repeat(e_idx, 3) + np.tile(range(3), len(e_idx))
         
         # d ei
         self.add_derivatives(self.const_idx["Fair"], e_idx, np.ones(3*len(e))) 
