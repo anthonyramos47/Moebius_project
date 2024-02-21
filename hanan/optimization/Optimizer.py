@@ -3,8 +3,10 @@ import numpy as np
 import time as tm
 import pandas as pd
 from hanan.optimization.Unit import Unit
+from hanan.geometry.utils import unit
 from scipy.sparse import csc_matrix,diags, vstack
 from scipy.sparse.linalg import splu, spsolve
+import matplotlib.pyplot as plt
 
 
 class Optimizer():
@@ -26,6 +28,7 @@ class Optimizer():
         self.J = None # Jacobian matrix
         self.r = None # Residual vector
         self.X = None # Variable
+        self.X0 = None # Initial variable 
         self.bestX = None # Best variable
         self.bestit = None # Best iteration
         self.prevdx = None # Previous dx
@@ -34,7 +37,120 @@ class Optimizer():
         self.step = None # Step size
         self.method = None # Method used to solve the problem
         self.energy = [] # Energy vector
-        self.var_idx = None # Variable indices
+        self.energy_dic = {} # Energy dictionary
+        self.var_idx = {} # Variable indices
+        self.var = 0 # Number of variables
+        self.constraints = [] # List of constraints objects
+        self.verbose = False # Verbose
+
+    def clear_energy(self):
+        """
+        Method to clear the energy
+        """
+        self.energy = []
+        self.bestit = None
+        self.bestX = None
+
+    def clear_constraints(self):
+        """
+        Method to clear the constraints
+        """
+        self.constraints = []
+
+    def reset_it_optimizer(self):
+        """
+        Method to reset the optimizer
+        """
+        self.clear_energy()
+        self.clear_constraints()
+        #self.X = self.X0.copy()
+        self.prevdx = None
+        self.it = 0
+        self.bestX = None
+        self.bestit = None
+    
+
+    def report_energy(self, name="Final_Energy_plot"):
+        # Save energy per constraint to a file
+        with open(name+"_energy_per_constraint.data", "w") as file:
+            file.write(f"ENERGY REPORT\n")
+            file.write("===========================================\n")
+            for en_name, energy in self.energy_dic.items():
+                file.write(f"{en_name}: {energy}\n")
+            file.write("===========================================\n")
+            file.write("=============Final Energy ==================\n")
+
+            file.write(f"Final Energy: {self.energy[-1]}\n")
+            file.write(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
+
+
+
+        print(f"Final Energy: {self.energy[-1]}")
+        plot = plt.plot(self.energy)
+        plt.xlabel('Iteration')
+        plt.ylabel('Energy')
+        plt.title('Energy per iteration')
+        plt.xlim(0, len(self.energy))
+        plt.grid()
+        # Put point markers on the plot
+        plt.scatter(range(len(self.energy)), self.energy, color='r')
+        plt.savefig(name)
+    
+    def get_energy_per_constraint(self):
+        print(f"ENERGY REPORT\n")
+        print("===========================================\n")
+        for name, energy in self.energy_dic.items():
+            print(f"{name}: {energy}")
+        print("===========================================\n")
+        print("=============Final Energy ==================\n")
+        print(f"Final Energy: {self.energy[-1]}\n")
+        print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}\n\n")
+
+    def add_variable(self, var_name, dim) -> None:
+        """
+            Method to add a variable to the optimizer
+            Input:
+                var_name: Name of the variable
+                dim: Dimension of the variable
+        """
+        self.var_idx[var_name] = np.arange(self.var, self.var + dim)
+        self.var += dim
+
+    def init_variables(self, X) -> None:
+        """
+            Method to set the variables of the optimizer
+            Input:
+                X: Variables
+        """
+        self.X = X
+        self.X0 = X.copy()
+
+    def init_variable(self, name, vals):
+        """
+            Method to set the value of a variable
+            Input:
+                name: Name of the variable
+                vals: Value of the variable
+        """
+        self.X[self.var_idx[name]] = vals
+        self.X0[self.var_idx[name]] = vals
+
+    def add_constraint(self, constraint, args, w=1) -> None:
+        """
+            Method to add a constraint to the optimizer
+            Input:
+                constraint: Constraint class
+                w: Weight of the constraint
+                args: arguments of the constraint
+        """
+
+        # Add constraint to the optimizer
+        constraint._initialize_constraint(self.X, self.var_idx, *args)
+        constraint.set_weigth(w)
+
+        self.constraints.append(constraint)
+
+
 
     def unitize_variable(self, var_name, dim) -> None:
         """
@@ -46,10 +162,13 @@ class Optimizer():
         """
         # Initialize constraint
         unit = Unit()
-        unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
-
+        #unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
+        unit._initialize_constraint(self.X, self.var_idx, var_name, dim)
+        unit.name = var_name + "_unit"
+        #self.energy_vector = np.zeros(len(self.X))
+        self.constraints.append(unit)
         # Add constraint
-        self.get_gradients(unit)
+        #self.get_gradients(unit)
 
     def fix_vertices(self, fix_vertices) -> None:
         """
@@ -65,40 +184,58 @@ class Optimizer():
         pass
 
 
-
-    def initialize_optimizer(self, X, var_dic, method= "LM", step = 0.8) -> None:
+    def initialize_optimizer(self, method= "LM", step = 0.8, print=0) -> None:
         """
         Initialize the optimizer( variables, step size)
         """
         # Initialize variables
-        self.X = X
-        self.var_idx = var_dic
-        self.X0 = X.copy()
+        self.X = np.zeros(self.var)
+        self.X0 = np.zeros(self.var)
         self.it = 0
         self.step = step
         self.method = method
+        self.verbose = print
 
-    def get_gradients(self, constraint) -> None:
+
+    def get_gradients(self) -> None:
         """ Add constraint to the optimizer
             Input:
                 constraint: Constraint class
                 args: arguments of the constraint
         """
-        
-        # Add J, r to the optimizer
-        if constraint.w != 0:
-            
-            # Compute J, r for the constraint
-            constraint._compute(self.X)
+        stacked_J = []
+        stacked_r = []
 
+        total = 0
+        for constraint in self.constraints:
+            
             # Add J, r to the optimizer
-            if self.J is None:
-                self.J =  np.sqrt(constraint.w) * constraint.J
-                self.r =  np.sqrt(constraint.w) * constraint.r
-            else:
-                self.J = vstack((self.J, np.sqrt(constraint.w) * constraint.J))
-                self.r = np.concatenate((self.r, np.sqrt(constraint.w) * constraint.r))
+            if constraint.w != 0:
+                
+                #initial_time = tm.time()
+                # Compute J, r for the constraint
+                constraint._compute(self.X, self.var_idx)
+                final_time = tm.time()
+                #total += final_time - initial_time
+                #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
+
+                # Add J, r to the optimizer                
+                stacked_J.append(np.sqrt(constraint.w) * constraint.J)
+                stacked_r.append(np.sqrt(constraint.w) * constraint.r)          
+
+                # Add energy to the energy dictionary
+                if constraint.name is not None:
+                        self.energy_dic[constraint.name] = constraint.w * np.sum(constraint.r**2)
+        #print(f"\nTotal time to compute constraints: {total}")
         
+        if len(stacked_J) == 1:
+            self.J = stacked_J[0]
+            self.r = stacked_r[0]
+        else:
+            
+            self.J = vstack(stacked_J)
+            self.r = np.hstack(stacked_r)
+
 
  
     def optimize(self):
@@ -111,7 +248,7 @@ class Optimizer():
             else:
                 print("Error: Solver not implemented or not specified")
         else:
-            pass   
+            pass
 
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares
@@ -139,7 +276,7 @@ class Optimizer():
         dx = spsolve(H, b)
 
         # Store previous dx norm
-        self.prevdx = np.linalg.norm(dx)
+        self.prevdx = np.linalg.norm(self.step*dx)
 
         # Compute energy
         energy = self.r.T@self.r
@@ -162,11 +299,10 @@ class Optimizer():
         # Update iteration
         self.it +=1
         
-        # Print energy
-        print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
+        if self.verbose:
+            # Print energy
+            print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
 
-        # Clear constraints
-        self.clear_constraints()
 
     def get_variables(self):
         # Return variables
@@ -202,19 +338,24 @@ class Optimizer():
     def update_variables(self, arg) -> None:
         # Update variables
 
-        if self.it%10 ==0:
-            self.step *= 0.9
+        # if self.it%10 ==0:
+        #     self.step *= 0.9
         
         if self.method == "LM":
             self.X += self.step*arg
         elif self.method == "PG":
             pass
-        
+    
+    def uncurry_X(self, *v_idx):
+        """ Function to uncurry the variables
+            Input:
+                v_idx: Variable indices
+        """
 
-    def clear_constraints(self):
-        # Clear Jacobian and residual
-        self.J = None
-        self.r = None
+        if len(v_idx) == 1:
+            return self.X[self.var_idx[v_idx[0]]]
+        else:
+            return [self.X[self.var_idx[k]] for k in v_idx]
 
     def reset(self):
         """ Function that resets the optimizer to the initial state.
@@ -229,4 +370,12 @@ class Optimizer():
         self.clear_constraints()
 
 
+    def force_unit_variable(self, v_name, dim):
+        """ Function that forces the variables to be unit vectors.
+            Input:
+                v_name: Name of the variable
+                dim: Dimension of the variable
+        """
+
+        self.X[self.var_idx[v_name]] = unit(self.X[self.var_idx[v_name]].reshape(-1, dim)).flatten()
 

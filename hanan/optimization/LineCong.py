@@ -1,42 +1,38 @@
 # Planarity constraint implementation
 import numpy as np
 from hanan.optimization.constraint import Constraint
+from hanan.geometry.utils import vec_dot
 
 class LineCong(Constraint):
 
     def __init__(self) -> None:
         super().__init__()
+        self.name = "LineCong" # Name of the constraint
         self.ei_dim = None # Number of edges per face
+        self.ei_norms = None # Norms of the edges
         self.num_edge_const = None # Number of edge constraints
-        self.bij = [] # List to store vertices distance
-        self.nt = [] # List to store normals
-        self.norms = [] # List to store norms of cicj
+        self.cij_norms = [] # List to store norms of cicj
+        self.ci_idx = None # Indices of ci
+        self.cj_idx = None # Indices of cj
+        self.i_idx = None # Indices of i
+        self.j_idx = None # Indices of j
         self.inner_vertices = None # List of inner vertices
-        self.dual_faces = None # List of dual faces
+        self.normals = None # List of normals
         
 
-    def initialize_constraint(self, X, var_indices, ei_dim, bt, nbt, num_faces, dual_faces, inner_vertices) -> None:
+    def initialize_constraint(self, X, var_indices, ei_dim, dual_faces, inner_vertices, normals) -> None:
         # Input
         # X : Variables
         # var_indices: Dictionary with the indices of the variables
-        # ei_dim: Number of edges per face
-        # bt: Circumcenters of the faces
-        # nbt: Normals at the circumcenters
-        # num_faces: Number of faces
+        # ei_dim: Number e_i lines per vertex
         # dual_faces: List of dual faces
         # inner_vertices: List of inner vertices
+        # normals: List of normals
 
-
-        # Initialize constraint \sum_{f \in F} \sum_{cj,ci \in E(f)} || e_f (cj - ci)/|| cj - ci||  ||^2 ; ci = bi + df * nbi
-        # 
-
-        self.var_idx = var_indices
+        self.normals = normals
 
         # Vector dimension
         self.ei_dim = ei_dim
-
-        # Set normals
-        self.nt = nbt
 
         # Set inner vertices
         self.inner_vertices = inner_vertices
@@ -48,60 +44,54 @@ class LineCong(Constraint):
 
         self.num_edge_const = edge_num
 
-        
-        self.const = self.num_edge_const
-        self.var = len(X)
 
-        e, df = self.uncurry_X(X, "e", "df")
+        c, e= self.uncurry_X(X, var_indices, "sph_c", "e")
 
         e = e.reshape(-1, 3)
+        c = c.reshape(-1, 3)
 
-        self.const_idx = {"E":[]
-                          }
+        self.ei_norms = np.linalg.norm(e, axis=1)
 
-        self.dual_faces = dual_faces
-        # Compute Jacobian
-        # Row index
-        i = 0
+
+        # Init ci, cj indices
+        self.ci_idx = []
+        self.cj_idx = []
+
+        # Init i, j indices
+        self.i_idx = []
+        self.j_idx = []
+
         # Loop over faces
-        for idx_f in range(len(inner_vertices)):
+        for idx_v in range(len(inner_vertices)):
             
             # Face index in dual
-            f = inner_vertices[idx_f]
+            v = inner_vertices[idx_v]
 
-            # Get dual face
-            face = dual_faces[f]
-            # Get rolled indices
+            # Get indices of neighbor faces to idx_v; faces to vertex v 
+            face = dual_faces[v]
+            self.ci_idx.append(face)
+
             faceroll = np.roll(face, -1, axis=0)
+            self.cj_idx.append(faceroll)
 
+            self.i_idx.append(3 * np.repeat(face, 3) + np.tile(range(3), len(face)))
+            self.j_idx.append(3 * np.repeat(faceroll, 3) + np.tile(range(3), len(faceroll)))
+            
             # Get vertices
-            bi = bt[face]
-            bj = bt[faceroll]
-
-            # Get normals
-            ni = nbt[face]
-            nj = nbt[faceroll]
-
-            # Get df 
-            lbi = df[face]
-            lbj = df[faceroll]
-
-            # Store vertices distance
-            self.bij.append(bj - bi)
-
-            # Define direction
-            cicj = (bj - bi) + (lbj[:, None]*nj - lbi[:, None]*ni)
+            ci = c[face]
+            cj = c[faceroll]
             
-            self.norms.append(np.linalg.norm(cicj, axis=1)[:, None]) 
+            self.cij_norms.append(np.linalg.norm(cj-ci, axis=1)[:, None]) 
 
-            self.const_idx["E"].append(np.arange(i, i + len(face)))
-
-            # Update row index
-            i += len(face)
+            self.add_constraint("Orth_"+str(idx_v), len(face))
+   
+        self.add_constraint("Length", len(e))
+        self.add_constraint("Surf_Orth", len(e))
+        
 
             
 
-    def compute(self, X) -> None:
+    def compute(self, X, var_idx) -> None:
         """ Compute the residual and the Jacobian of the constraint
             Input:
                 X: Variables
@@ -111,65 +101,89 @@ class LineCong(Constraint):
         inner_vertices = self.inner_vertices
 
         # Get variables
-        ei, df = self.uncurry_X(X, "e", "df")
+        c, e = self.uncurry_X(X, var_idx, "sph_c", "e")
 
-        ei = ei.reshape(-1, 3)
+        e = e.reshape(-1, 3)
+        c = c.reshape(-1, 3)
 
-        e_idx = self.var_idx["e"]
+        cij_norms = self.cij_norms
 
-        # Compute Jacobian for || e_f (cj - ci)/|| cj - ci||  ||^2 ; ci = bi + df * nbi
+        en = e/self.ei_norms[:, None]
+
+        e_idx = var_idx["e"]        
+
+        # Compute Jacobian for || e_f/||e_f|| . (cj - ci)/|| cj - ci||  ||^2 ;
         for idx_f in range(len(inner_vertices)):
 
+            # Get vertex index ef 
             f = inner_vertices[idx_f]
 
             # Get face
-            face     = self.dual_faces[f]
-            faceroll = np.roll(face, -1, axis=0) 
+            face     = self.ci_idx[idx_f]
+            faceroll = self.cj_idx[idx_f]
 
-            # Get normals
-            ni = self.nt[face]
-            nj = self.nt[faceroll]
+            i_idx = self.i_idx[idx_f]
+            j_idx = self.j_idx[idx_f]
+        
 
-            # Get df
-            lbi = df[face]
-            lbj = df[faceroll]
+            ci = c[face]
+            cj = c[faceroll]
 
-            # Define direction
-            cicj = (self.bij[idx_f] + (lbj[:, None]*nj - lbi[:, None]*ni) )
-
-            norms = self.norms[idx_f]
-                 
             # Define Jacobian
-            cicjnor = cicj/np.array(norms)
-
-            # d ei
-            #J[i:i + len(face), 3*f: 3*f + 3 ] = cicj
-            row_indices = self.const_idx["E"][idx_f].repeat(3)
-            col_indices = e_idx[np.tile(np.arange(3*f, 3*f + 3), len(face))]
-
-            # print(f" f : {f} \t 3*f : {3*f}")
-            # print("row indices:",row_indices)
-            # print(f"col indices: {col_indices}")
-            # print("cicjnor:", cicjnor)
-            # print("\n\n")
-            self.add_derivatives(row_indices, col_indices, cicjnor.flatten() )
+            cicjnor = (cj - ci)/np.array(cij_norms[idx_f])
 
             # Indices for I and J derivative
-            dfi = self.var_idx["df"][face]
-            dfj = self.var_idx["df"][faceroll]
+            idx_c_i = var_idx["sph_c"][i_idx]
+            idx_c_j = var_idx["sph_c"][j_idx]
+
+            # row indices
+            row_indices = self.const_idx["Orth_"+str(idx_f)].repeat(3)
+           
+            # d ci || e_f (cj - ci)/|| cj - ci|||e_f|  ||^2 =>  - ef/|| cj - ci|||e_f| 
+            self.add_derivatives(row_indices, idx_c_i, -(en[f] / np.array(cij_norms[idx_f])).flatten())
             
-            # d dfi || e_f (cj - ci)/|| cj - ci||  ||^2 =>  - ef.ni
-            #J[range(i,i + len(face)), ii] = -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten()
-            self.add_derivatives(self.const_idx["E"][idx_f], dfi, -np.sum( ei[f]*ni, axis=1)/self.norms[idx_f].flatten())
-            
-            #d dfj
-            #J[range(i,i + len(face)), jj] = np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten()
-            self.add_derivatives(self.const_idx["E"][idx_f], dfj, np.sum( ei[f]*nj, axis=1)/self.norms[idx_f].flatten())
+            #d cj => ef
+            self.add_derivatives(row_indices, idx_c_j, (en[f] / np.array(cij_norms[idx_f])).flatten())
+
+            # Get norms of ei                    
+            e_norm = self.ei_norms[f]
+
+            # d ef = > (cicjnor/e_norm)
+            col_indices = e_idx[np.tile(np.arange(3*f, 3*f + 3), len(face))]
+
+            self.add_derivatives(row_indices, col_indices, (cicjnor/e_norm).flatten() )
 
             # Define residual
-            self.set_r(self.const_idx["E"][idx_f], np.sum(cicjnor*ei[f], axis=1) )
-            self.r[self.const_idx["E"][idx_f]] = np.sum(cicj*ei[f], axis=1)
+            self.set_r(self.const_idx["Orth_"+str(idx_f)], vec_dot(en[f], cicjnor) )
+
+        #print("Orth Energy:", np.sum(np.linalg.norm(self.r[self.const_idx["Orth_"+str(idx_f)]],axis=1)**2) )
+
+        # Length constraint || e.e - le^2 ||^2
+            
+        # d e => 2e    
+        # self.add_derivatives(self.const_idx["Length"].repeat(3), e_idx, 2*e.flatten())
+        # # d le => -2le
+        # self.add_derivatives(self.const_idx["Length"], self.var_idx["le"], -2*le)
+        # self.set_r(self.const_idx["Length"], np.linalg.norm(e, axis=1)**2 - 2**2 - le**2)
+
+        # print("Length Energy:", np.linalg.norm(self.r[self.const_idx["Length"]])**2 )
+
+        ow = 0.7
+        # Orthogonality constraint || (e.n)**2/||e||^2 - 1 ||^2
+        e2 = self.ei_norms**2
+        # d e => n/||e||
+        self.add_derivatives(self.const_idx["Surf_Orth"].repeat(3), e_idx, ow*(2*((vec_dot(self.normals, e)/e2)[:,None]* self.normals) ).flatten())
+        self.set_r(self.const_idx["Surf_Orth"], ow*((1/e2)*vec_dot(e, self.normals)**2 - 1) )
+
+        # print("Orth Energy:", np.linalg.norm(self.r[self.const_idx["Orth"]])**2 )
+        # print("Total LC Energy:", self.r@self.r)
+        # print("\n")
+        self.ei_norms = np.linalg.norm(e, axis=1)
 
 
-            self.norms[idx_f] = np.linalg.norm(cicj, axis=1)[:, None] 
 
+        
+
+       
+
+        

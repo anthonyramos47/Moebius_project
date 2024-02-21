@@ -1,5 +1,6 @@
 import numpy as np
 import polyscope as ps
+from scipy.optimize import minimize, least_squares
 
 def unit(v):
     """normalize a list of vectors v
@@ -19,15 +20,20 @@ def proj(v, u):
     u = np.array(u)
 
     vu = vec_dot(v, u)
-    vv = vec_dot(u, u)
+    uu = vec_dot(u, u)
 
     if len(v.shape) == 1 and len(u.shape) == 1:
-        proj = vu/vv*u
+        proj = vu/uu*u
     else:
-        proj = vu/vv[:, None]*u
+        proj = (vu/uu)[:,None]*u
     return proj
 
 def barycenters(v, f):
+    """ Function to compute the barycenters of the faces
+    Input:
+        v: vertices
+        f: faces
+    """
      
     bary = np.zeros((len(f), 3))
     for i, face in enumerate(f):
@@ -36,6 +42,38 @@ def barycenters(v, f):
         bary[i] = b
 
     return bary
+
+def barycentric_coordinates_app(vi, vj, vk, vl):
+    """ Function to find the barycentric coordinates of a point vl 
+        in the triangle defined by vi, vj, vk
+    """
+    def bar_coord(x, vi, vj, vk, vl):
+        b1, b2, b3 = x
+        return np.linalg.norm(b1*vi + b2*vj + b3*vk - vl)
+    
+    init = np.array([1/3, 1/3, 1/3])
+
+    # Perform the optimization
+    result = minimize(bar_coord, init, args=(vi, vj, vk, vl), tol=1e-6)
+    
+    # Sol
+    b1, b2, b3 = result.x
+
+    return b1, b2, b3 
+
+
+def fit_sphere(pts, sph_c, sph_r):
+
+    # Initial guess
+    init = np.zeros(4)
+    init[:3] = np.mean(pts, axis=0)
+    init[3] = np.mean(np.linalg.norm(pts - init[:3], axis=1))
+
+    # Perform the optimization
+    result = minimize(fit_sphere_energy, init, args=(pts))
+
+    return result.x[:3], result.x[3]
+
 
 def barycentric_coordinates(vi, vj, vk, vl):
     """ Function to find the barycentric coordinates of a point vl 
@@ -48,18 +86,17 @@ def barycentric_coordinates(vi, vj, vk, vl):
     # Sol
     b1, b2, b3 = np.linalg.solve(A, vl)
 
-    return b1,b2,b3
-
-
-    
+    return b1, b2, b3    
 
 
 
 def orth_proj(v, u):
+    """ Orthogonal projection of v on u
+    """
     return v - proj(v, u)
 
 def vec_dot(v1, v2):
-    """dot product between two lists of vectors v1, v2
+    """ Dot product between two lists of vectors v1, v2
     """
     if len(v1.shape) == 1 and len(v2.shape) == 1:
         dot =  v1@v2
@@ -96,8 +133,6 @@ def circle_3pts(p1, p2, p3):
     cx = np.sum((p3 - p1)*u1, axis=1)
     cy = np.sum((p3 - p1)*u3, axis=1)
 
-
-    # h 
     # h = ( (cx - bx/2)**2 + cy**2 - (bx/2)**2 )/(2*cy)
     h = ((cx-bx/2)**2 + cy**2 - (bx/2)**2 )/(2*cy)
     
@@ -110,80 +145,7 @@ def circle_3pts(p1, p2, p3):
     
     return center, radius, u2
 
-def torsal_directions(v, f, e_i):
-    num_faces = len(f)
-    tors = np.zeros((2 * num_faces, 3))
-    cos_tors = np.zeros(num_faces)
-    for i in range(num_faces):
-        # Extract vertex indices for the current face
-        vertex_indices = f[i]
 
-        # Calculate vectors e(u, v), e_u, e_v for the current face
-        e_u, e_v = e_i[vertex_indices[1]] - e_i[vertex_indices[0]], \
-                    e_i[vertex_indices[2]] - e_i[vertex_indices[0]]
-        e = (e_i[vertex_indices[0]] + e_i[vertex_indices[1]] + e_i[vertex_indices[2]])/3
-
-        # Calculate vectors a(u, v), a_u, a_v for the current face
-        v_u, v_v = v[vertex_indices[1]] - v[vertex_indices[0]], \
-                    v[vertex_indices[2]] - v[vertex_indices[0]]
-        vv = (v[vertex_indices[0]] + v[vertex_indices[1]]+ v[vertex_indices[2]])/3
-
-        # Calculate coefficients of the equation and solve it
-        gamma_0 = np.linalg.det(np.array([e_u, v_u, e]))
-        gamma_1 = np.linalg.det(np.array([e_u, v_v, e])) + np.linalg.det(np.array([e_v, v_u, e]))
-        gamma_2 = np.linalg.det(np.array([e_v, v_v, e]))
-
-        discr = gamma_1 * gamma_1 - 4.0 * gamma_0 * gamma_2
-        # here should be exception about the negative discriminant
-
-        # Negative discriminant
-        if discr < 0 and abs(discr) > 1e-7:
-            print("Discriminant is negative")
-            tors[2*i] = np.array([0,0,0])
-            tors[2 * i + 1] = np.array([0,0,0])
-            cos_tors[i] = -1
-
-        # Zero discriminant
-        elif abs(discr) < 1e-7 :
-            if discr < 0 : 
-                soln = [(-gamma_1 ), (-gamma_1 )]
-                sold = (2.0 * gamma_0)
-            else:
-                soln = [(-gamma_1 - np.sqrt(discr)), (-gamma_1 + np.sqrt(discr))]
-                sold = (2.0 * gamma_0)
-                     
-            # Calculate torsal directions for the current face
-            tors1 = soln[0] * v_u + sold * v_v
-            tors1 = tors1 / np.linalg.norm(tors1)
-            tors[2*i] = tors1
-            tors2 = soln[1] * v_u + sold * v_v
-            tors2 = tors2 / np.linalg.norm(tors2)
-            tors[2 * i + 1] = tors2
-
-            normal_plane_1 = np.cross(tors1, e)
-            normal_plane_2 = np.cross(tors2, e)
-            
-            cos_tors[i] = abs(np.dot(normal_plane_1, normal_plane_2)) / (np.linalg.norm(normal_plane_1) * np.linalg.norm(normal_plane_2))
-
-        # Positive discriminant
-        else:            
-            soln = [(-gamma_1 - np.sqrt(discr)), (-gamma_1 + np.sqrt(discr))]
-            sold = (2.0 * gamma_0)
-            
-            # Calculate torsal directions for the current face
-            tors1 = soln[0] * v_u + sold * v_v
-            tors1 = tors1 / np.linalg.norm(tors1)
-            tors[2*i] = tors1
-            tors2 = soln[1] * v_u + sold * v_v
-            tors2 = tors2 / np.linalg.norm(tors2)
-            tors[2 * i + 1] = tors2
-
-            normal_plane_1 = np.cross(tors1, e)
-            normal_plane_2 = np.cross(tors2, e)
-            
-            cos_tors[i] = abs(np.dot(normal_plane_1, normal_plane_2)) / (np.linalg.norm(normal_plane_1) * np.linalg.norm(normal_plane_2))
-
-    return tors, cos_tors
 def torsal_dir_vec(tv, tf, e_i):
     
     # Get vertices
@@ -275,11 +237,11 @@ def torsal_dir_vec(tv, tf, e_i):
 
 # ====================== Polyscope Functions =================
 
-def draw_polygon(vertices, name="_"):
+def draw_polygon(vertices, color, name="_"):
     """
         Register a polygon as a surface
     """
-    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]])
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=color, transparency=0.6)
     
 def draw_plane(p0, n, size=(1,1), name="_"):
     """
@@ -289,7 +251,6 @@ def draw_plane(p0, n, size=(1,1), name="_"):
 
     v1 = unit(orth_proj(aux, n))
 
-    print(v1@aux)
     v2 = unit(np.cross(n, v1))
 
     v1 *= size[0]
@@ -297,7 +258,7 @@ def draw_plane(p0, n, size=(1,1), name="_"):
 
     vertices = np.array([p0 + v1 + v2, p0 + v1 - v2, p0 - v1 - v2, p0 - v1 + v2])
 
-    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.2)
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.6)
 
 
 def read_obj(filename):
@@ -343,26 +304,66 @@ def read_obj(filename):
 
 
 def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
+    """ Function to add cross field to polyscope
+    """
+
     mesh.add_vector_quantity(name+"_vec1" ,    vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec1",   -vec1, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
 
-def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
+def find_initial_torsal_th_phi(t1, t2, vij, vik):
+    """ Function to find the initial torsal directions parameters
+    Input:
+        t: Torsal direction
+        vij: edge vector
+        vik: edge vector
+    """
+    
+    theta = np.zeros(len(t1))
+    phi   = np.zeros(len(t1))
+
+    alpha = np.zeros(len(t1)) # alpha = theta + phi
+
+    for i in range(len(t1)):
+        # Compute theta
+        theta[i]   = find_angles(0, t1[i], vij[i], vik[i])
+
+        if t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]) < 0.8:
+            print( t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]))
+
+        alpha[i]   = find_angles(0, t2[i], vij[i], vik[i])
+
+        if t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]) < 0.8:
+            print( t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]))
+
+        # Compute phi
+        phi[i] = alpha[i] - theta[i]
+        if t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]) < 0.8:
+            print( t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]))
+    
+
+    return theta, phi, alpha
+
+
+    
+
+def solve_torsal(vi, vj, vk, ei, ej, ek) :
+    """ Function to solve the torsal directions analytically
+    Input:
+        vi, vj, vk: vertices
+        vvi, vvj, vvk: second envelope vertices
+    """
 
     # Get edges
     vij = vj - vi 
     vik = vk - vi
 
-    ei = vvi - vi 
-    ej = vvj - vj
-    ek = vvk - vk
-
     eij = ej - ei 
     eik = ek - ei
     
 
-    ec = (vvi + vvj + vvk)/3 - (vi + vj + vk)/3
+    ec = (ei + ej + ek)/3
 
     vijxec = np.cross(vij, ec)
     vikxec = np.cross(vik, ec)
@@ -386,6 +387,9 @@ def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
     a2 = np.zeros(len(vij))
     b1 = np.zeros(len(vij))
 
+    # Valid
+    valid = np.zeros(len(vij))
+
     # indices disc >0 
     idx = np.where(disc >= 0)[0]
 
@@ -398,156 +402,56 @@ def solve_torsal(vi, vj, vk, vvi, vvj, vvk) :
     t2[idx] = (-g1[idx] - np.sqrt(g1[idx]**2 - 4*g0[idx]*g2[idx]))[:, None]*vij[idx] + 2*g0[idx,None]*vik[idx]
 
     # Normalize
-    t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
-    t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
+    t1[idx] = unit(t1[idx])
+    t2[idx] = unit(t2[idx])
 
-    # # indices disc < 0
-    # idx = np.where(disc < 0)[0]
-    # a1[idx] = 1
-    # a2[idx] = ( - vec_dot(vij[idx],vik[idx]) -  vec_dot(vik[idx],vik[idx]) )/( vec_dot(vij[idx],vij[idx]) + vec_dot(vij[idx], vik[idx]))
-    # b1[idx] = 1
+    # Put 1 on valid disc
+    valid[idx] = 1
 
-    # # sol
-    # t1[idx] = a1[idx,None]*vij[idx] + vik[idx]
-    # t2[idx] = a2[idx,None]*vij[idx] + vik[idx]
+    # For disc < 0 we approximate the solution
+    app_idx = np.where(disc < 0)[0]
+    for i in app_idx:
+        a1[i] = approximate_torsal(100, g0[i], g1[i], g2[i])
+        a2[i] = approximate_torsal(-100, g0[i], g1[i], g2[i])
+        b1[i] = 1
 
-    # # Normalize
-    # t1[idx] /= np.linalg.norm(t1[idx], axis=1)[:, None]
-    # t2[idx] /= np.linalg.norm(t2[idx], axis=1)[:, None]
+        t1[i] = unit(a1[i]*vij[i] + b1[i]*vik[i])
 
-    return t1, t2, a1, a2, b1 
+        t2[i] = unit(a2[i]*vij[i] + b1[i]*vik[i])
+
+    return t1, t2, a1, a2, b1, valid
 
 
 def vv_second(vvi, vvj, vvk, f, numV):
+    """ Compute second envelope 
+    """
 
     vv = np.zeros((numV, 3))
+    nv = np.zeros(numV)
 
     for i in range(len(f)):      
-        vv[f[i,0]] = vvi[i]
-        vv[f[i,1]] = vvj[i]
-        vv[f[i,2]] = vvk[i]
+        vv[f[i,0]] += vvi[i]
+        vv[f[i,1]] += vvj[i]
+        vv[f[i,2]] += vvk[i]
+
+        nv[f[i,0]] += 1
+        nv[f[i,1]] += 1
+        nv[f[i,2]] += 1
+    
+    vv /= nv[:, None]
 
     return vv
 
 
-def init_test_data(data):
-    # # Define paths
-    dir_path = os.getcwd()
-    data_path = dir_path+"/approximation/data/" # data path
-
-    # Data of interest
-    k = data
-
-    # Load M mesh (centers of sphere mesh)
-    mv, mf = igl.read_triangle_mesh( os.path.join(data_path ,"centers.obj") ) 
-
-    # Load test mesh
-    tv, tf = igl.read_triangle_mesh(os.path.join(data_path,  "test_remeshed_"+str(k)+".obj"))
-
-    # Create dual mesh
-    tmesh = Mesh()
-    tmesh.make_mesh(tv,tf)
-
-    # Get inner vertices
-    inner_vertices = tmesh.inner_vertices()
-
-    # Get vertex normals for test mesh
-    e_i = igl.per_vertex_normals(tv, tf)
-
-    # Fix normal directions
-    signs = np.sign(np.sum(e_i * ([0,0,1]), axis=1))
-    e_i = e_i * signs[:, None]
-
-    # Compute circumcenters and axis vectors for each triangle
-    p1, p2, p3 = tv[tf[:, 0]], tv[tf[:, 1]], tv[tf[:, 2]]
-
-    ct, _, nt = circle_3pts(p1, p2, p3)
-
-    # Dual topology 
-    dual_tf = tmesh.vertex_ring_faces_list()
-
-    dual_top = tmesh.dual_top()
-
-    # Create hexagonal mesh                            
-    h_pts = np.empty((len(tf), 3), dtype=np.float64)
-    
-    li = np.zeros(len(tf), dtype=np.float64)
-    
-    center = vd.Mesh((mv, mf), alpha = 0.9, c=[0.4, 0.4, 0.81])
-
-    # Intersect circumcircle axis with center mesh
-    for i in range(len(tf)):
-        # Get points on circumcircle axis
-        p0  = ct[i] - 10*nt[i]
-        p1  = ct[i] + 10*nt[i]
-
-        # Get intersection points
-        h_pts[i,:] = np.array(center.intersect_with_line(p0, p1)[0])
-
-        # Set li 
-        li[i] = np.linalg.norm(h_pts[i] - ct[i])
-
-    # Get radius of spheres
-    r = np.linalg.norm(h_pts - tv[tf[:,0]], axis=1)
-
-    return tv, tf, ct, nt, li, inner_vertices, e_i, dual_tf, dual_top, r 
-
-
-def visualize_data(data):
-        # # Define paths
-    dir_path = os.getcwd()
-    data_path = dir_path+"/approximation/data/" # data path
-
-    # Data of interest
-    k = data
-
-    # Load M mesh (centers of sphere mesh)
-    mv, mf = igl.read_triangle_mesh( os.path.join(data_path ,"centers.obj") ) 
-
-    # Load test mesh
-    tv, tf = igl.read_triangle_mesh(os.path.join(data_path,  "test_remeshed_"+str(k)+".obj"))
-
-    # Create dual mesh
-    tmesh = Mesh()
-    tmesh.make_mesh(tv,tf)
-
-    # Get inner vertices
-    inner_vertices = tmesh.inner_vertices()
-
-    # Get vertex normals for test mesh
-    e_i = igl.per_vertex_normals(tv, tf)
-
-    # Fix normal directions
-    signs = np.sign(np.sum(e_i * ([0,0,1]), axis=1))
-    e_i = e_i * signs[:, None]
-
-    # Compute circumcenters and axis vectors for each triangle
-    p1, p2, p3 = tv[tf[:, 0]], tv[tf[:, 1]], tv[tf[:, 2]]
-
-    ct, _, nt = circle_3pts(p1, p2, p3)
-
-    # Dual topology 
-    dual_tf = tmesh.vertex_ring_faces_list()
-
-    # Create hexagonal mesh                            
-    h_pts = np.empty((len(tf), 3), dtype=np.float64)
-    center = vd.Mesh((mv, mf), alpha = 0.9, c=[0.4, 0.4, 0.81])
-
-    ps.init()
-
-    ps.remove_all_structures()
-
-    v_mesh = ps.register_surface_mesh("test", tv, tf)
-
-    c_mesh = ps.register_surface_mesh("centers", mv, mf)
-
-    v_mesh.add_vector_quantity("n_t", nt, defined_on = "faces", enabled=True, length=1.5, color=(0.1, 0.1, 0.1))
-    v_mesh.add_vector_quantity("e", e_i, defined_on = "vertices", enabled=True, length=1.5, color=(0.1, 0.1, 0.1))
-
-    ps.show()
-
 
 def compute_disc(tv, tf, e_i):
+    """ Function to compute the discriminant of the torsal directions
+    Input:
+        tv: vertices
+        tf: faces
+        e_i: edge directions normalized
+    """
+
 
     # # Compute the edge vectors per each face
     vi, vj, vk = tv[tf[:,0]], tv[tf[:,1]], tv[tf[:,2]]
@@ -615,7 +519,13 @@ def unormalize_dir(h_pts, dual, inner_vertices, tv, e_i, rad):
 
     return le
 
-def planarity_check(nt1, t1, tt1, ec):
+def planarity_check(t1, tt1, ec):
+    """ Function to check the planarity of the torsal directions
+    Input:
+        t1: Torsal direction
+        tt1: Second envelope torsal direction
+        ec: Lince congruence joining barycenters of the faces
+    """
 
     t1 = unit(t1)
     tt1 = unit(tt1)
@@ -632,6 +542,12 @@ def planarity_check(nt1, t1, tt1, ec):
     return planar
 
 def compute_torsal_angles(t1, t2, ec):
+    """ Function to compute the torsal angles between two cross fields
+    Input:
+        t1: Torsal direction
+        t2: Second torsal direction
+        ec: Lince congruence joining barycenters of the faces
+    """
 
     # Compute nt1 
     nt1 = np.cross(t1, ec)
@@ -645,3 +561,251 @@ def compute_torsal_angles(t1, t2, ec):
     torsal_angles = np.arccos(np.sum(nt1*nt2, axis=1))
 
     return torsal_angles, nt1, nt2
+
+
+# ====================== Torsal Approximation Functions =================
+
+def find_angles(init, t, vij, vik):
+    # Perform the optimization
+    result = minimize(quadratic_equation_angle, init, args=(t, vij, vik))
+
+
+    return result.x
+
+# Define the quadratic equation to be minimized
+def quadratic_equation_angle(x, t, vij, vik):
+    l = x
+    t_th = np.cos(l)*vij + np.sin(l)*vik
+    return (unit(t)@unit(t_th) - 1)**2
+
+
+def approximate_torsal(init, g0, g1, g2):
+
+    # Perform the optimization
+    result = minimize(objective_function, init, args=(g0, g1, g2))
+
+    return result.x
+
+def fit_sphere_energy(init, pts):
+    c = init[:3]
+    r = init[3]
+    return np.sum((np.linalg.norm(pts - c, axis=1)**2 - r**2)**2)
+
+# Define the quadratic equation to be minimized
+def quadratic_equation(x, g0, g1, g2):
+    l = x
+    return l**2 * g0 + l * g1 + g2
+
+# Function to be minimized
+def objective_function(x, g0, g1, g2):
+    return (quadratic_equation(x, g0, g1, g2))**2
+
+
+def compute_barycenter_coord_proj(v, vv, inner_edges, l, ie_i, ie_j, ie_k, ie_l):
+    # Get vertices
+    vi = v[ie_i]
+    vj = v[ie_j]
+    vk = v[ie_k]
+    vl = v[ie_l]
+
+    # Get envelope 2 vertices
+    vvi = vv[ie_i]
+    vvj = vv[ie_j]
+    vvk = vv[ie_k]
+    vvl = vv[ie_l]
+
+
+    vbi = orth_proj(vi, l)
+    vbj = orth_proj(vj, l)
+    vbk = orth_proj(vk, l)
+    vbl = orth_proj(vl, l)
+
+    vvb_i = orth_proj(vvi, l)
+    vvb_j = orth_proj(vvj, l)
+    vvb_k = orth_proj(vvk, l)
+    vvb_l = orth_proj(vvl, l)
+
+    Diff = 0
+
+    # Compute the barycentric coordinates of the vertices 
+    for i in range(len(inner_edges)):
+        
+        u1, u2, u3 = barycentric_coordinates_app(vbi[i], vbj[i], vbk[i], vbl[i])
+        
+        uu1, uu2, uu3 = barycentric_coordinates_app(vvb_i[i], vvb_j[i], vvb_k[i], vvb_l[i])
+
+        #print(f"u1 : {u1} u2 : {u2} u3 : {u3}\n uu1 : {uu1} uu2 : {uu2} uu3 : {uu3} \n")
+        Diff += np.linalg.norm(np.array([u1, u2, u3]) - np.array([uu1, uu2, uu3]))**2
+
+    print(f"Diff : {Diff}")
+
+def residuals(params, x):
+    # params contains the center coordinates (cx, cy, cz) and the radius (r)
+    cx, cy, cz, r = params
+    # Compute distances from each point to the center of the sphere
+    distances = np.sqrt((x[:, 0] - cx)**2 + (x[:, 1] - cy)**2 + (x[:, 2] - cz)**2)
+    # Compute residuals: differences between distances and the radius
+    return distances - r
+
+  
+def sphere_initialization(v, f, e):
+    """
+    Function to find the best fitting spheres to two envelopes.
+
+    Args:
+        v (numpy.ndarray): Vertices
+        f (numpy.ndarray): Faces
+        e (numpy.ndarray): Line congruence
+    
+    Returns:
+        numpy.ndarray: The midpoint of the closest points between the two envelopes.
+    """
+    
+    # Points in second envelope
+    vv = v + e 
+
+    # Get vi, vj, vk 
+    vi  ,  vj, vk  = v[f[:,0]], v[f[:, 1]], v[f[:, 2]]
+    # Get vvi, vvj, vvk 
+    vvi , vvj, vvk = vv[f[:,0]], vv[f[:, 1]], vv[f[:, 2]]
+
+    # Get circum circles for both envelopes
+    p1,  cr,  v1 = circle_3pts(vi, vj, vk)
+    p2, cr2,  v2 = circle_3pts(vvi, vvj, vvk)
+
+    # Compute intersection of circumcenter axis
+    l = unit(np.cross(v1,v2))  # Normal direction between lines
+
+    # Compute rejection vector bettwen p2-p1
+    rej = (p2-p1) - proj(p2-p1, v1) - proj(p2-p1, l)
+    
+    # Closest point l2 
+    cls2 = p2 - (np.linalg.norm(rej, axis= 1)/vec_dot(p2-p1,v2))[:,None]*v2
+
+    # Closest point to l2
+    cls = cls2 - proj(p2-p1, l)
+
+    mid = 0.5*(cls + cls2)
+
+    return mid
+
+def normalize_vertices(v, factor=1):
+    """ Function set the mesh into the a bounding box.
+    """
+
+    # Get the bounding box
+    min_v = np.min(v, axis=0)
+    max_v = np.max(v, axis=0)
+    
+    # Compute the center
+    size = max_v - min_v
+
+    max_dimension = max(size)
+
+    # Compute scale factors for each dimension
+    scale_factors = factor / max_dimension
+
+    # Translate by the negative of the min_coords
+    translated_vertices = v - min_v
+
+    # Scale vertices to fit into the unit bounding box
+    normalized_vertices = translated_vertices * scale_factors
+
+    return normalized_vertices
+
+
+# def initialize_Line_Congruence(v, f, v_f_adj, n, H ):
+#     """ Function to initialize the line congruence. 
+#     Input:
+#         v: vertices
+#         f: faces
+#         v_f_adj: vertex face adjacency
+#         n: normals
+#         faces_top: topology of faces
+#         H: Mean curvature per vertex
+#     """
+
+#     # Compute central sphere radius
+#     r = 1/H 
+
+#     # Per vertex take centers of mean curvature spheres 
+#     mid = v + r[:,None]*n
+
+#     # Average mean radius per face
+#     r_m = np.mean(1/H[f], axis=1)
+
+#     # # Get circumcircles of the faces
+#     # cc, c_r, c_n = circle_3pts(v[f[:,0]], v[f[:,1]], v[f[:,2]])
+
+#     # # Compute distance from the circumcenter to the center of the sphere
+#     # d = np.sqrt(r_m**2 - c_r**2)
+
+#     # # # Compute the centers of the spheres
+#     # sph_c = cc + d[:,None]*c_n
+    
+#     # # Compute the average of the sphere centers per face
+#     # sph_n = np.zeros((len(v),3))    
+#     # sph_mid = np.zeros((len(v),3))
+#     # for i in range(len(v)):
+#     #     sphi = sph_c[v_f_adj[i]]
+#     #     sphj = sph_c[np.roll(v_f_adj[i], -1)]
+
+
+#     #     sph_mid[i] = np.mean(sph_c[v_f_adj[i]], axis=0)
+
+#     #     sph_n[i] = unit(np.mean( np.cross( unit(sphj - sph_mid[i]), unit(sphi - sph_mid[i])), axis=0))
+
+#     # sph_m_normals = np.zeros((len(v),3))
+#     # for i in range(len(v)):
+#     #     sphi = sph_c[v_f_adj[i]]
+#     #     sphj = sph_c[np.roll(v_f_adj[i], -1)]
+
+#     #     if np.linalg.norm(np.mean(np.cross(sphi - sph_m[i], sphj - sph_m[i]),axis=0)) > 1e-7:
+#     #         sph_m_normals[i] = unit(np.mean(np.cross( unit(sphi - sph_m[i]), unit(sphj - sph_m[i])),axis=0))
+#     #     else:
+#     #         print(f"normal {v}: {unit(np.cross( sphi[0] - sph_m[i], sphj[0] - sph_m[i]))}")
+#     #         sph_m_normals[i] = unit(np.cross( sphi[0] - sph_m[i], sphj[0] - sph_m[i]))
+
+   
+#     # # Compute the normals of midpoint triangles
+#     n_mid = unit(np.cross(mid[f[:,1]] - mid[f[:,0]], mid[f[:,2]] - mid[f[:,0]]))
+
+#     av_n = np.zeros_like(v)
+
+#     print("Redoo the computation of the edge directions by using actual sphere centers")
+  
+#     # Compute the edge directions by averaging the normals of neighboring faces per vertex
+#     for i in range(len(v)):
+#         if len(v_f_adj[i]) <= 3:
+#             av_n[i] = n[i]
+#         else:
+#             av_n[i] = unit(np.sum(n_mid[v_f_adj[i]], axis=0))
+
+#     print(f"av_n : {av_n}")
+
+#     # Face mid 
+    
+    
+#     # Reflect v with respect e_i 
+#     v_ref = mid + (v-mid) - 2*proj((v- mid), av_n)
+
+#     #print(f"v_ref : {v_ref}")
+
+#     # Compute the e  
+#     e = v_ref - v 
+
+#     return e, mid, np.mean(mid[f], axis=1), r_m
+
+
+
+
+    
+
+    
+
+
+
+
+
+
+

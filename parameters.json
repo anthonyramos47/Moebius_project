@@ -1,0 +1,32 @@
+{   
+    "name_mesh" : "Coarse_1_lilium.obj",
+    "weights_Opt" : {
+        "sphericity"   : 0, 
+        "linecong"     : 0, 
+        "torsal"       : 10,
+        "line_fair"    : 0.0001,
+        "smoothness"   : 0,
+        "torsal_fair"  : 10,
+        "torsal_angle" : 10
+           },
+    "iterations" : 250,
+    
+    
+    "show" : true,
+    "targe_t_angle": 60,
+    "analytical_torsal" : false,
+    "show_spheres" : false, 
+    "show_plane": true,
+    "edge": 751,
+    "offset": 5,
+    "out_name": "lilium_TF",
+    "exp_dir": "/Users/cisneras/hanan/hananLab/hanan/approximation/experiments/lilium/",
+    
+
+    "iterations_QR": 200,
+    "weights_QR" : 
+        {"mesh_fairnes" : 1,
+          "closeness" : 0.4
+           }
+  }
+  

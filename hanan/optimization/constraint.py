@@ -8,6 +8,7 @@ from scipy.sparse import csc_matrix
 
 class Constraint():
     def __init__(self) -> None:
+        self.name = None # Name of the constraint
         self.w = 1 # Weight
         self.J = None # Jacobian matrix
         self.J0 = None # Constant Jacobian
@@ -15,26 +16,50 @@ class Constraint():
         self.j = [] # Column index
         self.values = [] # Values
         self.r = None # Residual vector
-        self.const = None # Num Constraints
+        self.const = 0 # Num Constraints
         self.var = None # Num Variables
-        self.var_idx = None # Dic to store the index of the variables
-        self.const_idx = None # Dic to store the index of the constraints
+        self.const_idx = {} # Dic to store the index of the constraints
 
-    def initialize_constraint(self) -> None:
-        """
-        Method to initialize the all initial data for the constraint
+    def initialize_constraint(self, X, var_indices, *args) -> None:
+        """ Method to initialize the constraint
+            Input:
+                X: Variables
+                var_indices: Indices of the variables
+                args: Arguments of the constraint
         """
         pass
 
-    def _compute(self, X) -> None:
+    def add_constraint(self, name, dim):
+        """ Method to add a constraint
+            Input:
+                name: Name of the constraint
+                dim: Dimension of the constraint
+        """
+        self.const_idx[name] = np.arange(self.const, self.const + dim)
+        self.const += dim
+
+    def _initialize_constraint(self, X, var_indices, *args) -> None:
+        """
+        Method to initialize the all initial data for the constraint
+        """
+
+        # Initialization function
+        self.initialize_constraint(X, var_indices, *args)
+    
+        # Get the number of variables
+        self.var = len(X)
+        
+
+
+    def _compute(self, X, var_idx) -> None:
         """
         Method to compute the residual and the Jacobian
         """
-        self.reset()
+        self.reset()    
 
-        self.compute(X)
+        self.compute(X, var_idx)
 
-        self.J = csc_matrix((self.values, (self.i, self.j)), shape=(self.const, self.var))
+        self.J = csc_matrix((np.array(self.values), (self.i, self.j)), shape=(self.const, self.var))
         pass
 
     def compute(self, X) -> None:
@@ -94,7 +119,7 @@ class Constraint():
         """
         self.w = w
 
-    def uncurry_X(self, X, *v_idx):
+    def uncurry_X(self, X, var_idx, *v_idx):
         """ Function to uncurry the variables
             Input:
                 X: Variables
@@ -102,16 +127,15 @@ class Constraint():
         """
 
         if len(v_idx) == 1:
-            return X[self.var_idx[v_idx[0]]]
+            return X[var_idx[v_idx[0]]]
         else:
-            return [X[self.var_idx[k]] for k in v_idx]
+            return [X[var_idx[k]] for k in v_idx]
         
     def set_X(self, X, var, values):
 
         X[self.var_idx[var]] = values
 
-        
-
+    
     def reset(self):
         """ Function to clear the Jacobian
         """

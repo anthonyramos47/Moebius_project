@@ -6,8 +6,11 @@
     The mesh data structure is used to represent the geometry of a 3D object.
 
     The mesh data is stored in half-edge data structure in a matrix form.
-    Half-Edge r-th row : | Origin | Twin | Face | Next | Previous | Edge |
-                             0        1     2      3       4          5
+    Half-Edge r-th row   :  | Origin | Twin | Face | Next | Previous | Edge |
+                                0        1     2      3       4          5
+                                 
+    PrevHalf-Edge r-th row: | Origin | Face | Next | Prev |  Twin    | Edge |
+                                0        1     2      3       4          5
 
     The code is based on the code implemented by Davide Pellis. 
 
@@ -18,6 +21,8 @@ import numpy as np
 import copy
 import scipy as sp
 from scipy.sparse import coo_matrix
+from igl import per_vertex_normals
+from geometry.utils import vec_dot, unit
 
 class Mesh():
 
@@ -40,6 +45,9 @@ class Mesh():
 
         # Boundary Half-Edges
         self._boundaryhalfedges = None
+
+        # Vertex Normals
+        self._vertex_normals = None
 
 
     # Properties: ------------------------------------------------------------------
@@ -90,6 +98,19 @@ class Mesh():
         self.halfedges = halfedges
         self.update_dimensions()
 
+    @property
+    def vertex_normals(self):
+        return self._vertex_normals
+
+    @vertex_normals.setter
+    def vertex_normals(self, normals):
+        normals = np.asarray(normals, dtype=np.float64)
+        # Assert that normals are 3D 
+        assert normals.ndim == 2, "normals must be an array of shape (n,3)"
+        assert normals.shape[1] == 3, "normals must be an array of shape (n,3)"
+        
+        # Set the normals
+        self._vertex_normals = normals
 
     # Updates Functions: ------------------------------------------------------------------ 
 
@@ -435,6 +456,22 @@ class Mesh():
             adjacency[vs[i]].append(vd[i])
 
         return adjacency
+    
+
+    def vertex_ring_vertices_iterators(self, sort=False, order=False):
+        H = self.halfedges
+        v  = H[:,0]
+        vj = H[H[:,1],0]
+        if order:
+            i  = self.vertex_ring_ordered_halfedges()
+            v  = v[i]
+            vj = vj[i]
+        elif sort:
+            i  = np.argsort(v)
+            v  = v[i]
+            vj = vj[i]
+        else:
+            return v, vj
 
     def vertex_face_adjacency_list(self):
         """
@@ -489,6 +526,22 @@ class Mesh():
 
         return adjacency
 
+
+    def vertex_multiple_ring_vertices(self, vertex_index, depth=1):
+        vi, vj = self.vertex_ring_vertices_iterators()
+        ring = np.array([], dtype='i')
+        search = np.array([vertex_index], dtype='i')
+        for i in range(int(depth)):
+            vring = np.array([], dtype='i')
+            for v in search:
+                vring = np.hstack((vj[vi == v], vring))
+            vring = np.unique(vring)
+            vring = vring[np.invert(np.in1d(vring, ring))]
+            search = vring
+            ring = np.hstack((ring, vring))
+            if len(ring) == self.V:
+                return ring
+        return np.unique(ring)
         
     # Boundary and interior functions ----------------------------------------------------------
 
@@ -661,19 +714,45 @@ class Mesh():
         v2 = v[1::2]
         return v1, v2
     
+    def edge_oposite_vertices(self):
+        """ Returns the oposite vertices of each edge
+        """
+
+        # Get halfedges
+        H  = self.halfedges
+        v  = H[np.argsort(H[:,5]),0]
+
+        opv =  H[H[H[np.argsort(H[:,5]),3], 3], 0]
+
+        # Get oposite vertices
+        # Even indices
+        ov1 = opv[0::2]
+        # Odd indices
+        ov2 = opv[1::2]
+        return ov1, ov2
+    
     def inner_edges(self):
         """ Function to get inner edges
         """
+    # Half-Edge r-th row   :  | Origin | Twin | Face | Next | Previous | Edge |
+    #                             0        1     2      3       4          5               
+    # PrevHalf-Edge r-th row: | Origin | Face | Next | Prev |  Twin    | Edge |
+    #                             0        1     2      3       4          5    
+
         # Get halfedges
         H = self.halfedges
+
         # Get boundary halfedges
-        h = np.where(H[:,1] != -1)[0]
+        h = H[np.where(H[:, 2] == -1)[0], 5] 
 
         # Get the edges 
-        e = H[h,5]
+        e = H[:, 5]
 
         # Get the unique edges
         e = np.unique(e)
+
+        # Delete boundary edges
+        e = np.delete(e, h)
 
         return e
 
@@ -720,3 +799,157 @@ class Mesh():
             if len(uv_list) > 0:
                 self._uv = np.array(uv_list)
         self.make_mesh(vertices_list, faces_list)
+
+
+
+
+# ------------------------- Jet Fitting ---------------------------------------
+
+    # def localCoord(self, vertex, normal, neighbors)->list:
+    #     """
+    #     Function to define a local coordinate system in each vertex
+    #     Input:
+    #         vertex.- vertex to define the center of the local coordinate system
+    #         normal.- normal of the vertex
+    #         neighbors.- list of the neighbors of the vertex
+    #     Output:
+    #         vertices.- List of coordinate vertices in the new basis
+    #         A.- Transformation matrix
+    #     """
+
+    #     # Neighbor vertex
+    #     v1 = neighbors[1]
+
+    #     # Define vx direction locally, with the one of the neighbors
+    #     vx = v1 - vertex
+
+    #     #print(n@n)
+    #     # Projection onto the tangent plane
+    #     vx = vx - (vx@normal)*normal
+    #     vx = vx/np.linalg.norm(vx)
+        
+        
+    #     # Define y direction locally
+    #     vy = np.cross(vx, normal) 
+
+    #     # Define transformation matrix to new basis
+    #     A = np.array([vx,vy,normal])
+
+    #     vertices = np.vstack((vertex, neighbors))
+        
+    #     # Translation
+    #     vertices = vertices - vertex
+            
+    #     # New basis 
+    #     vertices = (A@vertices.T).T
+
+    #     return vertices, A
+
+    # def jet_fit(self, vertices):
+    #     """
+    #     Function to get a paraboloid fitting of the surfaces at a vertex
+    #     z = a0 + a1 x + a2 y + a3 x y + a4 x^2 + a5 y^2
+    #     """
+        
+    #     n = len(vertices)
+    #     xi = vertices[:,0]
+    #     yi = vertices[:,1]
+    #     zi = vertices[:,2]
+
+    #     # Factors of the matrix A
+    #     fac = np.array([ np.ones((n,)) , xi, yi, xi*yi, xi*xi, yi*yi ] )
+        
+    #     # Initialize the matrix A
+    #     A = fac@fac.T
+        
+    #     b = np.array(list(map(lambda x : zi@x, fac ))) 
+        
+    #     # Solve the system (a0, a1, a2, a3, a4, a5)
+    #     sol = np.linalg.solve(A, b)
+
+        
+    #     return sol 
+        
+    # def compute_curvature_from_jet_fit(self, coeff_par, A):
+    #     """
+    #     Function to compute the curvature of a paraboloid of the form
+    #     z = a0 + a1 x + a2 y + a3 x y + a4 x^2 + a5 y^2.
+    #     at x, y = 0, 0
+    #     Input:
+    #         coeff_par.- Coefficients of the paraboloid [a0,a1,a2,a3,a4,a5]
+    #         A.- Transformation matrix
+    #     Return:
+    #         k1, k2, K, H,- principal curvatures (k1, k2), Gaussian, Mean Curvatures
+    #     """
+
+            
+    #     _, a1, a2, a3, a4, a5 = coeff_par
+    #     #a1, a2, a3, a4, a5 = coeff_par
+
+        
+    #     # Gaussian curvature
+    #     K = (4*a4*a5 - a3*a3)/((1+a1*a1 + a2*a2)*(1+a1*a1 + a2*a2))
+
+    #     # Factor of the quadratic equation 
+    #     b = -a1*a2*a3 + a4 + a2 ** 2*a4 + a5 + a1 ** 2*a5
+    #     # Discriminant of the quadratic equation
+    #     Delta = np.sqrt ((b)**2 + (1 + a1 ** 2 + a2 ** 2)*(a3 ** 2 - 4*a4*a5))
+    #     # Denominator
+    #     denom = (1 + a1 ** 2 + a2 ** 2)**(3/2)
+
+    #     # Principal Curvatures
+    #     k1 = (b - Delta)/denom
+    #     k2 = (b + Delta)/denom
+
+    #     # Mean Curvature
+    #     num = (a3 + a2*a2*a3 - a1*a2*a4 + a5 + a1*a1*a5)        
+    #     H  = num/denom 
+
+    #     # normal 
+    #     n = np.linalg.inv(A)@np.array([-a1, -a2, 1])
+
+    #     n = n/np.linalg.norm(n)
+
+    #     return n, k1, k2, K, H
+
+
+    # def curvatures(self, depth=1):
+    #     """ Function that compute principal curvatures and principal directions 
+    #     using the jet fitting method. 
+    #     Input:
+    #         depth: Depth of neighborhood rings to be considered
+    #     """
+    #     vertices = self.vertices # Vertices
+    #     normals = self.vertex_normals # Vertex normals
+
+    #     new_normals = np.zeros(normals.shape)
+    #     principal_k1 = np.zeros(self.V)
+    #     principal_k2 = np.zeros(self.V)
+    #     curvatures_K = np.zeros(self.V)
+    #     curvatures_H = np.zeros(self.V)
+
+    #     # Get neighbors
+    #     for vi in range(self.V):
+    #         neighbors = self.vertex_multiple_ring_vertices(vi, depth=depth)
+
+    #         neighbors = np.delete(neighbors, np.where(neighbors == vi))
+
+    #         # Get the vertices for the Jet fit
+    #         vertices_fit, A = self.localCoord(vertices[vi], normals[vi], vertices[neighbors])
+
+    #         # Get the parameters of the paraboloid
+    #         params_fit = self.jet_fit(vertices_fit)
+
+    #         # Jet fit
+    #         n, k1, k2, K, H = self.compute_curvature_from_jet_fit(params_fit, A)
+
+    #         # Modify the vertex normal
+    #         new_normals[vi] = n
+
+    #         # Store the principal curvatures
+    #         principal_k1[vi] = k1
+    #         principal_k2[vi] = k2
+    #         curvatures_K[vi] = K
+    #         curvatures_H[vi] = H
+
+    #     return principal_k1, principal_k2, curvatures_K, curvatures_H, new_normals
