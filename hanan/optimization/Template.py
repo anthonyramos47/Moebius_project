@@ -1,7 +1,11 @@
-# Planarity constraint implementation
-import numpy as np
+# Template constraint
+
+# Call parent class
 from hanan.optimization.constraint import Constraint
 
+# Import any other library that you need ...
+# Example:
+# import numpy as np
 
 class Template(Constraint):
 
