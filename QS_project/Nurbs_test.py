@@ -38,7 +38,7 @@ control_points = [[0, 0, 0], [0, 4, 0], [0, 8, -3],
 surf.set_ctrlpts(control_points, 4, 3)
 
 # Set knot vectors
-surf.knotvector_u = [0, 0, 0, 0, 1, 1, 1, 1]
+surf.knotvector_u = [0, 0, 0, 0, 3, 3, 3, 3]
 surf.knotvector_v = [0, 0, 0, 1, 1, 1]
 
 # Set evaluation delta (control the number of surface points)

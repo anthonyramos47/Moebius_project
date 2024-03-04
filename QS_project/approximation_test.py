@@ -18,9 +18,8 @@ import igl
 import polyscope as ps
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import BSpline, bisplev, bisplrep
-
-
+import splipy as sp
+import json
 # Import the necessary classes and functions from the hananLab/hanan directory
 
 # Geometry classes
@@ -37,66 +36,125 @@ dir_path = os.getcwd()
 print(dir_path)
 
 
-# Create a Bspline
-# Define control points for the B-spline surface
-data_points = np.array([[0, 0, 0], [1, 0, 0], [2, 0, 0],
-                        [0, 1, 1], [1, 1, 2], [2, 1, -1],
-                        [0, 2, 0], [1, 2, 0], [2, 2, 0]])
+# Open and read the JSON file
+with open('/Users/cisneras/hanan/hananLab/QS_project/Surfjson.json', 'r') as file:
+    data = json.load(file)
 
-# Create a B-spline surface representation
-kx, ky = 2, 2  # Degree of the B-spline in u and v directions
-s = 0.0  # Smoothing factor (0 for interpolation, higher values for smoother surfaces)
+# degree_u = data["degreeU"] + 1
+# degree_v = data["degreeV"] + 1
 
-# Compute the B-spline representation
-bsp1, _, _, _ = bisplrep(data_points[:, 0], data_points[:, 1], data_points[:, 2], kx=kx, ky=ky, s=s, full_output=True)
+# knots_u = data["knotsU"]
+# knots_v = data["knotsV"]
 
-bsp2 = bsp1.copy()
-bsp2[2] = bsp2[2] + 4
+# # Fix knots
+# knots_u = [knots_u[0]] + knots_u + [knots_u[-1]]
+# knots_v = [knots_v[0]] + knots_v + [knots_v[-1]]
+
+# # normalized knots
+# knots_u = np.array(knots_u) / knots_u[-1]
+# knots_v = np.array(knots_v) / knots_v[-1]
+# control_points = np.array(data["controlPoints"]).reshape(degree_u*degree_v,4)
+# control_points = control_points[:,:3]
 
 
-# Define the grid intervals
-grid_intervals = [[0, 2], [0, 2]]
-grid_size = [100, 100]
+#Small test
+degree_u = 3
+degree_v = 4
 
-# Initialize Optimizer
+knots_u = [0, 0, 0, 1, 1, 1]
+knots_v = [0, 0, 0, 0, 1, 1, 1, 1]
+
+# Generate set up 12 control points
+control_points = [  [0, 0, 0], [0, 4, 0], [0, 8, -3],
+                    [2, 0, 6], [2, 4, 0], [2, 8, 0],
+                    [4, 0, 0], [4, 4, 0], [4, 8, 3],
+                    [6, 0, 0], [6, 4, -3], [6, 8, 0]
+                ]
+
+
+basis_u = sp.BSplineBasis(degree_u, knots_u)   # quadratic basis: 3 functions in the u-direction
+basis_v = sp.BSplineBasis(degree_v, knots_v) # 4 quadratic functions in the v-direction
+
+control_points = np.array(control_points)
+
+control_points2 = 2*np.array(control_points) + np.random.rand(3)*10
+
+surface2 = sp.Surface(basis_u, basis_v, control_points2)
+
+surface = sp.Surface(basis_u, basis_v, control_points)
+
+sample = 60
+
+u = np.linspace(basis_u.start(), basis_u.end(), sample) # 31 uniformly spaced evaluation points in u (domain (0,1))
+v = np.linspace(basis_v.start(), basis_v.end(), sample) # 41 uniformly spaced evaluation points in u (domain (0,2))
+x = surface(u, v)
+
+
+x2 = surface2(u, v)
+
 opt = Optimizer()
+# optimization
+opt.add_variable("cp", len(control_points.flatten())) # Sphere center
 
-# Add viariables
-opt.add_variable("cp", len(bsp2[2]) )
 
-# Initialize optimizer
-opt.initialize_optimizer("LM", 0.8, 1)
+# Initialize Optimizer ("Method", step, verbosity)
+opt.initialize_optimizer("LM", 0.5, 1)
 
-# Add contraint
+
+sf1 = {
+    "basis_u": basis_u,
+    "basis_v": basis_v,
+    "control_points": control_points
+}
+
+sf2 = {
+    "basis_u": basis_u,
+    "basis_v": basis_v,
+    "control_points": control_points2
+}
+
+
+# Add the constraint to the optimizer
+# Example:
 bs_approx = BS_approx()
-opt.add_constraint(bs_approx, args=(grid_intervals, grid_size, bsp1, bsp2))
+# add_constraint(name, args, weight)
+opt.add_constraint(bs_approx, args=(sf1, sf2, 10, 10), w=1.0)
 
-# Optimize
-for i in range(10):
-    opt.get_gradients()
-    opt.optimize()
+# Optimize loop
+for i in range(100):
+    # Get gradients
+    opt.get_gradients() # Compute J and residuals
+    opt.optimize() # Solve linear system and update variables
 
+# Print in command line the energy per constraint and best energy
 opt.get_energy_per_constraint()
 
+cp2 = opt.X.reshape(len(control_points2),3)
+surface3 = sp.Surface(basis_u, basis_v, cp2)
+x3 = surface3(u, v)
 
-u_vals = bs_approx.u_pts
-v_vals = bs_approx.v_pts
 
 
-surface_points = bisplev(u_vals[:,0], v_vals[0,:], bsp1)
-
-bsp2[2] = opt.X[opt.var_idx["cp"]]
-surface_points2 = bisplev(u_vals[:,0], v_vals[0,:], bsp2)
-
-# Plot the B-spline surface
+# first we set up our 3D plotting environment
+from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.scatter(data_points[:, 0], data_points[:, 1], data_points[:, 2], c='r', marker='o', label='Control Points')
+# plot the (x,y,z)-coordinates of the surface (computed above)
+ax.plot_surface(x[:,:,0], x[:,:,1], x[:,:,2])
+ax.plot_surface(x2[:,:,0], x2[:,:,1], x2[:,:,2])
+#ax.plot_surface(x3[:,:,0], x3[:,:,1], x3[:,:,2])
 
-ax.plot_surface(u_vals, v_vals, surface_points, cmap='viridis', alpha=0.8)
-ax.plot_surface(u_vals, v_vals, surface_points2, alpha=0.8)
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-ax.legend()
+ax.scatter(control_points[:,0], control_points[:,1], control_points[:,2], color='r') # plot the control net
+ax.scatter(control_points2[:,0], control_points2[:,1], control_points2[:,2], color='g') # plot the control net
+#ax.scatter(cp2[:,0], cp2[:,1], cp2[:,2], color='b') # plot the control net
+# aspect ratio is 1:1:1
+
+min_x = np.min(control_points, axis=0)
+max_x = np.max(control_points, axis=0)
+scale = max(max_x - min_x)
+ax.set_box_aspect((max_x-min_x)/scale)
+
+# show the plot
 plt.show()
+
+

@@ -14,19 +14,21 @@ sys.path.append(path)
 print(path)
 
 # Import the necessary libraries for visualization and computation
+# Import the necessary libraries for visualization and computation
 import igl
 import polyscope as ps
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap, Normalize
-from scipy.interpolate import BSpline, bisplev, bisplrep
-
+import splipy as sp
+import json
+from scipy.interpolate import bisplev
 
 # Import the necessary classes and functions from the hananLab/hanan directory
 
 # Geometry classes
 from geometry.mesh import Mesh
 from geometry.utils import *
+from geometry.bsplines_functions import *
 
 # Optimization classes
 from energies.BS_approx import BS_approx
@@ -37,105 +39,111 @@ from optimization.Optimizer import Optimizer
 dir_path = os.getcwd()
 print(dir_path)
 
+# Define Bsplines Surface directory
+surface_dir = os.path.join(dir_path, "data", "Bsplines_Surfaces")
 
-# def f(u,v):
-
-#     lam = 2
-#     # Parametric equations for the surface
-#     x = u
-#     y = v
-#     z = 0.5 * lam * u - 0.5 * np.arctan(lam * v)
-
-#     return [x, y, z]
+print("surface dir:", surface_dir)
+# Name surface file
+bspline_surf_name = "Test_Mesh"
 
 
-# # Create a Bspline
-# # Define control points for the B-spline surface
-# data_points = np.array([f(u, v) for u in np.linspace(-5, 5, 20) for v in np.linspace(-5, 5, 20)])
+# Define the path to the B-spline surface
+bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
+print("bspline_surf_path:", bspline_surf_path)
 
-v, _ = igl.read_triangle_mesh("/Users/cisneras/hanan/hananLab/QS_project/data/Roof.obj")
+# Sample in each direction
+sample = 60 
 
-data_points = v
+# Load the B-spline surface
+control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
 
-fstd = 1.4
-min_x, max_x = np.mean(data_points[:,0]) - fstd*np.std(data_points[:,0]), np.mean(data_points[:,0]) + fstd*np.std(data_points[:,0])
-min_y, max_y = np.mean(data_points[:,1]) - fstd*np.std(data_points[:,1]), np.mean(data_points[:,1]) + fstd*np.std(data_points[:,1])
+# Create the B-splines basis
+basis_u = sp.BSplineBasis(order_u, knots_u) 
+basis_v = sp.BSplineBasis(order_v, knots_v) 
 
-# Create a B-spline surface representation
-kx, ky = 5, 5 # Degree of the B-spline in u and v directions
-s = 1.0  # Smoothing factor (0 for interpolation, higher values for smoother surfaces)
+# Create the B-spline surface
+bsp1 = sp.Surface(basis_u, basis_v, control_points)
 
-# Compute the B-spline representation
-bsp1, _, _, _ = bisplrep(data_points[:, 0], data_points[:, 1], data_points[:, 2], kx=kx, ky=ky, s=s, full_output=True)
-
-
-# Create the grid
-u_int = np.linspace(min_x , max_x, 20)
-v_int = np.linspace(min_y , max_y, 20)
-u_vals, v_vals = np.meshgrid(u_int, v_int, indexing='ij')
-
-surface_points = bisplev(u_vals[:,0], v_vals[0,:], bsp1)
-
-# Compute Mean Curvature
-GK, H = curvatures(bsp1, u_vals, v_vals)
-
-# Get shape of the grid
-m, n = u_vals.shape[0], v_vals.shape[1]
-
-# Central sphere radius
-c_bsp = GK
-
-# Fit a B-spline to the central spheres 
-kx, ky = 5, 5  # Degree of the B-spline in u and v directions
-s = 2.0  # Smoothing factor (0 for interpolation, higher values for smoother surfaces)
-
-# Compute the B-spline representation
-bsp2, _, _, _ = bisplrep(u_vals.flatten(), v_vals.flatten(), c_bsp, kx=kx, ky=ky, s=s, full_output=True)
+# Sample the grid points to evaluate the B-spline surface
+u_vals, v_vals = sample_grid(sample, sample)
 
 # Evaluate the B-spline surface
-c_bsp = bisplev(u_vals[:,0], v_vals[0,:], bsp2)
-#c_bsp = np.random.rand(m, n)
+eval_surf = bsp1(u_vals, v_vals)
+
+print("eval_surf:", eval_surf.shape)
+
+# Compute the curvature
+K, H, _ = curvatures_par(bsp1, u_vals, v_vals)
 
 
-cmap = plt.cm.RdBu # You can choose any existing colormap as a starting point
-norm = Normalize(vmin=c_bsp.min(), vmax=c_bsp.max())
+# Init figure
+fig     = plt.figure()
+surface_ax = fig.add_subplot(1,1,1, projection='3d') 
+#central_ax = fig.add_subplot(1,2,2, projection='3d')
+
+# Compute central spheres centers and radius
+c_z, r_z = central_spheres(bsp1, u_vals, v_vals)
 
 
-# Set the limits of the scalar values
-vmin = c_bsp.min()
-vmax = c_bsp.max()
+
+# Create r(u,v)  Bspline surface
+r_uv = r_uv_fitting(u_vals, v_vals, r_z)
+
+# Get grid points
+u_pts, v_pts = np.meshgrid(u_vals, v_vals, indexing='ij')
+
+r_uv_surf = bisplev(u_vals, v_vals, r_uv)
+
+X_ruv = np.stack((u_pts, v_pts, r_uv_surf), axis=2)
+
+nu, nv = normal_derivatives_uv(bsp1, u_vals, v_vals)
+
+cu, cv = sphere_congruence_derivatives(bsp1, r_uv, u_vals, v_vals)
 
 
-print("Cuvatures ", max(GK), min(GK))
-print("c_bsp", np.max(c_bsp))
-print("vmin", vmin)
-print("vmax", vmax)
-print("av ", c_bsp.mean())
+# Line congruence of offset surfaces
+cof, rof = offset_spheres(bsp1, u_vals, v_vals, 5)
 
-# Plot the B-spline surface
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-#ax.scatter(data_points[:, 0], data_points[:, 1], data_points[:, 2], c='r', marker='o', label='Control Points')
+# Fit rof to a B-spline surface
+r_uv_of = r_uv_fitting(u_vals, v_vals, rof)
 
-surf = ax.plot_surface(u_vals, v_vals, surface_points, cmap =plt.cm.plasma,  facecolors=cmap(norm(c_bsp)), alpha=0.8, vmin=vmin, vmax=vmax)
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-ax.legend()
-
-xmin, xmax = np.min(u_vals), np.max(u_vals)
-ymin, ymax = np.min(v_vals), np.max(v_vals)
-zmin, zmax = np.min(surface_points), np.max(surface_points)
-
-# Fix box aspect
-ax.set_box_aspect([xmax-xmin,ymax - ymin, zmax- zmin]/np.max([xmax-xmin, ymax-ymin, zmax-zmin]))
-ax.set_title('B-spline surface')
+l_uv = line_congruence_uv(bsp1, r_uv_of, u_vals, v_vals)
 
 
-# Add colorbar for reference
-mappable = plt.cm.ScalarMappable(cmap=cmap)
-mappable.set_array(c_bsp)
-colorbar = plt.colorbar(mappable, ax=ax, orientation='vertical', shrink=0.6)
-colorbar.set_label('Scalar Values')
+eval_surf_flat = eval_surf.reshape(-1,3)
+l_uv_flat = l_uv.reshape(-1,3)
+
+print(np.linalg.norm(l_uv_flat, axis=1))
+
+# Offset surface
+s_n = bsp1.normal(u_vals, v_vals)
+offset_surf = eval_surf - 5*s_n
+
+
+for _ in range(100):
+    
+    id = np.random.randint(0, len(l_uv_flat))
+
+    l = l_uv_flat[id]
+    p1 = eval_surf_flat[id]
+    p2 = -5*l
+
+    #sph_x, sph_y, sph_z = drawSphere(c_z_flat[id][0], c_z_flat[id][1], c_z_flat[id][2],  abs(r_z_flat[id]))
+    #    surface_ax.plot_surface(sph_x, sph_y, sph_z, color='r', alpha=0.3)
+    surface_ax.quiver(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], color='black')
+
+# surface_ax.scatter(X_ruv[:,:,0], X_ruv[:,:,1], r_z, color='r')
+# plot_surface(surface_ax, X_ruv, None, "R(u,v) Surface")
+plot_surface(surface_ax, eval_surf, control_points, "B-spline Surface")
+plot_surface(surface_ax, offset_surf, None, "B-spline Surface Offset")
+
+
+
+
+# # plot_surface(surface_ax, c_z, None, "Central Surface")
 
 plt.show()
+
+# plot_scalar_value(eval_surf, control_points, H, "Mean")
+
+#plot_scalar_value(eval_surf, control_points, K, "Gaussian")
