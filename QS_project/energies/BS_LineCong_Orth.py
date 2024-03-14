@@ -12,15 +12,15 @@ class BS_LC(Constraint):
     def __init__(self) -> None:
         """ Template constraint
         Energy that minimize the angle between the line congruence l(u,v) and the surface normal n(u,v)
-        Energy :  \sum_{pij \in Grid} || (l.n)^2/l^2 - cos(alpha)^2 - u^2 ||^2
+        Energy :  \sum_{pij \in Grid} || (l.n)^2 - cos(alpha)^2 - u^2 ||^2 
         where, 
-            l(u,v) .- Line congruence
+            l(u,v) .- Line congruence normalized
             n(u,v) .- Surface normal
             alpha .- Angle threshold between the line congruence and the surface normal
             u .- dummy variable
         """
         super().__init__()
-        self.name = "BS_approx" # Name of the constraint
+        self.name = "BS_LC" # Name of the constraint
         self.nu = None # Normals derivative u dir evaluated at grid points
         self.nv = None # Normals derivative v dir evaluated at grid points
         self.su = None # Surface derivative u dir evaluated at grid points
@@ -52,37 +52,24 @@ class BS_LC(Constraint):
         # Get surface derivatives
         self.su = bs1.derivative(self.u_pts, self.v_pts, d=(1,0))
         self.sv = bs1.derivative(self.u_pts, self.v_pts, d=(0,1))
-
+        
+        # Compute normal
         self.n = bs1.normal(self.u_pts, self.v_pts)
 
+        # Set the B-spline surface r(u,v)
         self.r_bs = r_bsp
 
         # Get normal derivatives
         self.nu, self.nv = normal_derivatives_uv(bs1, self.u_pts, self.v_pts)
 
-        # Get mid mesh derivatives
-        cu, cv = sphere_congruence_derivatives(bs1, self.r_bs, self.u_pts, self.v_pts)
-
         # Compute derivatives of the line congruence with respect to the control points [a0, a1, a2 ... an]
         cp_len = len(self.r_bs[2])
-
-
-        # # Define rows and columns of the J 
-        # rows = np.tile(np.arange(len(self.u_pts)*len(self.v_pts)), cp_len)
-        # cols = var_idx["rij"].repeat(len(self.u_pts)*len(self.v_pts))
-
-        # #rows = np.hstack( (rows, np.arange(len(self.u_pts)*len(self.v_pts))) ) 
-        # #cols = np.hstack( (cols, var_idx["mu"]) )
-        # self.define_rows_cols_J(rows, cols)
-
-    
 
         # Auxiliar identity matrix
         d_a = np.eye(cp_len)
 
         # Auxiliar b-spline surface to compute the derivatives
         cp_da = self.r_bs.copy()
-
 
         self.d_a_cu = np.zeros((cp_len, len(self.u_pts), len(self.v_pts), 3))
         self.d_a_cv = np.zeros((cp_len, len(self.u_pts), len(self.v_pts), 3))
@@ -92,6 +79,7 @@ class BS_LC(Constraint):
 
             # Get cooresponding a_i derivative
             d_cp = d_a[i]
+
             # Modify control points
             cp_da[2] = d_cp
 
@@ -103,20 +91,14 @@ class BS_LC(Constraint):
             self.d_a_cu[i] = da_ru[:,:,None]*self.n + da_r_bs[:,:,None]*self.nu
             self.d_a_cv[i] = da_rv[:,:,None]*self.n + da_r_bs[:,:,None]*self.nv
 
-
         # Set angle threshold
         self.cos_alpha = np.cos(angle)**2
-
-        # Initial variables are the control points
-        #X[var_idx["rij"]] = self.r_bs[2]
 
         # Add contraints
         self.add_constraint("orth", len(self.u_pts)*len(self.v_pts))
 
-        # Compute l_norm
-        self.l_norm = np.linalg.norm(self.l_uv(self.r_bs[2])[0], axis=2)
 
-    def l_uv(self, cp):
+    def d_c_uv(self, cp):
         """ Compute the line congruence l(u,v)
             Output:
                 l(u,v) : Line congruence
@@ -135,10 +117,7 @@ class BS_LC(Constraint):
         cu = self.su + ru[:,:,None]*self.n + r_uv[:,:,None]*self.nu
         cv = self.sv + rv[:,:,None]*self.n + r_uv[:,:,None]*self.nv
 
-        # Compute the line congruence
-        l = np.cross(cu, cv)
-
-        return l, cu, cv
+        return cu, cv
 
 
     def compute(self, X, var_idx) -> None:
@@ -150,20 +129,15 @@ class BS_LC(Constraint):
         """
         
         # Get new control points
-        cp = self.uncurry_X(X, var_idx, "rij")
+        cp, l = self.uncurry_X(X, var_idx, "rij", "l")
         
 
         # Compute the line congruence
-        l, cu, cv = self.l_uv(cp)
-
-        # Init values
-        values = []
+        cu, cv = self.l_uv(cp)
 
         # Prod l.n 
         l_n = np.sum(l*self.n, axis=2)
 
-        # Auxiliar b-spline surface to compute the derivatives
-        cp_da = self.r_bs.copy()
 
         # Compute the values of the J 
         for i in range(len(cp)):
@@ -177,14 +151,15 @@ class BS_LC(Constraint):
 
             d_ln = 2*l_n*d_l
 
-            self.add_derivatives(self.const_idx["orth"], var_idx["rij"][i].repeat(len(self.const_idx["orth"],)), d_ln.flatten())
+         
+            self.add_derivatives(self.const_idx["orth"], var_idx["rij"][i].repeat(len(self.const_idx["orth"])), d_ln.flatten())
 
         #values.extend(2*u)
         
 
         # Compute the residual
         #r = ((l_n**2/(self.l_norm**2)).flatten() - self.cos_alpha - u**2)
-        r = ((l_n**2/(self.l_norm**2)).flatten() - 1)
+        r = ((l_n**2/(self.l_norm**2)) - 1).flatten()
         
         self.set_r(self.const_idx["orth"], r)
 
