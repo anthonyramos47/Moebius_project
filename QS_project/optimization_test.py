@@ -33,6 +33,7 @@ from geometry.bsplines_functions import *
 
 # Optimization classes
 from energies.BS_LineCong import BS_LC
+from energies.BS_LineCong_Orth import BS_LC_Orth
 from optimization.Optimizer import Optimizer
 
 
@@ -55,35 +56,66 @@ print("surface dir:", surface_dir)
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
 
-# Ellipsoid
-bspline_surf_name, dir = "ellipsoid", -1
+# # Ellipsoid
+# bspline_surf_name, dir = "ellipsoid", -1
 
-# Define the path to the B-spline surface
-bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
-print("bspline_surf_path:", bspline_surf_path)
+# # Define the path to the B-spline surface
+# bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
+# print("bspline_surf_path:", bspline_surf_path)
 
 
-# Load the B-spline surface
-control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
+# # Load the B-spline surface
+# control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
+
+# # Create the B-splines basis
+# basis_u = sp.BSplineBasis(order_u, knots_u) 
+# basis_v = sp.BSplineBasis(order_v, knots_v) 
+
+
+# Mean curvature test
+
+# Load a file
+data = np.loadtxt("/Users/cisneras/sph_dt.dat", dtype=float)
+
+surface = approximate_surface(data, 32, 32, 4, 5)
+
+#data = data.reshape(32, 32, 3)
+
+ord_u = surface.degree_u + 1
+ord_v = surface.degree_v + 1
+ct_pts = surface.ctrlpts
+knots_u = surface.knotvector_u
+knots_v = surface.knotvector_v
 
 # Create the B-splines basis
-basis_u = sp.BSplineBasis(order_u, knots_u) 
-basis_v = sp.BSplineBasis(order_v, knots_v) 
+basis_u = sp.BSplineBasis(ord_u, knots_u) 
+basis_v = sp.BSplineBasis(ord_v, knots_v) 
 
 # Create the B-spline surface
-bsp1 = sp.Surface(basis_u, basis_v, control_points)
+bsp1 = sp.Surface(basis_u, basis_v, ct_pts)
+
+# Create the B-spline surface
+#bsp1 = sp.Surface(basis_u, basis_v, control_points)
 
 # Sample size
-sample = (20, 20)
+sample = (30, 30)
 
-u_pts, v_pts = sample_grid(sample[0], sample[1] )
+# Angle threshold
+angle = 45
+
+u_pts, v_pts = sample_grid(sample[0], sample[1], delta=0.2)
 
 # Compute central spheres radius and normals
-#c, r_H, n = central_spheres(bsp1, u_pts, v_pts) 
+c, r_H, H, n = central_spheres(bsp1, u_pts, v_pts) 
 
+#plot_scalar_value(plt, c, r_H, "Mean Curvature")
 
-r_H = np.array([ np.cos(u) + np.sin(v) + 2 for u in u_pts for v in v_pts]).reshape(sample[0], sample[1])
+#n = bsp1.normal(u_pts, v_pts)
 
+#r_H = np.array([ np.cos(u) + np.sin(v) + 2 for u in u_pts for v in v_pts]).reshape(sample[0], sample[1]) 
+
+# Add noise
+#r_H += np.random.normal(0, 0.1, r_H.shape)
 
 # Fit r_H to a B-spline surface r(u,v)
 r_uv = r_uv_fitting(u_pts, v_pts, r_H)
@@ -97,21 +129,30 @@ opt = Optimizer()
 
 # Add variables to the optimizer
 opt.add_variable("rij", len(cp)) # Control points
-opt.add_variable("l", 3*len(u_pts)*len(v_pts)) # Dummy variables
-#opt.add_variable("mu" , sample[0]*sample[1]) # Dummy variables
+opt.add_variable("l", 3*len(u_pts)*len(v_pts))
+# Dummy variables
+opt.add_variable("mu" , len(u_pts)*len(v_pts)) 
 
 # Initialize Optimizer ("Method", step, verbosity)
-opt.initialize_optimizer("LM", 0.2, 1)
+opt.initialize_optimizer("LM", 0.7, 1)
 
 # Initialize variables
 opt.init_variable("rij", cp)
-#opt.init_variable("mu", 1)
+opt.init_variable("mu", 0.5)
+
 
 # Add the constraint to the optimizer
-LC_orht = BS_LC()
-
+LC = BS_LC()
 # add_constraint(name, args, weight)
-opt.add_constraint(LC_orht, args=(bsp1, r_uv, u_pts, v_pts, 60*np.pi/180), w=1.0)
+opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=1.0)
+
+LC_orth = BS_LC_Orth()
+opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=4.0)
+
+
+print("Lc:", opt.uncurry_X("l"))
+
+opt.unitize_variable("l", 3)
 
 # Optimize
 for i in range(1):
@@ -122,18 +163,25 @@ for i in range(1):
 # Print in command line the energy per constraint and best energy
 opt.get_energy_per_constraint()
 
-
+l, u, cp = opt.uncurry_X("l", "mu", "cp")
 # Visualization
 
+l = l.reshape(len(u_pts), len(v_pts), 3)
+
+
+l /= np.linalg.norm(l, axis=2)[:,:,None]
+
+# Compute angles with n
+angles = np.arccos(np.sum(abs(l*n), axis=2))*180/np.pi
+
+# Histogram of angles
+plt.hist(angles.flatten(), bins=20)
+plt.show()
 
 # Get grid points
 u_grid, v_grid = np.meshgrid(u_pts, v_pts, indexing='ij')
 
-fit_pts = np.stack((u_grid, v_grid, r_H), axis=2).reshape(-1,3)
-
-r_nurbs= approximate_surface(fit_pts, size_u = 6, size_v=6, degree_u=3, degree_v=3)
-
-#print(r_nurbs.ctrlpts)
+r_uv[2] = cp
 
 r_uv_surf = bisplev(u_pts, v_pts, r_uv)
 r_u = bisplev(u_pts, v_pts, r_uv, dx=1, dy=0)
@@ -146,6 +194,9 @@ init_pts = np.stack((u_grid, v_grid, r_H), axis=2)
 
 X = bsp1(u_pts, v_pts)
 
+print("H shape:", H.shape)
+plt.hist(H.flatten(), bins=60, color='r')
+plt.show()
 
 # Init figure
 fig     = plt.figure()
@@ -154,9 +205,13 @@ surface_ax = fig.add_subplot(1,2,1, projection='3d')
 
 
 # Plot the B-spline surface
-# plot_surface(surface_ax, X,  "B-spline Surface")
-# plot_scalar_value(surface_ax, X,  r_H, "Mean")
-plot_surface(surface_ax, M_ruv,  "r(u,v) Surface")
+plot_surface(surface_ax, M_ruv,  "B-spline Surface")
+#plot_scalar_value(surface_ax, X,  H, "Mean_Curvature")
+
+# print("data shape", data.shape)
+
+#add_control_points(surface_ax, data)
+#plot_surface(surface_ax, M_ruv,  "r(u,v) Surface")
 #plot_surface(surface_ax, c,  "Central Surface")
 
 
@@ -176,7 +231,6 @@ plot_surface(surface_ax, M_ruv,  "r(u,v) Surface")
 
 #     surface_ax.quiver(r_pts_flat[i,0], r_pts_flat[i,1], r_pts_flat[i,2], dir_v[0], dir_v[1], dir_v[2], color='b')
 
-surface_ax.scatter(init_pts[:,:,0], init_pts[:,:,1], init_pts[:,:,2],  c='r', s=10)
-
+#surface_ax.scatter(init_pts[:,:,0], init_pts[:,:,1], init_pts[:,:,2],  c='r', s=10)
 
 plt.show()
