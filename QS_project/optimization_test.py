@@ -205,7 +205,7 @@ surface_ax = fig.add_subplot(1,2,1, projection='3d')
 
 
 # Plot the B-spline surface
-plot_surface(surface_ax, M_ruv,  "B-spline Surface")
+plot_surface(surface_ax, M_ruv,  "r(u,v) Surface")
 #plot_scalar_value(surface_ax, X,  H, "Mean_Curvature")
 
 # print("data shape", data.shape)

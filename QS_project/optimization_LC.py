@@ -1,12 +1,4 @@
 # This file is a template for creating a new python file in the hananLab/hanan directory
-
-# Ideas reorient before second optimization
-# Verify n is passed to bouth lc constriant wiht orientation
-# Check if reoreintation change energy 
-# Implement energy for positivity ln
-
-
-
 # Import the necessary libraries
 import os
 import sys
@@ -46,6 +38,7 @@ from energies.BS_Torsal_Angle import BS_Torsal_Angle
 from optimization.Optimizer import Optimizer
 
 
+
 # Here you can add the directory where you want to save the results
 dir_path = os.getcwd()
 print(dir_path)
@@ -60,31 +53,32 @@ print("surface dir:", surface_dir)
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-#bspline_surf_name, dir = "Complex_test_S2", 1
+bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
 
 # Florian Non change mean Curvature
-bspline_surf_name, dir = "Florian", 1
+#bspline_surf_name, dir = "Florian", 1
 
+# # Ellipsoid
+# #bspline_surf_name, dir = "ellipsoid", -1
 
 # Parameters optimization
 
 # Sample size
-sample = (30, 30)
-delta = 0.1
-angle = 25 # Angle threshold with surface
-tangle = 60 # Torsal angle threshold for torsal planes
-choice_data = 0 # 0: data_hyp.dat, 1: data_hyp2.dat
+sample = (25, 25)
+angle = 20 # Angle threshold with surface
+tangle = 45 # Torsal angle threshold for torsal planes
+choice_data = 1 # 0: data_hyp.dat, 1: data_hyp2.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
-opt_1_it = 100 # Number of iterations first optimization
-opt_2_it = 100 # Number of iterations second optimization
+opt_1_it = 100  # Number of iterations first optimization
+opt_2_it = 100  # Number of iterations second optimization
 weights = {
     "LC": 1, # Line congruence l.cu = 0, l.cv = 0
     "LC_Orth": 2, # Line congruence orthogonality with surface
-    "Torsal": 1, # Torsal constraint
-    "Torsal_Angle": 0.5 # Torsal angle constraint
+    "Torsal": 0.1, # Torsal constraint
+    "Torsal_Angle": 45 # Torsal angle constraint
 }
 
 
@@ -117,7 +111,7 @@ else:
     bsp1 = approx_surface_from_data(data_bspline)
 
 
-u_pts, v_pts = sample_grid(sample[0], sample[1], delta=delta)
+u_pts, v_pts = sample_grid(sample[0], sample[1], delta=0.3)
 # Number of squares
 n_squares = (len(u_pts)-1)*(len(v_pts)-1)
 
@@ -134,8 +128,6 @@ else:
 # Fit r_H to a B-spline surface r(u,v)
 r_uv = r_uv_fitting(u_pts, v_pts, r_H)
 
-r_uv_0 = bisplev(u_pts, v_pts, r_uv)
-
 # Compute the line congruence
 l = line_congruence_uv(bsp1, r_uv, u_pts, v_pts)
 # Fix sign with normal
@@ -149,22 +141,23 @@ opt = Optimizer()
 
 # Add variables to the optimizer
 opt.add_variable("rij", len(cp)) # Control points
-opt.add_variable("l"  , 3*len(u_pts)*len(v_pts))
-# Dummy variables                              
-opt.add_variable("mu" , len(u_pts)*len(v_pts)  )
-opt.add_variable("nu" , len(u_pts)*len(v_pts)  ) 
+opt.add_variable("l", 3*len(u_pts)*len(v_pts))
+# Dummy variables
+opt.add_variable("mu" , len(u_pts)*len(v_pts)) 
+
 
 
 # Initialize Optimizer ("Method", step, verbosity)
 opt.initialize_optimizer("LM", 0.7, 1)
 
 # Initialize variables
-opt.init_variable("rij" ,         cp )
-opt.init_variable("mu"  ,          5 )
-opt.init_variable("l"   , l.flatten())
+opt.init_variable("rij", cp)
+opt.init_variable("mu", 1)
+opt.init_variable("l", l.flatten())
 
 # Store initial line congruence for visualization
 init_l = l.copy()
+
 # Constraints ==========================================
 
 # Line congruence l.cu, l.cv = 0
@@ -173,7 +166,7 @@ opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"])
 
 # Line cong orthgonality with surface s(u,v)
 LC_orth = BS_LC_Orth()
-opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"])
+opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, dir, angle), w=weights["LC_Orth"])
 
 # Define unit variables
 opt.unitize_variable("l", 3, 10)
@@ -183,7 +176,6 @@ for i in range(opt_1_it):
     # Get gradients
     opt.get_gradients() # Compute J and residuals
     opt.optimize() # Solve linear system and update variables
-    opt.force_unit_variable("l", 3)
 
 
 # PRINT RESULTS FIRST OPTIMIZATION
@@ -192,89 +184,18 @@ print("First Optimization")
 opt.get_energy_per_constraint()
 
 
-# Copy previous X from optimization
-f_l, f_cp, f_mu, f_nu = opt.uncurry_X("l", "rij", "mu", "nu")
-
-f_l = f_l.reshape(-1,3)
-n_flat = n.reshape(-1,3)
-
-# Fix direction with normal
-f_l = np.sign(np.sum(f_l*n_flat, axis=1))[:,None]*f_l
-
-
-# Create the optimizer
-opt = Optimizer()
-
-# Add variables to the optimizer
-opt.add_variable("rij" , len(cp)) # Control points
-opt.add_variable("l"   , 3*len(u_pts)*len(v_pts))
-# Dummy variables
-opt.add_variable("mu"    , len(u_pts)*len(v_pts)) 
-opt.add_variable("nt1"   , 3*n_squares  ) 
-opt.add_variable("nt2"   , 3*n_squares  )
-opt.add_variable("u1"    , n_squares    )
-opt.add_variable("u2"    , n_squares    )
-opt.add_variable("v1"    , n_squares    )
-opt.add_variable("v2"    , n_squares    )
-opt.add_variable("theta" , n_squares    )
-
-
-# Initialize Optimizer
-opt.initialize_optimizer("LM", 0.7, 1)
-
-# Init variables 
-opt.init_variable("theta" , 55)
-opt.init_variable("l"     , f_l.flatten())  
-opt.init_variable("rij"   , f_cp)
-opt.init_variable("mu"    , f_mu)
-
-r_uv[2] = f_cp
-
-# Line congruence l.cu, l.cv = 0
-LC = BS_LC()
-opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"])
-
-# Line cong orthgonality with surface s(u,v)
-LC_orth = BS_LC_Orth()
-opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"])
-
-
-# Torsal constraint 
-LC_torsal = BS_Torsal()
-opt.add_constraint(LC_torsal, args=(bsp1, u_pts, v_pts, n, sample), w=weights["Torsal"])
-
-# Torsal angle constraint
-LC_torsal_ang = BS_Torsal_Angle()
-opt.add_constraint(LC_torsal_ang, args=(tangle, 0), w=weights["Torsal_Angle"])
-
-
-opt.unitize_variable("l", 3, 10)
-opt.unitize_variable("nt1", 3, 10)
-opt.unitize_variable("nt2", 3, 10)
-
-# Optimize
-for i in range(opt_2_it):
-    # Get gradients
-    opt.get_gradients() # Compute J and residuals
-    opt.optimize() # Solve linear system and update variables
-
-# PRINT RESULTS FIRST OPTIMIZATION
-print("Second Optimization")
-# Get energy per constraint
-opt.get_energy_per_constraint()
-
 # Get Line congruence
-l, cp, tu1, tu2, tv1, tv2, nt1, nt2, theta = opt.uncurry_X("l", "rij", "u1", "u2", "v1", "v2", "nt1", "nt2", "theta")
+l, cp = opt.uncurry_X("l", "rij")
 
 # Reshape Line congruence
 l = l.reshape(len(u_pts), len(v_pts), 3)
 l /= np.linalg.norm(l, axis=2)[:,:,None]
 # Reortient line congruence
 print("Where l.n < 0", np.sum(np.sum(l*n, axis=2) < 0))
-#l = np.sign(np.sum(l*n, axis=2))[:,:,None]*l
+l = np.sign(np.sum(l*n, axis=2))[:,:,None]*l
 
 # Angle with normal
-ang_normal = np.arccos( np.sum( l*n, axis=2) )*180/np.pi
+ang_normal = np.arccos( np.sum( l*n, axis=2))*180/np.pi
 
 # Surface points
 S_uv = bsp1(u_pts, v_pts)
@@ -309,24 +230,14 @@ vc_flat = baricenter.reshape(-1,3)
 S_flat = S_uv.reshape(-1,3)
 
 
-# OPTIMIZED TORSAL DIR
-opt1 = tu1[:,None]*du + tv1[:,None]*dv
-opt2 = tu2[:,None]*du + tv2[:,None]*dv
-
-olt1 = tu1[:,None]*lu + tv1[:,None]*lv
-olt2 = tu2[:,None]*lu + tv2[:,None]*lv
-
-planarity_opt = 0.5*(planarity_check(opt1, olt1, lc) + planarity_check(opt2, olt2, lc))
-
-
 # ANALYTICAL TORSAL DIR
 t1, t2, u1, v1, u2, v2, neg = torsal_directions(lc, lu, lv, du, dv)
 # Get number of valid torsal directions 
 valid_torsal = np.zeros((len(u_pts)-1)* (len(v_pts)-1))
 valid_torsal[neg] = 1
 
-lt1 = u1[:,None]*lu + v1[:,None]*lv
-lt2 = u2[:,None]*lu + v2[:,None]*lv
+lt1 = u1[:,None]*du + v1[:,None]*dv
+lt2 = u2[:,None]*du + v2[:,None]*dv
 
 planarity_anal = 0.5*(planarity_check(t1, lt1, lc) + planarity_check(t2, lt2, lc))
 
@@ -334,14 +245,14 @@ planarity_anal = 0.5*(planarity_check(t1, lt1, lc) + planarity_check(t2, lt2, lc
 # Torsal
 t1 = unit(t1)
 t2 = unit(t2)
-nt1 = unit( nt1.reshape(-1,3) )
-nt2 = unit( nt2.reshape(-1,3) )
+
+nt1 = unit( np.cross(t1, lc))
+nt2 = unit( np.cross(t2, lc) )
 
 
 # Compute angle between nt1, nt2
-torsal_angles= np.arccos(np.abs( np.sum(nt1*nt2,axis=1) ) )*180/np.pi
+torsal_angles= np.arccos(np.sum( abs(nt1*nt2),axis=1))*180/np.pi
 
-print("Torsal energy:", np.linalg.norm(np.sum(nt1*nt2,axis=1)**2 - np.cos(tangle*np.pi/180)**2 - theta**2))
 # Histograms: ======= 
 
 # Histogram
@@ -364,39 +275,17 @@ F = np.array([  (sample[1]*j) +np.array([ i, i+1, sample[1] + i + 1, sample[1] +
 
 V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
 
-
-# Visualize r(u,v)
-u_grid, v_grid = np.meshgrid(u_pts, v_pts, indexing='ij')
-R_vis_ruv = np.stack((u_grid, v_grid, r_uv_surf), axis=2) # Optimized r(u,v)
-R0_vis_ruv = np.stack((u_grid, v_grid, r_uv_0), axis=2) # Initial r(u,v)
-
-# Get min and max values of R(u,v)
-min_r = np.min(r_uv_surf)
-max_r = np.max(r_uv_surf)
-
-fig     = plt.figure()
-surface_ax = fig.add_subplot(1,1,1, projection='3d') 
-#plot_surface(surface_ax, R0_vis_ruv,  "r_0(u,v)")
-plot_surface(surface_ax, R_vis_ruv,   "r(u,v)")
-plt.title("R(u,v)")
-# Set limits
-surface_ax.set_xlim([-0.1, 1.1])
-surface_ax.set_ylim([-0.1, 1.1])
-surface_ax.set_zlim([min_r, 1.1*max_r])
-plt.show()
-
-
 ps.init()
 surf = ps.register_surface_mesh("S_uv", V, F)
 #central = ps.register_surface_mesh("Mid Surf", V_R, F)
 
 # LC 
-surf.add_vector_quantity("lc", lc.reshape(-1, 3), defined_on="faces", length=1,  enabled=True, color=(0, 0.2, 0))
+# surf.add_vector_quantity("lc", lc.reshape(-1, 3), defined_on="faces", length=1,  enabled=True, color=(0, 0.2, 0))
 # INITIAL LC
-surf.add_vector_quantity("init_l", init_l.reshape(-1, 3), vectortype='ambient', enabled=False, color=(0.0, 0.0, 0.1))
+surf.add_vector_quantity("init_l", init_l.reshape(-1, 3), vectortype='ambient', enabled=True, color=(0.0, 0.0, 0.1))
 
 # OPTIMIZED LC
-surf.add_vector_quantity("l", l.reshape(-1, 3), defined_on="vertices", vectortype='ambient',  enabled=False, color=(0.1, 0.0, 0.0))
+surf.add_vector_quantity("l", l.reshape(-1, 3), defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
 
 # ANGLES WITH NORMAL SCALAR FIELD
 surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", enabled=True)
@@ -404,36 +293,20 @@ surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", 
 # VALID TORSAL DIRECTIONS SCALAR FIELD
 surf.add_scalar_quantity("Valid Torsal", valid_torsal.flatten(), defined_on="faces", enabled=True)
 
-# OPTIMIZED PLANARITY SCALAR FIELD
-surf.add_scalar_quantity("Planarity", planarity_opt, defined_on="faces", enabled=True)
 
-# ANALYTICAL PLANARITY SCALAR FIELD
-surf.add_scalar_quantity("Planarity Anal", planarity_anal, defined_on="faces", enabled=True)
-
-# MEAN CURVATURE SCALAR FIELD
-if mid_init == 0:
-    surf.add_scalar_quantity("Mean Curvature", H.flatten(), defined_on="vertices", enabled=True)
-
-
-surf.add_vector_quantity("Normal", n, defined_on="vertices", length=0.01,  enabled=True, color=(0.4, 0.0, 0.0))
 
 # TORSAL PLANES SCALAR FIELD
-surf.add_scalar_quantity("Torsal Angles", torsal_angles, defined_on="faces", enabled=True) 
+surf.add_scalar_quantity("Torsal Angles", torsal_angles, defined_on="faces", enabled=True)
+
 # INITIAL RADIUS SCALAR FIELD
 #surf.add_scalar_quantity("Initial Radius", init_r_uv.flatten(), defined_on="vertices", enabled=True)
 
 # OPTIMIZED RADIUS SCALAR FIELD 
 surf.add_scalar_quantity("Radius", r_uv_surf.flatten(), defined_on="vertices", enabled=True)
 
-# Add torsal planes directions
-surf.add_vector_quantity("PT 1", nt1, defined_on="faces", length=0.01,  enabled=True, color=(0.4, 0.0, 0.0))
-surf.add_vector_quantity("PT 2", nt2, defined_on="faces", length=0.01,  enabled=True, color=(0.0, 0.4, 0.0))
-
-                        
-torsal_dir_show(baricenter, opt1, opt2)
-#torsal_dir_show(baricenter, t1, t2, (0,0,0), "Analytical ")
+# TORSAL DIRECTIONS ANALYTICAAL
+surf.add_vector_quantity("t1", t1, defined_on="faces", length=0.01,  enabled=True, color=(0, 0, 0))
+surf.add_vector_quantity("t2", t2, defined_on="faces", length=0.01,  enabled=True, color=(0, 0, 0))
 
 
 ps.show()
-
-

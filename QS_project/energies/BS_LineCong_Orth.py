@@ -35,7 +35,7 @@ class BS_LC_Orth(Constraint):
         self.cos_alpha = None # Cosine of the angle threshold
         
       
-    def initialize_constraint(self, X, var_idx, bs1, r_bsp, u_pts, v_pts, orient, angle) -> None:
+    def initialize_constraint(self, X, var_idx, bs1, r_bsp, u_pts, v_pts, angle) -> None:
         """ 
         Input:
             X : Variables
@@ -53,7 +53,7 @@ class BS_LC_Orth(Constraint):
         self.sv = bs1.derivative(self.u_pts, self.v_pts, d=(0,1))
         
         # Compute normal
-        self.n = orient*bs1.normal(self.u_pts, self.v_pts)
+        self.n = bs1.normal(self.u_pts, self.v_pts)
 
         # Set the B-spline surface r(u,v)
         self.r_bs = r_bsp
@@ -104,9 +104,6 @@ class BS_LC_Orth(Constraint):
         # Set residual = (l.n)^2 - 1
         self.set_r(self.const_idx["orth"], (l_n.flatten())**2 - self.cos_alpha - u**2)
         
-
-
-
 
         
         
