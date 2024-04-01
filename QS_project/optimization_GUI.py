@@ -5,7 +5,10 @@ from pathlib import Path
 
 # Obtain the path HananLab; this is the parent directory of the hananLab/hanan directory
 # <Here you can manually add the path direction to the hananLab/hanan directory>
-path = "/Users/cisneras/hanan/hananLab/hanan"
+# Linux 
+path = os.getenv('HANANLAB_PATH')
+if not path:
+    raise EnvironmentError("HANANLAB_PATH environment variable not set")
 sys.path.append(path)
 
 # Verification of the path
@@ -20,8 +23,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import splipy as sp
 import json
-from scipy.interpolate import bisplev
-from geomdl.fitting import approximate_surface
+import pickle
+
+
 from time import sleep
 
 # Import the necessary classes and functions from the hananLab/hanan directory
@@ -29,13 +33,17 @@ from time import sleep
 # Geometry classes
 from geometry.mesh import Mesh
 from geometry.utils import *
-from geometry.bsplines_functions import *
+
+# Local files
+from utils.bsplines_functions import *
+from utils.visualization import *
 
 # Optimization classes
 from energies.BS_LineCong import BS_LC
 from energies.BS_LineCong_Orth import BS_LC_Orth
 from energies.BS_Torsal import BS_Torsal
 from energies.BS_Torsal_Angle import BS_Torsal_Angle
+
 from optimization.Optimizer import Optimizer
 
 # Directory where the data is stored ======================================
@@ -47,8 +55,6 @@ print(dir_path)
 # Define Bsplines Surface directory
 surface_dir = os.path.join(dir_path, "data", "Bsplines_Surfaces")
 print("surface dir:", surface_dir)
-
-
 
 # Optimization options ======================================
 
@@ -69,11 +75,11 @@ bspline_surf_name, dir = "Florian", 1
 # Sample size
 sample = (22, 22)
 delta = 0.1
-angle = 25 # Angle threshold with surface
-tangle = 45 # Torsal angle threshold for torsal planes
 choice_data = 0 # 0: Json , 1: data_hyp2.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 delta = 0.1
+angle = 25 # Angle threshold with surface
+tangle = 45 # Torsal angle threshold for torsal planes
 weights = {
     "LC": [1,1], # Line congruence l.cu = 0, l.cv = 0
     "LC_Orth": [2,1], # Line congruence orthogonality with surface
@@ -87,126 +93,201 @@ ang_normal = np.zeros((sample[0], sample[1]))
 state = 0
 state2 = 0  
 counter = 1
-init_opt_2 = 0
+init_opt_1 = False
+init_opt_2 = False
 
 
-def flip(l, n ):
-    l = np.sign(np.sum(l*n, axis=2))[:,:,None]*l
-    return l
 
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, init_opt_2
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle
 
-    if psim.Button("Optimize 1"):
-        state = 1
-        counter = 1
+    # Title
+    psim.TextUnformatted("Sphere and Lince Congruence Optimization")
+
+    changed, angle  = psim.InputFloat("Angle", angle)
+    psim.SameLine()
+    changed, tangle = psim.InputFloat("Torsal Angle", tangle)
+    psim.Separator()
+
+       
+    # Inputs Opt 1
+    if psim.CollapsingHeader("Optimization 1:"):
+        changed, weights["LC"][0] = psim.InputFloat("Line Congruence", weights["LC"][0])
+        changed, weights["LC_Orth"][0] = psim.InputFloat("LC Surf Orth", weights["LC_Orth"][0])
+
+        # State handler
+        if counter%20 == 0:
+            state = 0
+            state2 = 0
+
+        if psim.Button("Init First opt"):
+
+            # Set init to True
+            init_opt_1 = True
+
+            # Create the optimizer
+            opt = Optimizer()
+
+            # Add variables to the optimizer
+            opt.add_variable("rij", len(cp)) # Control points
+            opt.add_variable("l"  , 3*sample[0]*sample[1])
+            # Dummy variables                              
+            opt.add_variable("mu" , sample[0]*sample[1])
+
+            # Initialize Optimizer ("Method", step, verbosity)
+            opt.initialize_optimizer("LM", 0.5, 1)
+
+            # Initialize variables
+            opt.init_variable("rij" ,         cp )
+            opt.init_variable("mu"  ,         5  )
+            opt.init_variable("l"   , l.flatten())
+
+
+            # Constraints ==========================================
+
+            # Line congruence l.cu, l.cv = 0
+            LC = BS_LC()
+            opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0])
+
+            # Line cong orthgonality with surface s(u,v)
+            LC_orth = BS_LC_Orth()
+            opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][0])
+
+            # Define unit variables
+            opt.unitize_variable("l", 3, 10)
+
+            ps.info("Finished Initialization of Optimization 1")
+
+
+        if psim.Button("Optimize 1"):
+            state = 1
+            counter = 1
+
     
-    if psim.Button("Optimize 2"):
-        state2 = 1
-        counter = 1
+    psim.Separator()
 
-    if counter%20 == 0:
-        state = 0
-        state2 = 0
+    if psim.CollapsingHeader("Optimization 2:"):
+
+        changed, weights["LC"][1] = psim.InputFloat("Line Congruence W", weights["LC"][1])
+        changed, weights["LC_Orth"][1] = psim.InputFloat("LC Surf Orth W", weights["LC_Orth"][1])
+        changed, weights["Torsal"] = psim.InputFloat("Torsal W", weights["Torsal"])
+        changed, weights["Torsal_Angle"] = psim.InputFloat("Torsal Angle W", weights["Torsal_Angle"])
+        
+        if psim.Button("Init Second opt"):
+
+            init_opt_2 = True
+
+            # Copy previous X from optimization
+            f_l, f_cp, f_mu = opt.uncurry_X("l", "rij", "mu")
+
+            f_l = f_l.reshape(-1,3)
+            n_flat = n.reshape(-1,3)
+
+            # Fix direction with normal
+            f_l = np.sign(np.sum(f_l*n_flat, axis=1))[:,None]*f_l
+
+            # Create the optimizer
+            opt = Optimizer()
+
+            # Add variables to the optimizer
+            opt.add_variable("rij" , len(f_cp)) # Control points
+            opt.add_variable("l"   , 3*len(u_pts)*len(v_pts))
+            # Dummy variables
+            opt.add_variable("mu"    , len(u_pts)*len(v_pts)) 
+            opt.add_variable("nt1"   , 3*n_squares  ) 
+            opt.add_variable("nt2"   , 3*n_squares  )
+            opt.add_variable("u1"    , n_squares    )
+            opt.add_variable("u2"    , n_squares    )
+            opt.add_variable("v1"    , n_squares    )
+            opt.add_variable("v2"    , n_squares    )
+            opt.add_variable("theta" , n_squares    )
+
+            # Initialize Optimizer
+            opt.initialize_optimizer("LM", 0.5, 1)
+
+            # Init variables 
+            opt.init_variable("theta" , 10)
+            opt.init_variable("l"     , f_l.flatten())  
+            opt.init_variable("rij"   , f_cp)
+            opt.init_variable("mu"    , f_mu)
+
+            r_uv[2] = f_cp
+
+            # Line congruence l.cu, l.cv = 0
+            LC = BS_LC()
+            opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0])
+
+            # Line cong orthgonality with surface s(u,v)
+            LC_orth = BS_LC_Orth()
+            opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][1])
+
+            # Torsal constraint 
+            LC_torsal = BS_Torsal()
+            opt.add_constraint(LC_torsal, args=(bsp1, u_pts, v_pts, n, sample), w=weights["Torsal"])
+
+            # Torsal angle constraint
+            LC_torsal_ang = BS_Torsal_Angle()
+            opt.add_constraint(LC_torsal_ang, args=(tangle, 0), w=weights["Torsal_Angle"])
+
+            opt.unitize_variable("l", 3, 10)
+            opt.unitize_variable("nt1", 3, 10)
+            opt.unitize_variable("nt2", 3, 10)
+
+            ps.info("Finished Initialization of Optimization 2")
+
+        if psim.Button("Optimize 2"):
+            state2 = 1
+            counter = 1
+
 
     if state:
-        counter += 1
-        # Optimize
-        
-        # Get gradients
-        opt.get_gradients() # Compute J and residuals
-        opt.optimize() # Solve linear system and update variables
+            if init_opt_1:
 
-        # l = opt.uncurry_X("l")
-        # l = l.reshape(len(u_pts), len(v_pts), 3)
-        # l = flip(l, n)
-        # opt.init_variable("l", l.flatten())
+                counter += 1
+                # Optimize
+                
+                # Get gradients
+                opt.get_gradients() # Compute J and residuals
+                opt.optimize() # Solve linear system and update variables
 
-        # Get Line congruence
-        l, cp = opt.uncurry_X("l", "rij" )
+                # l = opt.uncurry_X("l")
+                # l = l.reshape(len(u_pts), len(v_pts), 3)
+                # l = flip(l, n)
+                # opt.init_variable("l", l.flatten())
 
-        visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp)
+                # Get Line congruence
+                l, cp = opt.uncurry_X("l", "rij" )
+
+                visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp)
+            else:
+                ps.warning("First Optimization not initialized")
+                state = 0
     
-    if psim.Button("Init Second opt:"):
+    if state2:      
+        if init_opt_2:
+            counter += 1
 
-        init_opt_2 = 1
+            # Optimize
+            opt.get_gradients() # Compute J and residuals
+            opt.optimize() # Solve linear system and update variables
 
-        # Copy previous X from optimization
-        f_l, f_cp, f_mu = opt.uncurry_X("l", "rij", "mu")
+            # Flip line congruence if needed
+            l = opt.uncurry_X("l")
+            l = l.reshape(len(u_pts), len(v_pts), 3)
+            l = flip(l, n)
+            opt.init_variable("l", l.flatten())
 
-        f_l = f_l.reshape(-1,3)
-        n_flat = n.reshape(-1,3)
+            visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F)
+        else:
+            ps.warning("Second Optimization not initialized")
+            state2 = 0
+                            
 
-        # Fix direction with normal
-        f_l = np.sign(np.sum(f_l*n_flat, axis=1))[:,None]*f_l
-
-        # Create the optimizer
-        opt = Optimizer()
-
-        # Add variables to the optimizer
-        opt.add_variable("rij" , len(f_cp)) # Control points
-        opt.add_variable("l"   , 3*len(u_pts)*len(v_pts))
-        # Dummy variables
-        opt.add_variable("mu"    , len(u_pts)*len(v_pts)) 
-        opt.add_variable("nt1"   , 3*n_squares  ) 
-        opt.add_variable("nt2"   , 3*n_squares  )
-        opt.add_variable("u1"    , n_squares    )
-        opt.add_variable("u2"    , n_squares    )
-        opt.add_variable("v1"    , n_squares    )
-        opt.add_variable("v2"    , n_squares    )
-        opt.add_variable("theta" , n_squares    )
-
-        # Initialize Optimizer
-        opt.initialize_optimizer("LM", 0.5, 1)
-
-        # Init variables 
-        opt.init_variable("theta" , 10)
-        opt.init_variable("l"     , f_l.flatten())  
-        opt.init_variable("rij"   , f_cp)
-        opt.init_variable("mu"    , f_mu)
-
-        r_uv[2] = f_cp
-
-        # Line congruence l.cu, l.cv = 0
-        LC = BS_LC()
-        opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0])
-
-        # Line cong orthgonality with surface s(u,v)
-        LC_orth = BS_LC_Orth()
-        opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][1])
-
-        # Torsal constraint 
-        LC_torsal = BS_Torsal()
-        opt.add_constraint(LC_torsal, args=(bsp1, u_pts, v_pts, n, sample), w=weights["Torsal"])
-
-        # Torsal angle constraint
-        LC_torsal_ang = BS_Torsal_Angle()
-        opt.add_constraint(LC_torsal_ang, args=(tangle, 0), w=weights["Torsal_Angle"])
-
-        opt.unitize_variable("l", 3, 10)
-        opt.unitize_variable("nt1", 3, 10)
-        opt.unitize_variable("nt2", 3, 10)
-    
-    if state2 and init_opt_2:
-
-        counter += 1
-
-        # Optimize
-        opt.get_gradients() # Compute J and residuals
-        opt.optimize() # Solve linear system and update variables
-
-        # Flip line congruence if needed
-        l = opt.uncurry_X("l")
-        l = l.reshape(len(u_pts), len(v_pts), 3)
-        l = flip(l, n)
-        opt.init_variable("l", l.flatten())
-
-
-        visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F)
+    psim.Separator()
         
-    if psim.Button("Flip 1:"):
+    if psim.Button("Flip Line Congruence"):
     
         # Get Line congruence
         l = opt.uncurry_X("l")
@@ -228,12 +309,69 @@ def optimization():
         # OPTIMIZED LC
         surf.add_vector_quantity("l", l.reshape(-1, 3), defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
 
-
         # ANGLES WITH NORMAL SCALAR FIELD
         surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", enabled=True)
 
     if psim.Button("Report"):
         opt.get_energy_per_constraint()
+
+    if psim.Button("Save"):
+
+         # Get RESULTS
+        l, cp, tu1, tu2, tv1, tv2, nt1, nt2 = opt.uncurry_X("l", "rij", "u1", "u2", "v1", "v2", "nt1", "nt2")
+
+        # Reshape Torsal normals
+        nt1 = nt1.reshape(-1,3)
+        nt2 = nt2.reshape(-1,3)
+
+        # Compute Torsal angles
+        torsal_angles = np.arccos(np.abs(np.sum(nt1*nt2, axis=1)))*180/np.pi
+
+        # Update control points of r(u,v) spline surface
+        r_uv[2] = cp  
+        r_uv_surf = bisplev(u_pts, v_pts, r_uv)
+
+        # Reshape Line congruence
+        l = l.reshape(len(u_pts), len(v_pts), 3)
+        l /= np.linalg.norm(l, axis=2)[:,:,None]
+
+        # Angle with normal
+        ang_normal = np.arccos( np.sum( l*n, axis=2) )*180/np.pi
+
+        # Get vertices
+        v0, v1, v2, v3 = V[F[:,0]], V[F[:,1]], V[F[:,2]], V[F[:,3]]
+
+        # Compute tangents
+        du = v2 - v0
+        dv = v1 - v3
+
+        # Compute barycenters
+        barycenters = (v0 + v1 + v2 + v3)/4
+
+        # Get torsal directions
+        t1 = unit(tu1[:,None]*du + tv1[:,None]*dv)
+        t2 = unit(tu2[:,None]*du + tv2[:,None]*dv)
+
+        V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
+        
+        # Variable to save
+        save_data = {
+                    'V': V,
+                    'V_R': V_R,
+                    'F': F,
+                    'l': l,
+                    'n': n,
+                    't1': t1,
+                    't2': t2,
+                    'nt1': nt1,
+                    'nt2': nt2,
+                    'bar': barycenters,
+                      }
+
+        # Save the variable to a file
+        with open('my_data.pickle', 'wb') as file:
+            pickle.dump(save_data, file)
+
 
 bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
 
@@ -256,36 +394,6 @@ init_l = l.copy()
 # Get the number of control points
 cp = r_uv[2].copy()
 
-# Create the optimizer
-opt = Optimizer()
-
-# Add variables to the optimizer
-opt.add_variable("rij", len(cp)) # Control points
-opt.add_variable("l"  , 3*len(u_pts)*len(v_pts))
-# Dummy variables                              
-opt.add_variable("mu" , len(u_pts)*len(v_pts)  )
-
-# Initialize Optimizer ("Method", step, verbosity)
-opt.initialize_optimizer("LM", 0.5, 1)
-
-# Initialize variables
-opt.init_variable("rij" ,         cp )
-opt.init_variable("mu"  ,         0.1 )
-opt.init_variable("l"   , l.flatten())
-
-
-# Constraints ==========================================
-
-# Line congruence l.cu, l.cv = 0
-LC = BS_LC()
-opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0])
-
-# Line cong orthgonality with surface s(u,v)
-LC_orth = BS_LC_Orth()
-opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][0])
-
-# Define unit variables
-opt.unitize_variable("l", 3, 10)
 
 # End of constraints ===================================
 

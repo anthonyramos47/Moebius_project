@@ -2,7 +2,7 @@
 from optimization.constraint import Constraint
 from scipy.interpolate import BSpline, bisplev, bisplrep
 from geometry.utils import *
-from geometry.bsplines_functions import *
+from utils.bsplines_functions import *
 import numpy as np
 from time import time
 

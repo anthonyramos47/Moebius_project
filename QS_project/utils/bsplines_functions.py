@@ -625,6 +625,8 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
     l = l.reshape(len(u_pts), len(v_pts), 3)
     l /= np.linalg.norm(l, axis=2)[:,:,None]
 
+   
+
     # Angle with normal
     ang_normal = np.arccos( np.sum( l*n, axis=2) )*180/np.pi
 
@@ -634,6 +636,14 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
     # Compute tangents
     du = v2 - v0
     dv = v1 - v3
+
+    l_uv = l.reshape(-1, 3)
+
+    l0, l1, l2, l3 = l_uv[F[:,0]], l_uv[F[:,1]], l_uv[F[:,2]], l_uv[F[:,3]]
+
+    lu = l2 - l0
+    lv = l1 - l3
+
 
     mean_diagonals = np.mean((np.linalg.norm(du, axis=1) + np.linalg.norm(dv, axis=1))/2)
 
@@ -646,6 +656,13 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
     t1 = unit(tu1[:,None]*du + tv1[:,None]*dv)
     t2 = unit(tu2[:,None]*du + tv2[:,None]*dv)
 
+    lt1 = unit(tu1[:,None]*lu + tv1[:,None]*lv)
+    lt2 = unit(tu2[:,None]*lu + tv2[:,None]*lv)
+
+    lc = (l0 + l1 + l2 + l3)/4
+
+    planarity_opt = 0.5*(planarity_check(t1, lt1, lc) + planarity_check(t2, lt2, lc))
+
     # OPTIMIZED LC
     surf.add_vector_quantity("l", l.reshape(-1, 3), defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
 
@@ -656,8 +673,15 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
 
     surf.add_scalar_quantity("Torsal_Angles", torsal_angles, defined_on="faces", enabled=True)
 
+    surf.add_scalar_quantity("Planarity", planarity_opt, defined_on="faces", enabled=True)
+
     torsal_dir_show(barycenters, t1, t2, size=size_torsal, rad=0.004)
 
     V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
 
     ps.register_surface_mesh("C_uv", V_R, F)
+
+
+def flip(l, n ):
+    l = np.sign(np.sum(l*n, axis=2))[:,:,None]*l
+    return l
