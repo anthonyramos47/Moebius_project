@@ -85,23 +85,24 @@ class BS_LC_Orth(Constraint):
         # compute l. n
         l_n = np.sum(l*self.n, axis=2)
 
-        # E_orth = || (l.n)^2 - cos(a)^2 -  mu^2 ||^2
+        # E_orth = || l.n - cos(a) -  mu^2 ||^2
         # d_l E_orth = 2 (l.n) n
-        d_l_EO = 2*l_n[:,:,None]*self.n
+        d_l_EO = 2*(l_n)[:,:,None]*self.n
+        #d_l_EO = self.n
         self.add_derivatives(
             self.const_idx["orth"].repeat(3),
             var_idx["l"],
             d_l_EO.flatten()
         )
 
-        # d_mu E_orth =  2 mu 
+        # d_mu E_orth = - 2 mu 
         self.add_derivatives(
             self.const_idx["orth"],
             var_idx["mu"],
             -2*u
         )
 
-        # Set residual = (l.n)^2 - 1
+        # Set residual = (l.n)^2 - cos a - u^2
         self.set_r(self.const_idx["orth"], (l_n.flatten())**2 - self.cos_alpha - u**2)
         
 

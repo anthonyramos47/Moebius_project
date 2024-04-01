@@ -6,8 +6,6 @@ from geometry.bsplines_functions import *
 import numpy as np
 from time import time
 
-
-
 class BS_Torsal(Constraint):
 
     def __init__(self) -> None:
@@ -106,8 +104,8 @@ class BS_Torsal(Constraint):
         lt2 = unit(ut2[:, None]*lu + vt2[:, None]*lv)
 
         # Compute the torsal plane normal
-        nt1 = unit(np.cross(t1, lt1))
-        nt2 = unit(np.cross(t2, lt2))
+        nt1 = unit(np.cross(lc, lt1))
+        nt2 = unit(np.cross(lc, lt2))
     
         # Init the torsal directions
         X[var_idx["u1"]] = ut1 
@@ -176,7 +174,7 @@ class BS_Torsal(Constraint):
         self.E_lc_nt(lc, nt1, nt2, var_idx)
         
         # final_t = time()
-        self.print_per_const_energy()
+        #self.print_per_const_energy()
         #print("Time to compute BTorsal:", final_t - init_t)
  
     def E_t_unit(self, u1, v1, u2, v2, var_idx):
@@ -311,7 +309,7 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        #self.set_r(cols, np.sum(t2*nt2, axis=1))
+        self.set_r(cols, np.sum(t2*nt2, axis=1))
 
 
     def E_lt_nt(self, lu, lv, nt1, nt2, u1, v1, u2, v2, var_idx):

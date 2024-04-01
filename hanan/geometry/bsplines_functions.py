@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import splipy as sp
+import polyscope as ps
 import json
+import os
 from scipy.interpolate import bisplev, bisplrep
 from geomdl.fitting import approximate_surface
 import splipy as sp
@@ -129,7 +131,7 @@ def read_bspline_json(dir):
     # 
     print("Reading B-Spline from Json:")
     print("U dir order: ", order_u )
-    print("V dir order: ", order_v)
+    print("V dir order: ", order_v )
 
     # Get the knots
     knots_u = data["knotsU"]
@@ -411,7 +413,7 @@ def drawSphere(xCenter, yCenter, zCenter, r):
     return x, y, z
 
 
-def approx_surface_from_data(file,box_size=2):
+def approx_surface_from_data(file, box_size=2):
     """
     Function to approximate the surface from the data. 
     Input:
@@ -431,7 +433,8 @@ def approx_surface_from_data(file,box_size=2):
     v_degree = int(data[1,1])
 
     # Points fitting
-    pts = normalize_vertices(data[2:], 2)
+    #pts = normalize_vertices(data[2:], 2)
+    pts = data[2:]
 
     geom_bsp = approximate_surface(pts, u_pts+1, v_pts+1, u_degree, v_degree)
 
@@ -457,4 +460,204 @@ def approx_surface_from_data(file,box_size=2):
 
     return bsp
 
+
+# ====================== Optimization GUI Functions =================
+
+
+def get_spline_data(choice_data, surface_dir, bspline_surf_name):
+    """ Function to get the B-spline surface data
+    Input:
+        choice_data: Choice of the data type
+        surface_dir: Directory of the surface
+        bspline_surf_name: B-spline surface name
+    Output:
+        bsp1: B-spline surface
+    """
+
+    if choice_data == 0:
+        # Define the path to the B-spline surface
+        bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
+        print("bspline_surf_path:", bspline_surf_path)
+
+        # Load the B-spline surface
+        control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
+
+        # Scale control points
+        ctrl_pts_shape = control_points.shape
+        flat_ctrl_pts  = control_points.reshape(-1,3)
+        norm_ctrl_pts  = normalize_vertices(flat_ctrl_pts, 2)
+        control_points = norm_ctrl_pts.reshape(ctrl_pts_shape)
+
+        # Create the B-splines basis
+        basis_u = sp.BSplineBasis(order_u, knots_u) 
+        basis_v = sp.BSplineBasis(order_v, knots_v) 
+
+        # Create the B-spline surface
+        bsp1 = sp.Surface(basis_u, basis_v, control_points)
+    else:
+        data_bspline = "data_hyp.dat"
+        data_bspline = os.path.join(surface_dir, data_bspline)
+        bsp1 = approx_surface_from_data(data_bspline)
+
+    return bsp1
+
+def init_sphere_congruence(mid_init, bsp1, u_pts, v_pts, sample):
+    """
+    Function to get a sphere congruence.
+    Input:
+        mid_init: type of initialization
+        bsp1: B-spline surface
+        u_pts: u points
+        v_pts: v points
+        sample: sample size
+    Output:
+        c: center of the spheres
+        r_H: radius of the spheres
+        H: mean curvature
+        n: normals
+    """
+
+    if mid_init == 0:
+        # Compute central spheres radius and normals
+        _, r, _, n = central_spheres(bsp1, u_pts, v_pts) 
+    else: 
+        n = bsp1.normal(u_pts, v_pts)
+        r = 5*np.ones((sample[0], sample[1])) 
     
+    return r, n
+
+
+def Bspline_to_mesh(bsp1, u_pts, v_pts, sample):
+    """
+    Function to convert the B-spline surface to a mesh.
+    Input:
+        bsp1: B-spline surface
+        u_pts: u points
+        v_pts: v points
+        sample: sample size
+    Output:
+        V: Vertices of the mesh
+        F: Faces of the mesh
+    """
+
+    # Mesh Visualization ========================== 
+    S_flat = bsp1(u_pts, v_pts).reshape(-1,3)
+
+    # Get Grid as quad mesh V and F
+    V = S_flat
+    # Faces F_i = [i, i+1, sample[1]*i + i, sample[1]*i + i]
+    F = np.array([  (sample[1]*j) +np.array([ i, i+1, sample[1] + i + 1, sample[1] + i])   for j in range(sample[1] - 1)for i in range(sample[0] - 1)] )
+
+    return V, F
+
+
+def visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp):
+    """ 
+    Function to visualize the line congruence and centers of the spheres
+    Here we visualized the optimize line congruence, the angles with the normal and the optimized centers of the spheres.
+    Input:
+        surf: polyscope surface
+        r_uv: Bspline surface of the radius
+        l: line congruence
+        n: normals
+        u_pts: u points
+        v_pts: v points
+        V: Vertices of the mesh
+        F: Faces of the mesh
+        cp: number of control points
+    """
+    
+    # Update control points of r(u,v) spline surface
+    r_uv[2] = cp  
+
+    # Evaluate r(u,v) at grid points
+    r_uv_surf = bisplev(u_pts, v_pts, r_uv)
+
+    # Reshape Line congruence
+    l = l.reshape(len(u_pts), len(v_pts), 3)
+    l /= np.linalg.norm(l, axis=2)[:,:,None]
+
+    # Angle with normal
+    ang_normal = np.arccos( np.sum( l*n, axis=2) )*180/np.pi
+
+    # OPTIMIZED LC
+    surf.add_vector_quantity("l", l.reshape(-1, 3), defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
+    surf.add_scalar_quantity("r_uv", r_uv_surf.flatten(), defined_on="vertices", enabled=True)
+
+    # ANGLES WITH NORMAL SCALAR FIELD
+    surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", enabled=True)
+
+    # Visualization Mid Surface
+    V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
+    ps.register_surface_mesh("C_uv", V_R, F)
+
+def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
+    """
+    Function to visualize the line congruence and the torsal angles
+    Input:
+        surf: polyscope surface
+        opt: optimization object
+        r_uv: Bspline surface of the radius
+        u_pts: u points
+        v_pts: v points
+        n: normals
+        V: Vertices of the mesh
+        F: Faces of the mesh
+    """
+
+    
+    # Get RESULTS
+    l, cp, tu1, tu2, tv1, tv2, nt1, nt2 = opt.uncurry_X("l", "rij", "u1", "u2", "v1", "v2", "nt1", "nt2")
+
+    # Reshape Torsal normals
+    nt1 = nt1.reshape(-1,3)
+    nt2 = nt2.reshape(-1,3)
+
+    # Compute Torsal angles
+    torsal_angles = np.arccos(np.abs(np.sum(nt1*nt2, axis=1)))*180/np.pi
+
+    # Update control points of r(u,v) spline surface
+    r_uv[2] = cp  
+    r_uv_surf = bisplev(u_pts, v_pts, r_uv)
+
+
+    # Reshape Line congruence
+    l = l.reshape(len(u_pts), len(v_pts), 3)
+    l /= np.linalg.norm(l, axis=2)[:,:,None]
+
+    # Angle with normal
+    ang_normal = np.arccos( np.sum( l*n, axis=2) )*180/np.pi
+
+    # Get vertices
+    v0, v1, v2, v3 = V[F[:,0]], V[F[:,1]], V[F[:,2]], V[F[:,3]]
+
+    # Compute tangents
+    du = v2 - v0
+    dv = v1 - v3
+
+    mean_diagonals = np.mean((np.linalg.norm(du, axis=1) + np.linalg.norm(dv, axis=1))/2)
+
+    size_torsal = mean_diagonals/4
+
+    # Compute barycenters
+    barycenters = (v0 + v1 + v2 + v3)/4
+
+    # Get torsal directions
+    t1 = unit(tu1[:,None]*du + tv1[:,None]*dv)
+    t2 = unit(tu2[:,None]*du + tv2[:,None]*dv)
+
+    # OPTIMIZED LC
+    surf.add_vector_quantity("l", l.reshape(-1, 3), defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
+
+    surf.add_scalar_quantity("r_uv", r_uv_surf.flatten(), defined_on="vertices", enabled=True)
+
+    # ANGLES WITH NORMAL SCALAR FIELD
+    surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", enabled=True)
+
+    surf.add_scalar_quantity("Torsal_Angles", torsal_angles, defined_on="faces", enabled=True)
+
+    torsal_dir_show(barycenters, t1, t2, size=size_torsal, rad=0.004)
+
+    V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
+
+    ps.register_surface_mesh("C_uv", V_R, F)

@@ -124,15 +124,17 @@ class BS_LC(Constraint):
         
         # Reshape line congruence to shape (u, v, 3)
         l = l.reshape(len(self.u_pts), len(self.v_pts), 3)
-        
+
         # Compute the derivatives of the mid mesh with respect to u and v
         cu, cv = self.d_c_uv(cp)
 
+        #signs = - np.sign(np.sum(self.n*np.cross(cu, cv), axis=2))
 
-        # E_cu = \sum_{pij \in Grid} || l.cu/||cu|| ||^2 
-        # E_cv = \sum_{pij \in Grid} || l.cv/||cv|| ||^2
+        #cu_2 = np.linalg.norm(cu, axis=2)**2
+        #cv_2 = np.linalg.norm(cv, axis=2)**2
 
         d_l_E_cu = (cu/self.cu_norm[:,:, None])
+        #d_l_E_cu = (2*np.sum(l*cu, axis=2)/cu_2)[:,:,None]*cu 
         # d_l E_cu = cu 
         self.add_derivatives(self.const_idx["E_cu"].repeat(3),              # Rows
                             var_idx["l"],                                   # Cols
@@ -140,6 +142,7 @@ class BS_LC(Constraint):
             )
 
         d_l_E_cv = (cv/self.cv_norm[:,:, None])
+        #d_l_E_cv = (2*np.sum(l*cv, axis=2)/cv_2)[:,:,None]*cv
         # d_l E_cv = cv
         self.add_derivatives(self.const_idx["E_cv"].repeat(3), 
                             var_idx["l"], 
@@ -151,6 +154,9 @@ class BS_LC(Constraint):
 
             d_ak_E_cu = np.sum(self.d_a_cu[k]*l, axis=2)/self.cu_norm
             d_ak_E_cv = np.sum(self.d_a_cv[k]*l, axis=2)/self.cv_norm
+
+            #d_ak_E_cu = signs*(2*np.sum(self.d_a_cu[k]*l, axis=2)/cu_2)*(np.sum(l*cu, axis=2))
+            #d_ak_E_cv = signs*(2*np.sum(self.d_a_cv[k]*l, axis=2)/cv_2)*(np.sum(l*cv, axis=2))
 
             # d_ak E_cu = l.(d_ak cu)/||cu||
             self.add_derivatives(self.const_idx["E_cu"], 
@@ -168,10 +174,12 @@ class BS_LC(Constraint):
 
         # r_cu = l.cu/||cu||^2 
         r_cu = (np.sum(l*cu, axis=2)/self.cu_norm).flatten()    
+        #r_cu = (np.sum(l*cu, axis=2)**2/cu_2).flatten()
         self.set_r(self.const_idx["E_cu"], r_cu)
 
         # r_cv = l.cv/||cv||^2
         r_cv = (np.sum(l*cv, axis=2)/self.cv_norm).flatten()
+        #r_cv = (np.sum(l*cv, axis=2)**2/cv_2).flatten()
         self.set_r(self.const_idx["E_cv"], r_cv)
 
 
