@@ -56,6 +56,8 @@ print(dir_path)
 surface_dir = os.path.join(dir_path, "data", "Bsplines_Surfaces")
 print("surface dir:", surface_dir)
 
+experiment_dir = os.path.join(dir_path, "experiments")
+
 # Optimization options ======================================
 
 # Name surface file
@@ -95,20 +97,29 @@ state2 = 0
 counter = 1
 init_opt_1 = False
 init_opt_2 = False
-
+name_saved = "Results"
+iter_per_opt = 20
+step_1 = 0.5
+step_2 = 0.5
 
 
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2
 
     # Title
     psim.TextUnformatted("Sphere and Lince Congruence Optimization")
 
-    changed, angle  = psim.InputFloat("Angle", angle)
+    if psim.Button("Stop"):
+        state = 0
+        state2 = 0
+
+    psim.PushItemWidth(150)
+    changed, iter_per_opt = psim.InputInt("Num of Iterations per Run: ", iter_per_opt)
     psim.SameLine()
-    changed, tangle = psim.InputFloat("Torsal Angle", tangle)
+    changed, angle  = psim.InputFloat("Angle: ", angle)
+    changed, tangle = psim.InputFloat("Torsal Angle: ", tangle)
     psim.Separator()
 
        
@@ -116,11 +127,13 @@ def optimization():
     if psim.CollapsingHeader("Optimization 1:"):
         changed, weights["LC"][0] = psim.InputFloat("Line Congruence", weights["LC"][0])
         changed, weights["LC_Orth"][0] = psim.InputFloat("LC Surf Orth", weights["LC_Orth"][0])
+        changed, step_1 = psim.InputFloat("Optimization step size", step_1)
 
         # State handler
-        if counter%20 == 0:
+        if counter%iter_per_opt == 0:
             state = 0
             state2 = 0
+
 
         if psim.Button("Init First opt"):
 
@@ -137,7 +150,7 @@ def optimization():
             opt.add_variable("mu" , sample[0]*sample[1])
 
             # Initialize Optimizer ("Method", step, verbosity)
-            opt.initialize_optimizer("LM", 0.5, 1)
+            opt.initialize_optimizer("LM", step_1, 1)
 
             # Initialize variables
             opt.init_variable("rij" ,         cp )
@@ -174,6 +187,7 @@ def optimization():
         changed, weights["LC_Orth"][1] = psim.InputFloat("LC Surf Orth W", weights["LC_Orth"][1])
         changed, weights["Torsal"] = psim.InputFloat("Torsal W", weights["Torsal"])
         changed, weights["Torsal_Angle"] = psim.InputFloat("Torsal Angle W", weights["Torsal_Angle"])
+        changed, step_2 = psim.InputFloat("Optimization step size", step_2)
         
         if psim.Button("Init Second opt"):
 
@@ -205,7 +219,7 @@ def optimization():
             opt.add_variable("theta" , n_squares    )
 
             # Initialize Optimizer
-            opt.initialize_optimizer("LM", 0.5, 1)
+            opt.initialize_optimizer("LM", step_2, 1)
 
             # Init variables 
             opt.init_variable("theta" , 10)
@@ -314,6 +328,12 @@ def optimization():
 
     if psim.Button("Report"):
         opt.get_energy_per_constraint()
+    
+    psim.Separator()
+
+    psim.TextUnformatted("Save Results")
+
+    changed, name_saved = psim.InputText("Save File Name", name_saved)    
 
     if psim.Button("Save"):
 
@@ -323,9 +343,6 @@ def optimization():
         # Reshape Torsal normals
         nt1 = nt1.reshape(-1,3)
         nt2 = nt2.reshape(-1,3)
-
-        # Compute Torsal angles
-        torsal_angles = np.arccos(np.abs(np.sum(nt1*nt2, axis=1)))*180/np.pi
 
         # Update control points of r(u,v) spline surface
         r_uv[2] = cp  
@@ -341,16 +358,29 @@ def optimization():
         # Get vertices
         v0, v1, v2, v3 = V[F[:,0]], V[F[:,1]], V[F[:,2]], V[F[:,3]]
 
+        # l (-1,3)
+        l_f = l.reshape(-1,3)
+
+        l0, l1, l2, l3 = l_f[F[:,0]], l_f[F[:,1]], l_f[F[:,2]], l_f[F[:,3]]
+
+        lu = l2 - l0
+        lv = l1 - l3
+
         # Compute tangents
         du = v2 - v0
         dv = v1 - v3
 
         # Compute barycenters
         barycenters = (v0 + v1 + v2 + v3)/4
+        lc = (l0 + l1 + l2 + l3)/4
 
         # Get torsal directions
         t1 = unit(tu1[:,None]*du + tv1[:,None]*dv)
         t2 = unit(tu2[:,None]*du + tv2[:,None]*dv)
+
+        lt1 = unit(tu1[:,None]*lu + tv1[:,None]*lv)
+        lt2 = unit(tu2[:,None]*lu + tv2[:,None]*lv)
+
 
         V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
         
@@ -365,12 +395,20 @@ def optimization():
                     't2': t2,
                     'nt1': nt1,
                     'nt2': nt2,
+                    'lt1': lt1,
+                    'lt2': lt2,
                     'bar': barycenters,
+                    'lc': lc,
+                    'r_uv_surf': r_uv_surf
                       }
+        
+        save_file_path = os.path.join(experiment_dir, name_saved + ".pickle")
 
         # Save the variable to a file
-        with open('my_data.pickle', 'wb') as file:
+        with open(save_file_path, 'wb') as file:
             pickle.dump(save_data, file)
+
+        ps.warning("Results saved in: " + save_file_path)
 
 
 bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
@@ -407,5 +445,4 @@ surf = ps.register_surface_mesh("S_uv", V, F)
 surf.add_vector_quantity("init_l", init_l.reshape(-1, 3), vectortype='ambient', enabled=False, color=(0.0, 0.0, 0.1))
 ps.set_user_callback(optimization)
 ps.show()
-
 
