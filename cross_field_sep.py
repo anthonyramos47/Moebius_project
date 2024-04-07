@@ -47,16 +47,16 @@ def save_fields(file_name, v1, l1, v2, l2):
 
     # Write the first vector field
     with open(file1, 'w') as f:
-        for v in v1:
+        for v in v2:
             f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
         for l in l1:
             f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
 
     # Write the second vector field
     with open(file2, 'w') as f:
-        for v in v2:
+        for v in v1:
             f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
-        for l in l1:
+        for l in l2:
             f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
 # -----------------------------------------------------------------------------
             
