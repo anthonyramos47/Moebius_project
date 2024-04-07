@@ -23,8 +23,20 @@ def sep_cross_field(v):
     n_v = v.shape[0]//4
 
     # First vector field
-    v1 = v[:2*n_v, :]
-    v2 = v[2*n_v:, :]
+    v1i, v1j = v[:n_v, :], v[n_v:2*n_v, :]
+
+    # Second vector field
+    v2i, v2j = v[2*n_v:3*n_v, :], v[3*n_v:, :]
+
+    # Create the two vector fields
+    v1_i = 0.5*(v1i + v1j)
+    v1_f = v1_i + (v1j - v1i)/np.linalg.norm(v1j - v1i, axis=1)[:, None]
+    
+    v2_i = 0.5*(v2i + v2j)
+    v2_f = v2_i + (v2j - v2i)/np.linalg.norm(v2j - v2i, axis=1)[:, None]
+
+    v1 = np.concatenate([v1_i, v1_f], axis=0)
+    v2 = np.concatenate([v2_i, v2_f], axis=0)
 
     print(v1.shape, v2.shape)
 
