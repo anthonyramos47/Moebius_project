@@ -26,6 +26,8 @@ def sep_cross_field(v):
     v1 = v[:2*n_v, :]
     v2 = v[2*n_v:, :]
 
+    print(v1.shape, v2.shape)
+
     # Lines joining
     l1 = [[i, i+n_v] for i in range(n_v)]
     l2 = [[i, i+n_v] for i in range(n_v)]
@@ -54,7 +56,7 @@ def save_fields(file_name, v1, l1, v2, l2):
     with open(file2, 'w') as f:
         for v in v2:
             f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
-        for l in l2:
+        for l in l1:
             f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
 # -----------------------------------------------------------------------------
             
