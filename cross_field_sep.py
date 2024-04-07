@@ -28,7 +28,7 @@ def sep_cross_field(v):
 
     # Lines joining
     l1 = [[i, i+n_v] for i in range(n_v)]
-    l2 = [[i, i+n_v] for i in range(n_v, 2*n_v)]
+    l2 = [[i, i+n_v] for i in range(n_v)]
 
     return v1, v2, l1, l2
 
