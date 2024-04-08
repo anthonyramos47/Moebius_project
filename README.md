@@ -28,6 +28,6 @@ The **geometry** folder contains files related to the half-edge data structure t
 The **optimization** folder holds all related to linear solvers and optimizers. So far it has been implemented Levenberg-Marquart algorithm and Projected Guided is meant to be implemented soon. 
 
 
-
+For Quad_Remesh in MAC install PyQT5 in case of problems with tkv of Mayavi
 
 *The name Hanan comes from the Kichwa cosmovision where Hanan-Pacha refers to the spiritual world*

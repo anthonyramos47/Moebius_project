@@ -117,7 +117,7 @@ if __name__ == '__main__':
     opt = OrthoOptimizer(V, H, D1, D2)
     #opt.iterations = int(args.it)
     opt.iterations = 300
-    opt.step = 0.25
+    opt.step = 0.20
     opt.set_weight('mesh_fairness', w_f)
     opt.set_weight('closeness', w_c)
     opt.optimize()

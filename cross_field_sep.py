@@ -91,12 +91,21 @@ def get_dir_diag(v,f):
     """
     Get directions of the diagonals of the faces for reorientation
     """
-    v0, v1, v2, v3 = v[f[:,0]], v[f[:,1]], v[f[:,2]], v[f[:,3]]
+    # v0, v1, v2, v3 = v[f[:,0]], v[f[:,1]], v[f[:,2]], v[f[:,3]]
 
-    d1 = v2 - v0
-    d1 /= np.linalg.norm(d1, axis=1)[:, None]
-    d2 = v1 - v3
-    d2 /= np.linalg.norm(d2, axis=1)[:, None]
+    # d1 = v2 - v0
+    # d1 /= np.linalg.norm(d1, axis=1)[:, None]
+    # d2 = v1 - v3
+    # d2 /= np.linalg.norm(d2, axis=1)[:, None]
+
+    # n = np.cross(d1, d2)
+
+    # d2 = np.cross(n, d1)
+
+    # d2 /= np.linalg.norm(d2, axis=1)[:, None]
+
+    d1 = np.array([0, 0, 1])
+    d2 = np.array([1, 0, 0])
 
     return d1, d2
 
@@ -109,10 +118,10 @@ def reorient(d1, d2, v1, v2, l1, l2):
     l2 = np.array(l2)
 
     # Get initial point and direction
-    _, v1_d = v1[l1[:,0]], v1[l1[:,1]]
+    v1_p, v1_d = v1[l1[:,0]], v1[l1[:,1]]
 
     # Get initial point and direction
-    _, v2_d = v2[l2[:,0]], v2[l2[:,1]]
+    v2_p, v2_d = v2[l2[:,0]], v2[l2[:,1]]
 
     # Check min angle between the diagonals
     angle_v1_d1 = np.arccos(np.abs(np.sum(v1_d*d1, axis=1)))
@@ -132,11 +141,18 @@ def reorient(d1, d2, v1, v2, l1, l2):
     
 
     # Reorient the lines
-    v1[l1[:,1]][idx_flip] = s12[idx_flip, None] * v1_d[idx_flip]
-    v1[l1[:,1]][idx_nor]  = s11[idx_nor, None]  * v1_d[idx_nor]
+    #v1[l1[:,1]][idx_flip] = s12[idx_flip, None] * v1_d[idx_flip]
+    #v1[l1[:,1]][idx_nor]  = s11[idx_nor, None]  * v1_d[idx_nor]
 
-    v2[l2[:,1]][idx_flip] = s21[idx_flip, None] * v2_d[idx_flip]
-    v2[l2[:,1]][idx_nor]  = s22[idx_nor, None]  * v2_d[idx_nor]
+    v1[l1[:,1]] = v1_p + s11[:,None]*v1[l1[:,1]]
+
+    #v2[l2[:,1]][idx_flip] = s21[idx_flip, None] * v2_d[idx_flip]
+    #v2[l2[:,1]][idx_nor]  = s22[idx_nor, None]  * v2_d[idx_nor]
+
+    v2[l2[:,1]] = v2_p + s22[:,None]*v2[l2[:,1]]
+
+    # v1[l1[:,1]] = v1_p + d1
+    # v2[l2[:,1]] = v2_p + d2 
 
 
 # -----------------------------------------------------------------------------
