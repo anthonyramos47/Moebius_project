@@ -94,6 +94,7 @@ if __name__ == '__main__':
 
     save = 1
 
+    
 
     # per face directions
     # D1 = np.loadtxt(dir_data+'tor_D1.dat', delimiter=',', dtype=np.float64)
