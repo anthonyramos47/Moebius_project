@@ -235,7 +235,6 @@ class Optimizer():
             self.J = stacked_J[0]
             self.r = stacked_r[0]
         else:
-            
             self.J = vstack(stacked_J)
             self.r = np.hstack(stacked_r)
 
