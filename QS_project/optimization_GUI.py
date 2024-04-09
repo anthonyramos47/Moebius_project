@@ -75,7 +75,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 bspline_surf_name, dir = "Florian", 1
 
 # Sample size
-sample = (22, 22)
+sample = (40, 40)
 delta = 0.1
 choice_data = 0 # 0: Json , 1: data_hyp2.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
@@ -436,7 +436,6 @@ cp = r_uv[2].copy()
 # End of constraints ===================================
 
 V, F = Bspline_to_mesh(bsp1, u_pts, v_pts, sample)
-
 
 ps.init()
 # Surface

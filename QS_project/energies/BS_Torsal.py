@@ -160,9 +160,12 @@ class BS_Torsal(Constraint):
         lv = lv.reshape(-1, 3)
         lc = lc.reshape(-1, 3)
 
+        t1 = u1[:, None]*self.du + v1[:, None]*self.dv
+        t2 = u2[:, None]*self.du + v2[:, None]*self.dv
+
         # init_t = time()
         # Add E_t_unit E = || t^2 - 1 ||^2
-        self.E_t_unit(u1, v1, u2, v2, var_idx)
+        self.E_t_unit(t1, t2, var_idx)
 
         # Add E_t_nt E = || t.nt ||^2
         self.E_t_nt(nt1, nt2, u1, v1, u2, v2, var_idx)
@@ -177,7 +180,7 @@ class BS_Torsal(Constraint):
         #self.print_per_const_energy()
         #print("Time to compute BTorsal:", final_t - init_t)
  
-    def E_t_unit(self, u1, v1, u2, v2, var_idx):
+    def E_t_unit(self, t1, t2, var_idx):
         """
         Compute energy J and residual for energy:
         E_t_unit = || t^2 - 1 ||^2
@@ -188,9 +191,6 @@ class BS_Torsal(Constraint):
 
         # E_t_unit1 = || t1^2 - 1 ||^2
         cols = self.const_idx["t1_unit"]
-
-        t1 = u1[:, None]*self.du + v1[:, None]*self.dv
-        t2 = u2[:, None]*self.du + v2[:, None]*self.dv
 
         # d u1
         d_u1_E_t_unit1 = 2*(vec_dot(self.du, t1))
@@ -234,7 +234,7 @@ class BS_Torsal(Constraint):
         self.set_r(cols, np.sum(t2**2, axis=1) - 1)
 
 
-    def E_t_nt(self, nt1, nt2, u1, v1, u2, v2, var_idx):
+    def E_t_nt(self, nt1, nt2, t1, t2, var_idx):
         """
         Compute energy J and residual for energy:
         E_t_nt = || t.nt ||^2
@@ -246,10 +246,6 @@ class BS_Torsal(Constraint):
             u2, v2 : Torsal direction 2
             var_idx : Dictionary of indices of variables
         """
-
-        t1 = u1[:, None]*self.du + v1[:, None]*self.dv
-
-        t2 = u2[:, None]*self.du + v2[:, None]*self.dv
 
         # E_t_nt1 = || t1.nt1 ||^2
         cols = self.const_idx["t_nt1"]
@@ -459,7 +455,6 @@ class BS_Torsal(Constraint):
 
         # Cols E_lc_nt1
         cols = self.const_idx["lc_nt1"].repeat(3)
-
      
         # E lc_nt1 
         # dli E_lc_nt = nt/||lc||
@@ -535,22 +530,3 @@ class BS_Torsal(Constraint):
 
         # Update lc norm 
         self.lc_norm = np.linalg.norm(lc, axis=1)
-
-
-
-
-
-
-
-
-    
-
-    
-        
-
-        
-                
-
-        
-
-
