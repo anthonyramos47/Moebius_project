@@ -75,7 +75,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 bspline_surf_name, dir = "Florian", 1
 
 # Sample size
-sample = (40, 40)
+sample = (25, 25)
 delta = 0.1
 choice_data = 0 # 0: Json , 1: data_hyp2.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
@@ -154,7 +154,7 @@ def optimization():
 
             # Initialize variables
             opt.init_variable("rij" ,         cp )
-            opt.init_variable("mu"  ,         5  )
+            opt.init_variable("mu"  ,         11  )
             opt.init_variable("l"   , l.flatten())
 
 
@@ -251,9 +251,9 @@ def optimization():
 
             ps.info("Finished Initialization of Optimization 2")
 
-        if psim.Button("Optimize 2"):
-            state2 = 1
-            counter = 1
+        # if psim.Button("Optimize 2"):
+        #     state2 = 1
+        #     counter = 1
 
 
     if state:
@@ -279,13 +279,13 @@ def optimization():
                 ps.warning("First Optimization not initialized")
                 state = 0
     
-    if state2:      
-        if init_opt_2:
-            counter += 1
+    
+    if psim.Button("Optimize 2"):
 
-            # Optimize
-            opt.get_gradients() # Compute J and residuals
-            opt.optimize() # Solve linear system and update variables
+            for _ in range(iter_per_opt):
+                # Optimize
+                opt.get_gradients() # Compute J and residuals
+                opt.optimize() # Solve linear system and update variables
 
             # Flip line congruence if needed
             l = opt.uncurry_X("l")
@@ -294,9 +294,9 @@ def optimization():
             opt.init_variable("l", l.flatten())
 
             visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F)
-        else:
-            ps.warning("Second Optimization not initialized")
-            state2 = 0
+        # else:
+        #     ps.warning("Second Optimization not initialized")
+        #     state2 = 0
                             
 
     psim.Separator()
@@ -386,6 +386,10 @@ def optimization():
         
         # Variable to save
         save_data = {
+                    'surf': bsp1,
+                    'r_uv': r_uv,
+                    'u_pts': u_pts,
+                    'v_pts': v_pts,
                     'V': V,
                     'V_R': V_R,
                     'F': F,

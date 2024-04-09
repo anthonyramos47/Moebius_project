@@ -7,6 +7,8 @@ import os
 from scipy.interpolate import bisplev, bisplrep
 from geomdl.fitting import approximate_surface
 import splipy as sp
+from scipy.spatial import KDTree
+from scipy.optimize import minimize
 from geometry.utils import *
 
 
@@ -267,6 +269,74 @@ def sphere_congruence_derivatives(bsp, r_uv, u_vals, v_vals):
     cv = sv + rv[:,:,None]*n + r[:,:,None]*nv
 
     return cu, cv
+
+def sph_ln_cong_at_pt(bsp, r_uv, ui, vj):
+    """
+    Function to get sphere congruence info at a point (ui, vj)
+    Input:
+        bsp: Bspline surface S(u,v): R^2 -> R^3
+        r: radius of the spheres
+        ui: u value
+        vj: v value
+    """
+
+    # Compute the normal
+    n = bsp.normal(ui, vj)
+
+    # r(ui,vj)
+    r_ij = bisplev(ui, vj, r_uv)
+
+    ru = bisplev(ui, vj, r_uv, dx=1, dy=0)
+    rv = bisplev(ui, vj, r_uv, dx=0, dy=1)
+
+    # sij
+    sij = bsp(ui, vj)
+
+    # su_ij 
+    su_ij = bsp.derivative(ui, vj, d=(1, 0))
+
+    # sv_ij
+    sv_ij = bsp.derivative(ui, vj, d=(0, 1))
+
+    # suu_ij 
+    suu_ij = bsp.derivative(ui, vj, d=(2, 0))
+
+    # svv_ij
+    svv_ij = bsp.derivative(ui, vj, d=(0, 2))
+
+    # suv_ij
+    suv_ij = bsp.derivative(ui, vj, d=(1, 1))
+
+    # n from suxsv
+    aux_n = np.cross(su_ij, sv_ij)
+    n_norm = np.linalg.norm(aux_n)
+
+    # Compute the derivatives of the normal
+    # nu = f1/n_norm + f2/n_norm - n*(f1 + f2)@n)/n_norm**3
+    suu_sv = np.cross(suu_ij, sv_ij)
+    su_suv = np.cross(su_ij , suv_ij)
+    suv_sv = np.cross(suv_ij, sv_ij)
+    su_svv = np.cross(su_ij , svv_ij)
+
+    nu = suu_sv/n_norm + su_suv/n_norm - aux_n*((suu_sv + su_suv)@aux_n/n_norm**3)
+    nv = suv_sv/n_norm + su_svv/n_norm - aux_n*((suv_sv + su_svv)@aux_n/n_norm**3)
+
+    # Compute the center of the spheres
+    c = bsp(ui, vj) + r_ij*n
+
+    # Derivative of the center of the spheres in the u direction
+    cu =  su_ij + ru*n + r_ij*nu
+    cv =  sv_ij + rv*n + r_ij*nv
+
+    # Line congruence 
+    l = np.cross(cu, cv)
+
+    l = l/np.linalg.norm(l)
+
+    # fix direction
+    l = l*np.sign(l@n)
+
+    return c, l 
 
 def normal_derivatives_uv(bsp, u_vals, v_vals):
     """
@@ -685,3 +755,46 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
 def flip(l, n ):
     l = np.sign(np.sum(l*n, axis=2))[:,:,None]*l
     return l
+
+
+def closest_grid_points(p, grid_v):
+    """
+    Find the closest grid point to a given point p
+    """
+    kd_tree = KDTree(grid_v)
+
+    _, i = kd_tree.query(p)
+
+    return grid_v[i], i
+
+def foot_points(p, V, u_pts, v_pts, Bsp):
+    """
+    Find the foot point of a point p in the B-spline surface
+    """
+    #n = len(u_pts)
+    m = len(v_pts)
+    # Find the closest grid point
+    _, idx = closest_grid_points(p, V)
+
+    u_idx = idx//m
+    v_idx = idx%m
+
+    x0 = np.hstack((u_pts[u_idx], v_pts[v_idx]))
+
+    x0 = x0.reshape(-1, 2)
+
+    # Find the closest point in the B-spline surface
+    # Define function to minimize 
+    def min_dist(x, p):
+        xu = x[0]
+        xv = x[1]
+        ev_b = Bsp(xu, xv)
+        return np.linalg.norm(ev_b - p)
+    
+    for i in range(len(x0)):
+        res = minimize(min_dist, x0[i], args=(p[i]), bounds=[(0, 1), (0, 1)])
+        x0[i] = res.x
+
+    print("res: ", res)
+
+    return x0

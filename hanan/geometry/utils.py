@@ -595,13 +595,11 @@ def approximate_torsal(lc, lu, lv, du, dv):
     # ut^2 [du, lu, lc] + (ut vt) ([du, lv, lc] + [dv, lu, lc]) + vt^2 [dv, lv, lc] = 0
     # variables ut and vt
     def torsal_energy(X, lc, lu, lv, du, dv):
-        X = X.reshape(-1, 2)
-        ut, vt = X[:,0], X[:,1]
-
+        
+        ut, vt = X[0], X[1]
         # Energy
-        E = ut**2 * np.sum(du*np.cross(lu, lc), axis=1) + (ut * vt) * (np.sum(du* np.cross(lv, lc), axis=1)   + np.sum(dv*np.cross(lu, lc), axis=1))+  vt**2    *  np.sum(dv* np.cross(lv, lc), axis=1)
-
-        return np.sum( E**2)
+        E = ut**2 *du@np.cross(lu, lc) + (ut * vt) * ( du@np.cross(lv, lc)  + dv@np.cross(lu, lc)) +  vt**2 * dv@np.cross(lv, lc)
+        return E**2
 
     # Define the constraints: ut du + vt dv = 1
     cons = {'type': 'eq', 'fun': lambda X: np.sum((np.linalg.norm((X[0]*du + X[1]*dv),axis=1)**2 - 1))}
@@ -609,28 +607,21 @@ def approximate_torsal(lc, lu, lv, du, dv):
     # T1 initial guess
     X0 = np.zeros((len(lc)*2)) 
     X0[::2] = 1
-
-    res1 = minimize(torsal_energy, X0, args=(lc, lu, lv, du, dv), constraints=cons)
+    X0 = X0.reshape(-1, 2)
 
     # T2 initial guess
-    X0 = np.zeros((len(lc)*2)) 
-    X0[1::2] = 1
+    X1 = np.zeros((len(lc)*2)) 
+    X1[1::2] = -1
+    X1 = X1.reshape(-1, 2)
     
-    res2 = minimize(torsal_energy, X0, args=(lc, lu, lv, du, dv), constraints=cons)
+    for i in range(len(X0)):
+        res1 = minimize(torsal_energy, X0[i], args=(lc[i], lu[i], lv[i], du[i], dv[i]), constraints=cons)
+        res2 = minimize(torsal_energy, X1[i], args=(lc[i], lu[i], lv[i], du[i], dv[i]), constraints=cons)
 
-    # X = res.x.reshape(-1, 2)
-    # print(res)
+        X0[i] = res1.x
+        X1[i] = res2.x
 
-    # ut, vt = X[:,0], X[:,1]
-
-    # lt = ut[:,None]*lu + vt[:,None]*lv
-    # vt = ut[:,None]*du + vt[:,None]*dv
-
-    # lt_lc = np.cross(lt, lc)
-
-    # print("Unitarity vt", np.linalg.norm(vt, axis=1)**2 - 1)
-    # print("Planarity", np.sum(vt*lt_lc, axis=1))
-    return res1.x.reshape(-1, 2), res2.x.reshape(-1, 2)
+    return X0, X1
 
 def fit_sphere_energy(init, pts):
     c = init[:3]
@@ -843,11 +834,16 @@ def torsal_directions(lc, lu, lv, du, dv):
     t1 = ut1[:,None]*du + vt1[:,None]*dv
     t2 = ut2[:,None]*du + vt2[:,None]*dv
 
+    
+
     ut1 /= np.linalg.norm(t1, axis=1)
     vt1 /= np.linalg.norm(t1, axis=1)
 
     ut2 /= np.linalg.norm(t2, axis=1)
     vt2 /= np.linalg.norm(t2, axis=1)
+
+    t1 /= np.linalg.norm(t1, axis=1)[:, None]
+    t2 /= np.linalg.norm(t2, axis=1)[:, None]
    
     return t1, t2, ut1, vt1, ut2, vt2, idx
     
@@ -913,3 +909,31 @@ def torsal_dir_show(baricenter, t1, t2, size=0.005, rad=0.0005,  color=(1,1,1), 
     t1_net.set_radius(rad, relative=False) 
     t2_net.set_radius(rad, relative=False)
 
+def get_torsal_Mesh(V, F, L):
+    """ Function that compute the torsal directions given a polyhedral surface
+    with a line congruence per vertex
+    Input:
+        V: Vertices
+        F: Faces
+        L: Line congruence
+    Output:
+        t1: Torsal direction 1
+        t2: Torsal direction 2
+    """
+
+    l0, l1, l2 = L[F[:, 0]], L[F[:, 1]], L[F[:, 2]]
+
+    lu = l1 - l0
+    lv = l2 - l0
+
+    v0, v1, v2 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
+
+    du = v1 - v0
+    dv = v2 - v0
+
+    lc = (l0 + l1 + l2)/3
+    vc = (v0 + v1 + v2)/3
+
+    t1, t2, _, _, _, _, _  = torsal_directions(lc, lu, lv, du, dv)
+
+    return t1, t2, vc

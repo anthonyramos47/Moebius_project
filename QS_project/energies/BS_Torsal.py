@@ -168,7 +168,7 @@ class BS_Torsal(Constraint):
         self.E_t_unit(t1, t2, var_idx)
 
         # Add E_t_nt E = || t.nt ||^2
-        self.E_t_nt(nt1, nt2, u1, v1, u2, v2, var_idx)
+        self.E_t_nt(nt1, nt2, t1, t2, var_idx)
 
         # Add E_lt_nt E = || lt/||lt||.nt ||^2
         self.E_lt_nt(lu, lv, nt1, nt2, u1, v1, u2, v2, var_idx)
