@@ -46,10 +46,10 @@ def sep_cross_field(v):
 
     # Create the two vector fields
     v1_i = 0.5*(v1i + v1j)
-    v1_f = (v1j - v1i)/np.linalg.norm(v1j - v1i, axis=1)[:, None]
+    v1_f = v1_i + 0.1*(v1j - v1i)/np.linalg.norm(v1j - v1i, axis=1)[:, None]
     
     v2_i = 0.5*(v2i + v2j)
-    v2_f = (v2j - v2i)/np.linalg.norm(v2j - v2i, axis=1)[:, None]
+    v2_f = v2_i + 0.1*(v2j - v2i)/np.linalg.norm(v2j - v2i, axis=1)[:, None]
 
     v1 = np.concatenate([v1_i, v1_f], axis=0)
     v2 = np.concatenate([v2_i, v2_f], axis=0)
@@ -174,7 +174,7 @@ vd, fd = read_obj_faces(mesh_path)
 v1, v2, l1, l2 = sep_cross_field(v)
 
 # Get the directions of the diagonals
-d1, d2 = get_dir_diag(vd, fd)
+#d1, d2 = get_dir_diag(vd, fd)
 
 # Reorient the lines
 #reorient(d1, d2, v1, v2, l1, l2)
