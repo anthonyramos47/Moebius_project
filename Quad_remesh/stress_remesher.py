@@ -45,6 +45,29 @@ from orthogonal_mapper import OrthoOptimizer
 # -----------------------------------------------------------------------------
 
 
+def triangulate_quads(quads):
+    """
+    Triangulate a list of quads into triangles.
+
+    Args:
+    - quads (list of list of int): List of quads, where each quad is a list of four vertex indices.
+
+    Returns:
+    - list of list of int: List of triangles, where each triangle is a list of three vertex indices.
+    """
+    triangles = []
+    for quad in quads:
+        # Ensure the quad has exactly 4 vertices
+        if len(quad) == 4:
+            # First triangle from first, second, and third vertices
+            triangles.append([quad[0], quad[1], quad[2]])
+            # Second triangle from first, third, and fourth vertices
+            triangles.append([quad[0], quad[2], quad[3]])
+        else:
+            print("Error: Quad does not have exactly 4 vertices.", quad)
+    return triangles
+
+
 if __name__ == '__main__':
 
     # -------------------------------------------------------------------------
@@ -70,18 +93,26 @@ if __name__ == '__main__':
         data  = pickle.load(file)
 
     V = data["V"]
-    F = data["F"]
+    aux_F = data["F"]
+
+    F = np.array(triangulate_quads(aux_F))
+
+
+
     t1 = data["t1"]
     t2 = data["t2"]
+
+    t1 = t1.repeat(2, axis=0)
+    t2 = t2.repeat(2, axis=0)
 
     # print("args.w_fairness: ", args)
     # print("args.w_closeness: ", args.w_closeness)
 
     # Scale factor
-    v0, v1, v2, v3 = V[F[:,0]], V[F[:,1]], V[F[:,2]], V[F[:,3]]
+    v0, v1, v2 = V[F[:,0]], V[F[:,1]], V[F[:,2]]
 
     du = v1 - v0
-    dv = v3 - v0
+    dv = v2 - v0
 
     # Get mean diagonals
     mean_diag =  np.min(np.vstack([du, dv]).mean(axis=1) )

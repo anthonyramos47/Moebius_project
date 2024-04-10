@@ -19,28 +19,6 @@ sys.path.append(hanan_path)
 from geometry.utils import *
 from utils.bsplines_functions import *
 
-def triangulate_quads(quads):
-    """
-    Triangulate a list of quads into triangles.
-
-    Args:
-    - quads (list of list of int): List of quads, where each quad is a list of four vertex indices.
-
-    Returns:
-    - list of list of int: List of triangles, where each triangle is a list of three vertex indices.
-    """
-    triangles = []
-    for quad in quads:
-        # Ensure the quad has exactly 4 vertices
-        if len(quad) == 4:
-            # First triangle from first, second, and third vertices
-            triangles.append([quad[0], quad[1], quad[2]])
-            # Second triangle from first, third, and fourth vertices
-            triangles.append([quad[0], quad[2], quad[3]])
-        else:
-            print("Error: Quad does not have exactly 4 vertices.", quad)
-    return triangles
-
 
 
 path = os.getcwd()
