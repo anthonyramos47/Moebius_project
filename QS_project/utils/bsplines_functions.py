@@ -506,7 +506,7 @@ def approx_surface_from_data(file, box_size=2):
     #pts = normalize_vertices(data[2:], 2)
     pts = data[2:]
 
-    geom_bsp = approximate_surface(pts, u_pts+1, v_pts+1, u_degree, v_degree)
+    geom_bsp = approximate_surface(pts, u_pts, v_pts, u_degree, v_degree)
 
 
     # Get controp points
