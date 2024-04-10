@@ -177,7 +177,7 @@ v1, v2, l1, l2 = sep_cross_field(v)
 d1, d2 = get_dir_diag(vd, fd)
 
 # Reorient the lines
-reorient(d1, d2, v1, v2, l1, l2)
+#reorient(d1, d2, v1, v2, l1, l2)
 
 # Save the two vector fields
 save_fields(name, v1, l1, v2, l2)
