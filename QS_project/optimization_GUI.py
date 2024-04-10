@@ -74,12 +74,14 @@ experiment_dir = os.path.join(dir_path, "experiments")
 # Florian Non change mean Curvature
 bspline_surf_name, dir = "Florian", 1
 
+# Dat name
+#bspline_surf_name, dir = "inv_1", 1
+
 # Sample size
-sample = (40, 40)
-delta = 0.3
-choice_data = 1 # 0: Json , 1: data_hyp2.dat
-mid_init = 0  # 0: central_sphere, 1: offset_surface
+sample = (25, 25)
 delta = 0.1
+choice_data = 0 # 0: Json , 1: data_hyp2.dat
+mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
 tangle = 45 # Torsal angle threshold for torsal planes
 weights = {

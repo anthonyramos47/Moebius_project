@@ -25,8 +25,9 @@ class Optimizer():
             The optimizer is then solved using the optimize(name_solv) method. The name_solv parameter is a string that can be
             either "LM" for Levenberg-Marquardt or "PG" for Projected Gauss-Newton.
         """
-        self.J = None # Jacobian matrix
-        self.r = None # Residual vector
+        #self.J = None # Jacobian matrix
+        #self.r = None # Residual vector
+        self.b = None # Vector of residuals J.T@r
         self.X = None # Variable
         self.X0 = None # Initial variable 
         self.bestX = None # Best variable
@@ -37,6 +38,7 @@ class Optimizer():
         self.step = None # Step size
         self.method = None # Method used to solve the problem
         self.energy = [] # Energy vector
+        self.e_diff = 1 # Energy difference
         self.energy_dic = {} # Energy dictionary
         self.var_idx = {} # Variable indices
         self.var = 0 # Number of variables
@@ -206,8 +208,8 @@ class Optimizer():
                 constraint: Constraint class
                 args: arguments of the constraint
         """
-        stacked_J = []
-        stacked_r = []
+        stacked_H = []
+        stacked_b = []
 
         total = 0
         for constraint in self.constraints:
@@ -223,26 +225,27 @@ class Optimizer():
                 #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
 
                 # Add J, r to the optimizer                
-                stacked_J.append(np.sqrt(constraint.w) * constraint._J)
-                stacked_r.append(np.sqrt(constraint.w) * constraint._r)          
+                #stacked_J.append(np.sqrt(constraint.w) * constraint._J)
+                stacked_H.append( constraint.w * constraint._J.T.dot(constraint._J))
+                stacked_b.append( constraint.w * constraint._J.T.dot(constraint._r))          
 
                 # Add energy to the energy dictionary
                 if constraint.name is not None:
                         self.energy_dic[constraint.name] = constraint.w * np.sum(constraint._r**2)
         #print(f"\nTotal time to compute constraints: {total}")
         
-        if len(stacked_J) == 1:
-            self.J = stacked_J[0]
-            self.r = stacked_r[0]
+        if len(stacked_H) == 1:
+            self.H = stacked_H[0]
+            self.b = stacked_b[0]
         else:
-            self.J = vstack(stacked_J)
-            self.r = np.hstack(stacked_r)
+            self.H = sum(H_i for H_i in stacked_H)
+            self.b = sum(b_i for b_i in stacked_b)
 
 
  
     def optimize(self):
         
-        if self.prevdx is None or self.prevdx > 1e-8:
+        if self.prevdx is None or (self.prevdx > 1e-8 and self.energy[-1] > 1e-9 and self.e_diff > 1e-7) :
             if self.method == 'LM': # Levenberg-Marquardt
                 self.LM()
             elif self.method == 'PG': # Projected Gauss-Newton
@@ -258,30 +261,32 @@ class Optimizer():
         # Solve for (J^TJ + lambda*I) dx = -J^Tr, lambda = max(diag(J^TJ))*1e-8
 
         # Get J 
-        J = self.J
+        #J = self.J
 
         # Compute pseudo Hessian
-        H = (J.T * J).tocsc()
+        #H = (J.T * J).tocsc()
         
         # Calculate the value to add to the diagonal
-        add_value = H.max() * 1e-8
+        add_value = self.H.max() * 1e-8
 
         # Create a diagonal matrix with the values to add
-        diagonal_values = np.array([add_value] * H.shape[0])
+        diagonal_values = np.array([add_value] * self.H.shape[0])
         diagonal_matrix = diags(diagonal_values, 0, format='csc')
 
         # Add the diagonal_matrix to H
-        H = H + diagonal_matrix
+        self.H = self.H + diagonal_matrix
        
-        b = -J.T@self.r
-
-        dx = spsolve(H, b)
+        #b = -J.T@self.r
+        dx = spsolve(self.H, -self.b)
 
         # Store previous dx norm
         self.prevdx = np.linalg.norm(self.step*dx)
 
-        # Compute energy
-        energy = self.r.T@self.r
+        energy = sum(e_i for e_i in self.energy_dic.values())   
+
+        if len(self.energy) > 1:
+            self.e_diff = abs(energy - self.energy[-1])
+            
 
         # Append energy
         self.energy.append(energy)
@@ -378,6 +383,5 @@ class Optimizer():
                 v_name: Name of the variable
                 dim: Dimension of the variable
         """
-
         self.X[self.var_idx[v_name]] = unit(self.X[self.var_idx[v_name]].reshape(-1, dim)).flatten()
 

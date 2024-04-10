@@ -158,8 +158,9 @@ def reorient(d1, d2, v1, v2, l1, l2):
 # -----------------------------------------------------------------------------
             
 path = '/Users/cisneras/hanan/hananLab/'
-name = 'Florian_A_25_TA_45_deformed_crossfield'
-mesh = 'Florian_A_25_TA_45_deformed'
+name = 'Nice_result_deformed_crossfield'
+mesh = 'Nice_result_deformed'
+
 
 file_path = path + name + '.obj'
 mesh_path = path + mesh + '.obj'

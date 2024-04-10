@@ -494,6 +494,8 @@ def approx_surface_from_data(file, box_size=2):
     # Read the data
     data = np.loadtxt(file)
 
+    print("Data shape: ", data.shape)
+
     # Number of u, v pts 
     u_pts = int(data[0,0])
     v_pts = int(data[0,1])
@@ -565,7 +567,9 @@ def get_spline_data(choice_data, surface_dir, bspline_surf_name):
         # Create the B-spline surface
         bsp1 = sp.Surface(basis_u, basis_v, control_points)
     else:
-        data_bspline = "data_hyp.dat"
+
+        data_bspline =  bspline_surf_name+".dat"
+        print("data_bspline:", data_bspline)
         data_bspline = os.path.join(surface_dir, data_bspline)
         bsp1 = approx_surface_from_data(data_bspline)
 
