@@ -143,10 +143,9 @@ q = np.array([[1, 1, 1],[1,0,0.2]])
 # End of constraints ===================================
 V, F = Bspline_to_mesh(bsp1, u_pts, v_pts, sample)
 
-
 p_q, _ = closest_grid_points(q, V)
 
-foot_pts = foot_point(q, V, u_pts, v_pts, bsp1)
+foot_pts = foot_points(q, V, u_pts, v_pts, bsp1)
 
 foot_pts = foot_pts.reshape(-1, 2)
 
