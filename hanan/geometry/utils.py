@@ -912,12 +912,15 @@ def torsal_dir_show(baricenter, t1, t2, size=0.005, rad=0.0005,  color=(1,1,1), 
 def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, name=""):
 
     # Torsal directions t1
-    t1_dir_i = baricenter.reshape(-1,3) + size*t1
-    t1_dir_f = baricenter.reshape(-1,3) - size*t1
+    t1_dir_i = baricenter.reshape(-1,3) 
+    t1_dir_f = baricenter.reshape(-1,3) + size*t1
+
 
     # Torsal directions t2 
-    t2_dir_i = baricenter.reshape(-1,3) + size*t2
-    t2_dir_f = baricenter.reshape(-1,3) - size*t2
+    t2_dir_i = baricenter.reshape(-1,3) 
+    t2_dir_f = baricenter.reshape(-1,3) + size*t2
+
+    
     
     t2_nodes = np.concatenate((t2_dir_i, t2_dir_f), axis=0)
     t1_nodes = np.concatenate((t1_dir_i, t1_dir_f), axis=0)
