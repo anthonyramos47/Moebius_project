@@ -1,6 +1,7 @@
 import numpy as np
 import polyscope as ps
 from scipy.optimize import minimize
+from scipy.spatial import KDTree
 
 def unit(v):
     """normalize a list of vectors v
@@ -87,8 +88,6 @@ def barycentric_coordinates(vi, vj, vk, vl):
     b1, b2, b3 = np.linalg.solve(A, vl)
 
     return b1, b2, b3    
-
-
 
 def orth_proj(v, u):
     """ Orthogonal projection of v on u
@@ -312,41 +311,38 @@ def add_cross_field(mesh, name, vec1, vec2, rad, size, col):
     mesh.add_vector_quantity(name+"_vec2" ,    vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
     mesh.add_vector_quantity(name+"_-vec2",   -vec2, defined_on ='faces', enabled=True, radius=rad, length=size, color=col)
 
-def find_initial_torsal_th_phi(t1, t2, vij, vik):
-    """ Function to find the initial torsal directions parameters
-    Input:
-        t: Torsal direction
-        vij: edge vector
-        vik: edge vector
-    """
+# def find_initial_torsal_th_phi(t1, t2, vij, vik):
+#     """ Function to find the initial torsal directions parameters
+#     Input:
+#         t: Torsal direction
+#         vij: edge vector
+#         vik: edge vector
+#     """
     
-    theta = np.zeros(len(t1))
-    phi   = np.zeros(len(t1))
+#     theta = np.zeros(len(t1))
+#     phi   = np.zeros(len(t1))
 
-    alpha = np.zeros(len(t1)) # alpha = theta + phi
+#     alpha = np.zeros(len(t1)) # alpha = theta + phi
 
-    for i in range(len(t1)):
-        # Compute theta
-        theta[i]   = find_angles(0, t1[i], vij[i], vik[i])
+#     for i in range(len(t1)):
+#         # Compute theta
+#         theta[i]   = find_angles(0, t1[i], vij[i], vik[i])
 
-        if t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]) < 0.8:
-            print( t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]))
+#         if t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]) < 0.8:
+#             print( t1[i]@unit(np.cos(theta[i])*vij[i] + np.sin(theta[i])*vik[i]))
 
-        alpha[i]   = find_angles(0, t2[i], vij[i], vik[i])
+#         alpha[i]   = find_angles(0, t2[i], vij[i], vik[i])
 
-        if t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]) < 0.8:
-            print( t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]))
+#         if t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]) < 0.8:
+#             print( t2[i]@unit(np.cos(alpha[i])*vij[i] + np.sin(alpha[i])*vik[i]))
 
-        # Compute phi
-        phi[i] = alpha[i] - theta[i]
-        if t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]) < 0.8:
-            print( t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]))
+#         # Compute phi
+#         phi[i] = alpha[i] - theta[i]
+#         if t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]) < 0.8:
+#             print( t2[i]@unit(np.cos(theta[i] + phi[i])*vij[i] + np.sin(theta[i] + phi[i])*vik[i]))
     
 
-    return theta, phi, alpha
-
-
-    
+#     return theta, phi, alpha    
 
 def solve_torsal(vi, vj, vk, ei, ej, ek) :
     """ Function to solve the torsal directions analytically
@@ -997,3 +993,68 @@ def triangulate_quads(quads):
         else:
             print("Error: Quad does not have exactly 4 vertices.", quad)
     return triangles
+
+
+
+def distance_point_to_triangle(p, v0, v1, v2):
+    """
+    Compute the minimum distance between points p and a triangle defined by vertices v0, v1, and v2.
+    """
+
+    # Compute vectors
+    v0v1 = v1 - v0
+    v0v2 = v2 - v0
+    p_v0 = p - v0
+
+    # Compute dot products
+    dot00 = np.sum(v0v1*v0v1, axis=1)
+    dot01 = np.sum(v0v1*v0v2, axis=1)
+    dot02 = np.sum(v0v1*p_v0, axis=1)
+    dot11 = np.sum(v0v2*v0v2, axis=1)
+    dot12 = np.sum(v0v2*p_v0, axis=1)
+
+    
+
+    # Compute barycentric coordinates
+    inv_denom = 1 / (dot00 * dot11 - dot01 * dot01)
+    u = (dot11 * dot02 - dot01 * dot12) * inv_denom
+    v = (dot00 * dot12 - dot01 * dot02) * inv_denom
+
+    # Clamp barycentric coordinates to avoid points outside the triangle
+    u = np.clip(u, 0, 1)
+    v = np.clip(v, 0, 1)
+
+    # Compute closest points on the triangles
+    closest_points = v0 + u[:, None] * v0v1 + v[:, None] * v0v2
+
+    return closest_points, np.hstack((1-u-v, u, v))
+
+def closest_point_on_mesh(mesh_vertices, mesh_triangles, query_points):
+    """
+    Compute the closest points on a triangular mesh to multiple query points using KDTree for efficiency.
+    """
+
+    vc = np.sum(mesh_vertices[mesh_triangles], axis=1) / 3
+
+    tree = KDTree(vc)
+
+    # Find nearest triangles
+    dists, nearest_triangle_idxs = tree.query(query_points)
+
+    # Get the faces that contain the nearest vertex idx
+    # Search in wich face is contained that index
+
+    # Get vertices of the nearest triangles
+    nearest_triangles = mesh_triangles[nearest_triangle_idxs]
+
+    print(nearest_triangles)
+
+    # Get vertices of the nearest triangles
+    v0 = mesh_vertices[nearest_triangles[:, 0]]
+    v1 = mesh_vertices[nearest_triangles[:, 1]]
+    v2 = mesh_vertices[nearest_triangles[:, 2]]
+
+    # Compute closest points on the nearest triangles
+    closest_points_on_triangles, bar_coord  = distance_point_to_triangle(query_points, v0, v1, v2)
+
+    return closest_points_on_triangles, bar_coord
