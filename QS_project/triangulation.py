@@ -167,4 +167,6 @@ mesh.add_vector_quantity("l_uv", or_l, defined_on="vertices", vectortype='ambien
 #ps.register_surface_mesh("Proj", V_R, TF)
 #ps.register_surface_mesh("C_uv", C_uv, TF)
 
+save_torsal(vc, t1, t2, name=parser.parse_args().file_name)
+
 ps.show()

@@ -909,6 +909,41 @@ def torsal_dir_show(baricenter, t1, t2, size=0.005, rad=0.0005,  color=(1,1,1), 
     t1_net.set_radius(rad, relative=False) 
     t2_net.set_radius(rad, relative=False)
 
+def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, name=""):
+
+    # Torsal directions t1
+    t1_dir_i = baricenter.reshape(-1,3) + size*t1
+    t1_dir_f = baricenter.reshape(-1,3) - size*t1
+
+    # Torsal directions t2 
+    t2_dir_i = baricenter.reshape(-1,3) + size*t2
+    t2_dir_f = baricenter.reshape(-1,3) - size*t2
+    
+    t2_nodes = np.concatenate((t2_dir_i, t2_dir_f), axis=0)
+    t1_nodes = np.concatenate((t1_dir_i, t1_dir_f), axis=0)
+
+    t1_edges = np.array([[i, i + len(t1_dir_i)] for i in range(len(t1_dir_i))])
+
+    # Create two files for each vector field
+    file1 = name + '_D1.obj'
+    file2 = name + '_D2.obj'
+
+
+    # Write the first vector field
+    with open(file1, 'w') as f:
+        for v in t1_nodes:
+            f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
+        for l in t1_edges:
+            f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
+
+    # Write the second vector field
+    with open(file2, 'w') as f:
+        for v in t2_nodes:
+            f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
+        for l in t1_edges:
+            f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
+        
+
 def get_torsal_Mesh(V, F, L):
     """ Function that compute the torsal directions given a polyhedral surface
     with a line congruence per vertex
