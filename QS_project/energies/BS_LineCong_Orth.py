@@ -83,7 +83,7 @@ class BS_LC_Orth(Constraint):
         l = l.reshape(len(self.u_pts), len(self.v_pts), 3)
 
         # compute l. n
-        l_n = np.sum(l*self.n, axis=2)
+        l_n = np.einsum('ijk, ijk-> ij', l,self.n)
 
         # E_orth = || l.n - cos(a) -  mu^2 ||^2
         # d_l E_orth = 2 (l.n) n

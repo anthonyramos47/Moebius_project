@@ -66,13 +66,13 @@ experiment_dir = os.path.join(dir_path, "experiments")
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-#bspline_surf_name, dir = "Complex_test_S2", 1
+bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
 
 # Florian Non change mean Curvature
-bspline_surf_name, dir = "Florian", 1
+#bspline_surf_name, dir = "Florian", 1
 
 # Dat name
 #bspline_surf_name, dir = "inv_1", 1

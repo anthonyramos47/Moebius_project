@@ -152,8 +152,8 @@ class BS_LC(Constraint):
         # = Derivatives with respec to the control points
         for k in range(len(cp)):
 
-            d_ak_E_cu = np.sum(self.d_a_cu[k]*l, axis=2)/self.cu_norm
-            d_ak_E_cv = np.sum(self.d_a_cv[k]*l, axis=2)/self.cv_norm
+            d_ak_E_cu = np.einsum('ijk, ijk-> ij', self.d_a_cu[k],l)/self.cu_norm
+            d_ak_E_cv = np.einsum('ijk, ijk-> ij', self.d_a_cv[k],l)/self.cv_norm
 
             #d_ak_E_cu = signs*(2*np.sum(self.d_a_cu[k]*l, axis=2)/cu_2)*(np.sum(l*cu, axis=2))
             #d_ak_E_cv = signs*(2*np.sum(self.d_a_cv[k]*l, axis=2)/cv_2)*(np.sum(l*cv, axis=2))
@@ -173,12 +173,12 @@ class BS_LC(Constraint):
                                 
 
         # r_cu = l.cu/||cu||^2 
-        r_cu = (np.sum(l*cu, axis=2)/self.cu_norm).flatten()    
+        r_cu = (np.einsum('ijk, ijk-> ij', l ,cu)/self.cu_norm).flatten()    
         #r_cu = (np.sum(l*cu, axis=2)**2/cu_2).flatten()
         self.set_r(self.const_idx["E_cu"], r_cu)
 
         # r_cv = l.cv/||cv||^2
-        r_cv = (np.sum(l*cv, axis=2)/self.cv_norm).flatten()
+        r_cv = (np.einsum('ijk, ijk-> ij', l, cv)/self.cv_norm).flatten()
         #r_cv = (np.sum(l*cv, axis=2)**2/cv_2).flatten()
         self.set_r(self.const_idx["E_cv"], r_cv)
 

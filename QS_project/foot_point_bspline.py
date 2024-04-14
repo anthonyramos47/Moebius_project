@@ -17,6 +17,7 @@ if not hanan_path:
 sys.path.append(hanan_path)
 
 from geometry.utils import *
+from geometry.mesh import Mesh
 from utils.bsplines_functions import *
 
 
@@ -65,34 +66,71 @@ sample = (len(u_pts), len(v_pts))
 # End of constraints ===================================
 V, F = Bspline_to_mesh(BSurf, u_pts, v_pts, sample)
 
-
-
-p_q, _ = closest_grid_points(ffV, V)
-
+# Compute footpoints of remeshed mesh onto the B-spline
 foot_pts = foot_points(ffV, V, u_pts, v_pts, BSurf)
-
 foot_pts = foot_pts.reshape(-1, 2)
 
-# Evaluate 
+# Evaluate the B-spline functions at the foot points bsurf(u, v), r(u, v) and n(u, v)
 f_pts = np.zeros((len(foot_pts), 3))
 r_pts = np.zeros((len(foot_pts), 3))
 n_dir = np.zeros((len(foot_pts), 3))
 
+
 for i in range(len(foot_pts)):
     f_pts[i] = BSurf(foot_pts[i, 0], foot_pts[i, 1])
     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
-    
     r_pts[i] = bisplev(foot_pts[i, 0], foot_pts[i, 1], rsurf)
 
+# Compute the vertices of the mid mesh
 VR = f_pts + r_pts[:,None]*n_dir
-
 VR = VR.reshape(-1, 3)
 
+# Compute the nodes of the mid mesh
 c0, c1, c2, c3 = VR[ffF[:, 0]], VR[ffF[:, 1]], VR[ffF[:, 2]], VR[ffF[:, 3]]
 
+# Compute the baricenter of the mid mesh
 cc = (c0 + c1 + c2 + c3)/4
 
+# Compute the barycenter at the remeshed mesh
 vc = np.sum(f_pts[ffF], axis=1)/4
+
+# Compute radius of spheres
+rads = np.linalg.norm(vc - cc, axis=1)
+
+
+
+# Create HE mesh 
+mesh = Mesh()
+mesh.make_mesh(f_pts, ffF)
+
+print(f"Number of faces: {len(ffF)}")
+print(f"Number of ccs:   {len(cc)}")
+
+# Get the face-face adjacency list 
+f_f_adj = mesh.face_face_adjacency_list()
+
+inn_f = mesh.inner_faces()
+# Prepare sphere date for export
+# (cc, rads, vc, f_f_adj)
+
+# Open file
+exp_file = open(os.path.join(exp_dir, 'spheres_exp.dat'), 'w')
+
+# Write inn_f in the first line
+for i in inn_f:
+    exp_file.write(f"{i} ")
+exp_file.write("\n")
+
+for i in range(len(ffF)):
+
+    exp_file.write(f"{cc[i][0]} {cc[i][1]} {cc[i][2]} {rads[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
+
+    for j in f_f_adj[i]:
+        exp_file.write(f"{j} ")
+
+    exp_file.write("\n")
+
+exp_file.close()
 
 
 

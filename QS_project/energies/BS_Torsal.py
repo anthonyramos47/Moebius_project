@@ -72,8 +72,8 @@ class BS_Torsal(Constraint):
         v0, v1, v2, v3 = s_uv[self.i0], s_uv[self.i1], s_uv[self.i2], s_uv[self.i3]
 
         # Compute the derivatives of the grid
-        self.du = v2 - v0
-        self.dv = v1 - v3
+        self.du = (v2 - v0)
+        self.dv = (v1 - v3)
 
         # Compute normal of BSpline surface
         n = bsp.normal(u_pts, v_pts)
@@ -83,7 +83,7 @@ class BS_Torsal(Constraint):
         l = l.reshape(sample[0], sample[1], 3)
 
         # Reorient l 
-        sign = np.sign(np.sum(l*n, axis=2))
+        sign = np.sign(np.einsum('ijk,ijk->ij', l, n))
         l = l*sign[:,:,None]
         
         # Compute the line congruence at the baricenter and the line congruence directions
@@ -176,8 +176,8 @@ class BS_Torsal(Constraint):
         # Add E_lc_nt E = || lc/||lc||.nt ||^2
         self.E_lc_nt(lc, nt1, nt2, var_idx)
         
-        # final_t = time()
-        #self.print_per_const_energy()
+        #final_t = time()
+        self.print_per_const_energy()
         #print("Time to compute BTorsal:", final_t - init_t)
  
     def E_t_unit(self, t1, t2, var_idx):
@@ -193,7 +193,7 @@ class BS_Torsal(Constraint):
         cols = self.const_idx["t1_unit"]
 
         # d u1
-        d_u1_E_t_unit1 = 2*(vec_dot(self.du, t1))
+        d_u1_E_t_unit1 = 2*(np.einsum('ij,ij->i', self.du, t1))
         self.add_derivatives(
             cols, 
             var_idx["u1"],
@@ -201,7 +201,7 @@ class BS_Torsal(Constraint):
         )
 
         # d v1
-        d_v1_E_t_unit1 = 2*(vec_dot(self.dv, t1))
+        d_v1_E_t_unit1 = 2*(np.einsum('ij,ij->i', self.dv, t1))
         self.add_derivatives(
             cols, 
             var_idx["v1"],
@@ -209,13 +209,13 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(cols, np.sum(t1**2, axis=1) - 1)
+        self.set_r(cols, np.einsum('ij,ij->i', t1, t1)-1)
 
         # E_t_unit2 = || t2^2 - 1 ||^2
         cols = self.const_idx["t2_unit"]
 
         # d u2
-        d_u2_E_t_unit2 = 2*(vec_dot(self.du, t2))
+        d_u2_E_t_unit2 = 2*(np.einsum('ij,ij->i', self.du, t2))
         self.add_derivatives(
             cols, 
             var_idx["u2"],
@@ -223,7 +223,7 @@ class BS_Torsal(Constraint):
         )
 
         # d v2
-        d_v2_E_t_unit2 = 2*(vec_dot(self.dv, t2))
+        d_v2_E_t_unit2 = 2*(np.einsum('ij,ij->i', self.dv, t2))
         self.add_derivatives(
             cols, 
             var_idx["v2"],
@@ -231,7 +231,7 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(cols, np.sum(t2**2, axis=1) - 1)
+        self.set_r(cols, np.einsum('ij,ij->i', t2, t2) - 1)
 
 
     def E_t_nt(self, nt1, nt2, t1, t2, var_idx):
@@ -251,7 +251,7 @@ class BS_Torsal(Constraint):
         cols = self.const_idx["t_nt1"]
 
         # d u1
-        d_u1_E_t_nt1 = (vec_dot(self.du, nt1))
+        d_u1_E_t_nt1 = (np.einsum('ij,ij->i', self.du, nt1))
         self.add_derivatives(
             cols, 
             var_idx["u1"],
@@ -259,7 +259,7 @@ class BS_Torsal(Constraint):
         )
 
         # d v1
-        d_v1_E_t_nt1 = (vec_dot(self.dv, nt1))
+        d_v1_E_t_nt1 = (np.einsum('ij,ij->i', self.dv, nt1))
         self.add_derivatives(
             cols, 
             var_idx["v1"],
@@ -274,8 +274,9 @@ class BS_Torsal(Constraint):
             d_nt1_E_t_nt1
         )
 
+        assert np.einsum('ij,ij->i', t1, nt1)== np.sum(t1*nt1, axis=1), "Error"
         # Set residual  
-        self.set_r(cols, np.sum(t1*nt1, axis=1))
+        self.set_r(cols, np.einsum('ij,ij->i', t1, nt1))
 
         # E_t_nt2 = || t2.nt2 ||^2
         cols = self.const_idx["t_nt2"]
@@ -305,7 +306,7 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(cols, np.sum(t2*nt2, axis=1))
+        self.set_r(cols, np.einsum('ij,ij->i', t2, nt2))
 
 
     def E_lt_nt(self, lu, lv, nt1, nt2, u1, v1, u2, v2, var_idx):
@@ -379,14 +380,14 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(self.const_idx["lt_nt1"], np.sum(lt1*nt1, axis=1)/self.lt1_norm)
+        self.set_r(self.const_idx["lt_nt1"], np.einsum('ij,ij->i', lt1, nt1)/self.lt1_norm)
 
         # E_lt_nt2 = || lt2/||lt2||.nt2 ||^2
         # Cols E_lt_nt2
         cols = self.const_idx["lt_nt2"].repeat(3)
 
         # d u2
-        d_u2_E_lt_nt2 = (vec_dot(lu, nt2)/self.lt2_norm)
+        d_u2_E_lt_nt2 = (np.einsum('ij,ij->i', lu, nt2)/self.lt2_norm)
         self.add_derivatives(
             self.const_idx["lt_nt2"], 
             var_idx["u2"],
@@ -394,7 +395,7 @@ class BS_Torsal(Constraint):
         )
         
         # d v2
-        d_v2_E_lt_nt2 = (vec_dot(lv, nt2)/self.lt2_norm)
+        d_v2_E_lt_nt2 = (np.einsum('ij,ij->i', lv, nt2)/self.lt2_norm)
         self.add_derivatives(
             self.const_idx["lt_nt2"], 
             var_idx["v2"],
@@ -437,7 +438,7 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(self.const_idx["lt_nt2"], np.sum(lt2*nt2, axis=1)/self.lt2_norm)
+        self.set_r(self.const_idx["lt_nt2"], np.einsum('ij,ij->i', lt2, nt2)/self.lt2_norm)
 
         # Update norms
         self.lt1_norm = np.linalg.norm(lt1, axis=1)
@@ -490,7 +491,7 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(self.const_idx["lc_nt1"], np.sum(lc*nt1, axis=1)/self.lc_norm)
+        self.set_r(self.const_idx["lc_nt1"], np.einsum('ij,ij->i', lc, nt1)/self.lc_norm)
 
         # E lc_nt2
         cols = self.const_idx["lc_nt2"].repeat(3)
@@ -526,7 +527,7 @@ class BS_Torsal(Constraint):
         )
 
         # Set residual
-        self.set_r(self.const_idx["lc_nt2"], np.sum(lc*nt2, axis=1)/self.lc_norm)
+        self.set_r(self.const_idx["lc_nt2"], np.einsum('ij,ij->i', lc, nt2)/self.lc_norm)
 
         # Update lc norm 
         self.lc_norm = np.linalg.norm(lc, axis=1)

@@ -158,11 +158,12 @@ def reorient(d1, d2, v1, v2, l1, l2):
 # -----------------------------------------------------------------------------
             
 path = '/Users/cisneras/hanan/hananLab/'
-name = 'Nice_result_deformed_crossfield'
-mesh = 'Nice_result_deformed'
+name = 'Complex_res'
+cf =  name+'_deformed_crossfield'
+mesh = name+'_deformed'
 
 
-file_path = path + name + '.obj'
+file_path = path + cf + '.obj'
 mesh_path = path + mesh + '.obj'
 
 # Read the cross field

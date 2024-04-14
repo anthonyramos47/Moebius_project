@@ -99,8 +99,10 @@ def vec_dot(v1, v2, ax=1):
     """
     if len(v1.shape) == 1 and len(v2.shape) == 1:
         dot =  v1@v2
-    else: 
-        dot = np.sum(v1*v2, axis=ax) 
+    elif ax == 1:
+        dot = np.einsum('ij,ij->i', v1, v2)
+    elif ax == 0:
+        dot = np.einsum('ij,ij->j', v1, v2)
 
     return dot
 

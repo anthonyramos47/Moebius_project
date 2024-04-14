@@ -3,7 +3,8 @@
 
 #Exp_dir="/home/anthony/Hanan Lab/hananLab/QS_project/experiments/"
 Exp_dir="/Users/cisneras/hanan/hananLab/QS_project/experiments/"
-Exp_name="Nice_result.pickle"
+#Exp_name="Nice_result.pickle"
+Exp_name="Complex_res.pickle"
 
 file_path=$Exp_dir$Exp_name
 echo $Exp_dir$Exp_name
