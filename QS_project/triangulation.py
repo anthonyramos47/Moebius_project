@@ -19,13 +19,12 @@ sys.path.append(hanan_path)
 from geometry.utils import *
 from utils.bsplines_functions import *
 
-
-
 path = os.getcwd()
-print(path)
+print("Path triangulation:", path)
 
 # experiment dir
-exp_dir = os.path.join(path, 'experiments')
+exp_dir = os.path.join(path, 'QS_project', 'experiments')
+print("Experiment dir:", exp_dir)
 
 
 # Create the parser
@@ -38,7 +37,7 @@ parser.add_argument('file_name', type=str, help='File name to load')
 file_name = parser.parse_args().file_name
 
 # Save dir
-save_dir = os.path.join(path, 'data', 'Remeshing', file_name)
+save_dir = os.path.join(path, 'QS_project', 'data', 'Remeshing', file_name)
 
 print("Save dir:", save_dir)
 
