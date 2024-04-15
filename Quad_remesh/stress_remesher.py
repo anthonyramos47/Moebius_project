@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # Get mean diagonals
     mean_diag =  np.min(np.vstack([du, dv]).mean(axis=1) )
 
-    scale = 0.05
+    scale = mean_diag*0.5
 
 
     w_f, w_c= float(args.w_fairnes), float(args.w_closenes)

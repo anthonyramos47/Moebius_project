@@ -128,31 +128,15 @@ def reorient(d1, d2, v1, v2, l1, l2):
     angle_v2_d1 = np.arccos(np.abs(np.sum(v2_d*d1, axis=1)))
     
 
-    idx_flip = np.where(angle_v1_d1 > angle_v2_d1)[0]
-    idx_nor = np.where(angle_v1_d1 <= angle_v2_d1)[0]
-
-    # Get signs 
-    s11 = np.sign(np.sum(v1_d*d1, axis=1))
-    s22 = np.sign(np.sum(v2_d*d2, axis=1))
-
-    s12 = np.sign(np.sum(v1_d*d2, axis=1))
-    s21 = np.sign(np.sum(v2_d*d1, axis=1))
-
-    
-
-    # Reorient the lines
-    #v1[l1[:,1]][idx_flip] = s12[idx_flip, None] * v1_d[idx_flip]
-    #v1[l1[:,1]][idx_nor]  = s11[idx_nor, None]  * v1_d[idx_nor]
-
-    v1[l1[:,1]] = v1_p + s11[:,None]*v1[l1[:,1]]
-
-    #v2[l2[:,1]][idx_flip] = s21[idx_flip, None] * v2_d[idx_flip]
-    #v2[l2[:,1]][idx_nor]  = s22[idx_nor, None]  * v2_d[idx_nor]
-
-    v2[l2[:,1]] = v2_p + s22[:,None]*v2[l2[:,1]]
-
-    # v1[l1[:,1]] = v1_p + d1
-    # v2[l2[:,1]] = v2_p + d2 
+    for i in range(v1_d):
+        if angle_v1_d1[i] > angle_v2_d1[i]:
+            v1[l1[i,1]] = v1_p[i] + d2
+            v2[l2[i,1]] = v2_p[i] + d1 
+        else:
+            v1[l1[i,1]] = v1_p[i] + d1
+            v2[l2[i,1]] = v2_p[i] + d2
+   
+   
 
 
 # -----------------------------------------------------------------------------
