@@ -89,7 +89,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     
-    with open(args.pkl_name, 'rb') as file:
+    with open(args.pkl_name+'.pickle', 'rb') as file:
         data  = pickle.load(file)
 
     V = data["V"]
@@ -121,11 +121,14 @@ if __name__ == '__main__':
 
 
     w_f, w_c= float(args.w_fairnes), float(args.w_closenes)
+
+    # Mac path
+    path = "/Users/cisneras/hanan/hananLab/QS_project/data/Remeshing"
+
     name = args.pkl_name.split('/')[-1].split('.')[0]
+    file_path = os.path.join(path, name, name)
 
     save = 1
-
-    
 
     # per face directions
     # D1 = np.loadtxt(dir_data+'tor_D1.dat', delimiter=',', dtype=np.float64)
@@ -154,8 +157,8 @@ if __name__ == '__main__':
     opt.optimize()
 
     if save:
-        opt.save_mesh('{}_deformed'.format(name), field_scale=1, save_all=True)
-        geo.save_mesh_obj(V, F, '{}_start'.format(name), overwrite=True)
+        opt.save_mesh('{}_deformed'.format(file_path), field_scale=1, save_all=True)
+        geo.save_mesh_obj(V, F, '{}_start'.format(file_path), overwrite=True)
 
     v1, v2 = opt.vectors()
 

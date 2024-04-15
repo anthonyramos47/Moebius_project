@@ -27,6 +27,7 @@ print(path)
 # experiment dir
 exp_dir = os.path.join(path, 'experiments')
 
+
 # Create the parser
 parser = argparse.ArgumentParser(description="Visualizer Parser")
 
@@ -35,6 +36,11 @@ parser.add_argument('file_name', type=str, help='File name to load')
 
 # Parse the command line arguments
 file_name = parser.parse_args().file_name
+
+# Save dir
+save_dir = os.path.join(path, 'data', 'Remeshing', file_name)
+
+print("Save dir:", save_dir)
 
 file_name += '.pickle'
 
@@ -167,6 +173,6 @@ mesh.add_vector_quantity("l_uv", or_l, defined_on="vertices", vectortype='ambien
 #ps.register_surface_mesh("Proj", V_R, TF)
 #ps.register_surface_mesh("C_uv", C_uv, TF)
 
-save_torsal(vc, t1, t2, name=parser.parse_args().file_name)
+save_torsal(vc, t1, t2, path=save_dir)
 
 ps.show()

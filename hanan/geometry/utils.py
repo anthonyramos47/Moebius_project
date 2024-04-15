@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import polyscope as ps
 from scipy.optimize import minimize
 from scipy.spatial import KDTree
@@ -907,7 +908,10 @@ def torsal_dir_show(baricenter, t1, t2, size=0.005, rad=0.0005,  color=(1,1,1), 
     t1_net.set_radius(rad, relative=False) 
     t2_net.set_radius(rad, relative=False)
 
-def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, name=""):
+def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path=""):
+
+    # Get the last name of name
+    name = path.split('/')[-1]
 
     # Torsal directions t1
     t1_dir_i = baricenter.reshape(-1,3) 
@@ -925,9 +929,14 @@ def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, name=""):
 
     t1_edges = np.array([[i, i + len(t1_dir_i)] for i in range(len(t1_dir_i))])
 
+    # Check if path exist
+    if not os.path.exists(path):
+        os.makedirs(path)
+        
+
     # Create two files for each vector field
-    file1 = name + '_D1.obj'
-    file2 = name + '_D2.obj'
+    file1 = os.path.join(path, name+'_TD1.obj')
+    file2 = os.path.join(path, name+'_TD2.obj')
 
 
     # Write the first vector field
