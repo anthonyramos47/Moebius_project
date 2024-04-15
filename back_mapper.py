@@ -3,11 +3,19 @@ import igl
 import polyscope as ps
 from scipy.spatial import KDTree
 
+# Import the necessary libraries
+import os
+import sys
+from pathlib import Path
+import argparse
+
+hanan_path = os.getenv('HANANLAB_PATH')
+if not hanan_path:
+    raise EnvironmentError("HANANLAB_PATH environment variable not set")
+sys.path.append(hanan_path)
 
 
 # -----------------------------------------------------------------------------
-
-
 
 def distance_point_to_triangle(p, v0, v1, v2):
     """
@@ -231,20 +239,26 @@ def reorient(d1, d2, v1, v2, l1, l2):
 
 
 # -----------------------------------------------------------------------------
-            
-path = '/Users/cisneras/hanan/hananLab/'
-name = 'Nice_result'
+
+# Create the parser
+parser = argparse.ArgumentParser(description="Backmapper name")
+
+# Add an argument
+parser.add_argument('file_name', type=str, help='File name to load')
+
+# Parse the command line arguments
+file_name = parser.parse_args().file_name            
+
+path =  hanan_path
 
 
-
-or_mesh = name+'_start'
-de_mesh = name+'_deformed'
-remesh  = name+'_remesh'
+or_mesh = file_name + '_start'
+de_mesh = file_name + '_deformed'
+remesh  = file_name + '_remesh'
 
 or_mesh_path = path + or_mesh + '.obj'
 de_mesh_path = path + de_mesh + '.obj'
 remesh_path  = path + remesh + '.obj'
-
 
 orV, orF = igl.read_triangle_mesh(or_mesh_path)
 rV , rF = read_obj_faces(remesh_path)
@@ -259,13 +273,13 @@ cpt1, bar = distance_point_to_triangle(cpts, v0, v1, v2)
 iglbar = igl.barycentric_coordinates_tri(cpts, v0, v1, v2)
 
 orV += [0,0,2]
+
 #newpts = iglbar[:, 0][:,None]*v0 + iglbar[:, 1][:,None]*v1 + iglbar[:, 2][:,None]*v2
 newpts = iglbar[:,0][:,None]*orV[orF[l,0]] + iglbar[:,1][:,None]*orV[orF[l,1]] + iglbar[:,2][:,None]*orV[orF[l,2]]
 
 valid = np.zeros(len(orF))
 valid[0] = 1
 valid[4] = 1
-
 
 ps.init()
 dmesh = ps.register_surface_mesh("deformed", dV, dF)
@@ -276,10 +290,11 @@ omesh.add_scalar_quantity("valid", valid, defined_on='faces', enabled = False)
 
 ps.register_surface_mesh("Remap", newpts, rF)
 ps.register_surface_mesh("remeshed", rV, rF)
+
 # ps.register_point_cloud("closest", cpt1, radius = 0.002)
 
 # ps.register_surface_mesh("Closest", cpts, rF)
-
-ps.show()
 #ps.register_surface_mesh("original", orV, orF)
+ps.show()
+
 

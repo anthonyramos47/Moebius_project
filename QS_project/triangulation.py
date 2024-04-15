@@ -73,26 +73,26 @@ ot2 = data['t2']
 ot1 = ot1.reshape(-1, 3)
 ot2 = ot2.reshape(-1, 3)
 
-v0, v1, v2, v3 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]], V[F[:, 3]]
-l0, l1, l2, l3 = or_l[F[:, 0]], or_l[F[:, 1]], or_l[F[:, 2]], or_l[F[:, 3]]
+# v0, v1, v2, v3 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]], V[F[:, 3]]
+# l0, l1, l2, l3 = or_l[F[:, 0]], or_l[F[:, 1]], or_l[F[:, 2]], or_l[F[:, 3]]
 
-lu = l2 - l0
-lv = l1 - l3
+# lu = l2 - l0
+# lv = l1 - l3
 
-du = v2 - v0
-dv = v3 - v0
+# du = v2 - v0
+# dv = v3 - v0
 
-bc = ( v0 + v1 + v2 + v3 ) / 4
-lc = ( l0 + l1 + l2 + l3 ) / 4
+# bc = ( v0 + v1 + v2 + v3 ) / 4
+# lc = ( l0 + l1 + l2 + l3 ) / 4
 
-ct1, ct2, _, _, _, _, idx =  torsal_directions(lc, lu, lv, du, dv)
+# # ct1, ct2, _, _, _, _, idx =  torsal_directions(lc, lu, lv, du, dv)
 
 
-valid = np.zeros(len(F))
-valid[idx] = 1
+# valid = np.zeros(len(F))
+# valid[idx] = 1
 
-BSurf = data['surf']
-rsurf = data['r_uv']
+# BSurf = data['surf']
+# rsurf = data['r_uv']
 # Assuming V and F are your vertices and faces arrays
 # For demonstration, let's create some dummy data
 # V: 3D positions of vertices (N x 3 numpy array)
@@ -152,26 +152,27 @@ print(len(F))
 # l_uv = np.zeros((len(ui_vj), 3))
 
 
-# If you want to save the remeshed mesh to a file
-ps.init()
+# # If you want to save the remeshed mesh to a file
+# ps.init()
 
-ps.remove_all_structures()
+# ps.remove_all_structures()
 
-or_mesh = ps.register_surface_mesh("mesh", V, F)
-or_mesh.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
-or_mesh.add_vector_quantity("l", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.0, 1.0, 0.0))
+# or_mesh = ps.register_surface_mesh("mesh", V, F)
+# or_mesh.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
+# or_mesh.add_vector_quantity("l", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.0, 1.0, 0.0))
 
-ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
+# ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
 
-torsal_dir_show(vc, t1, t2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
-torsal_dir_show(bc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,0,1), name="Or")
-torsal_dir_show(bc, ct1, ct2, size=0.02, rad=0.0005,  color=(1,0,0), name="ReComp")
+# torsal_dir_show(vc, t1, t2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
+# torsal_dir_show(bc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,0,1), name="Or")
+# torsal_dir_show(bc, ct1, ct2, size=0.02, rad=0.0005,  color=(1,0,0), name="ReComp")
 
-mesh = ps.register_surface_mesh("remeshed", V, TF)
-mesh.add_vector_quantity("l_uv", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
-#ps.register_surface_mesh("Proj", V_R, TF)
-#ps.register_surface_mesh("C_uv", C_uv, TF)
+# mesh = ps.register_surface_mesh("remeshed", V, TF)
+# mesh.add_vector_quantity("l_uv", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
+# #ps.register_surface_mesh("Proj", V_R, TF)
+# #ps.register_surface_mesh("C_uv", C_uv, TF)
+#ps.show()
 
 save_torsal(vc, t1, t2, path=save_dir)
 
-ps.show()
+

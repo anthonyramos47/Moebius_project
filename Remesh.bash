@@ -21,7 +21,7 @@ conda activate geo
 file_path=$Exp_dir$Exp_name
 echo $Exp_dir$Exp_name
 
-python Quad_remesh/stress_remesher.py "$file_path" 0.01 0.001 300
+python Quad_remesh/stress_remesher.py "$file_path" 0.001 0.002 300
 
 conda deactivate
 conda activate hananJ

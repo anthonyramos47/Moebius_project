@@ -147,13 +147,13 @@ def reorient(d1, d2, v1, v2, l1, l2):
     angle_v2_d1 = np.arccos(np.abs(np.sum(v2_d*d1, axis=1)))
     
 
-    for i in range(v1_d):
+    for i in range(len(v1_d)):
         if angle_v1_d1[i] > angle_v2_d1[i]:
-            v1[l1[i,1]] = v1_p[i] + d2
-            v2[l2[i,1]] = v2_p[i] + d1 
+            v1[l1[i,1]] = np.sign( d2 @ v1_d[i]) * v1_d[i]
+            v2[l2[i,1]] = np.sign( d1 @ v1_d[i]) * v2_d[i]
         else:
-            v1[l1[i,1]] = v1_p[i] + d1
-            v2[l2[i,1]] = v2_p[i] + d2
+            v1[l1[i,1]] = np.sign( d1 @ v2_d[i]) * v1_d[i]
+            v2[l2[i,1]] = np.sign( d2 @ v2_d[i]) * v2_d[i]
    
    
 
@@ -176,10 +176,14 @@ vd, fd = read_obj_faces(mesh_path)
 v1, v2, l1, l2 = sep_cross_field(v)
 
 # Get the directions of the diagonals
-#d1, d2 = get_dir_diag(vd, fd)
+d1, d2 = get_dir_diag(vd, fd)
 
+l1 = np.array(l1)
+l2 = np.array(l2)
+
+# print(v1[l1[0,0]], v1[l1[0,1]] )
 # Reorient the lines
-#reorient(d1, d2, v1, v2, l1, l2)
-
+reorient(d1, d2, v1, v2, l1, l2)
+# print(v1[l1[0,0]], v1[l1[0,1]] )
 # Save the two vector fields
 save_fields(save_path, v1, l1, v2, l2)
