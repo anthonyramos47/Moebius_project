@@ -21,13 +21,6 @@ from geometry.mesh import Mesh
 from utils.bsplines_functions import *
 
 
-path = os.getcwd()
-print(path)
-
-# experiment dir
-exp_dir = os.path.join(path, 'experiments')
-
-objs_dir = '/Users/cisneras/hanan/hananLab'
 
 # Create the parser
 parser = argparse.ArgumentParser(description="Visualizer Parser")
@@ -39,12 +32,23 @@ parser.add_argument('file_name', type=str, help='File name to load')
 name = parser.parse_args().file_name
 pickle_name = name+'.pickle'
 
+# Working directory
+working_path = os.getcwd()
+
+# Experiments folder
+exp_dir = os.path.join(working_path, 'experiments')
+
+# Remeshing data folder
+remeshing_dir = os.path.join(working_path, 'data', 'Remeshing', name)
+
 # Frame Field remeshed obj
-remeshed_obj = name+'_FFR.obj'
-
-ffV, ffF = read_obj(os.path.join(objs_dir, remeshed_obj))
+remeshed_obj = os.path.join( remeshing_dir,  name+'_backmapped.obj')
 
 
+# Read remeshed mesh
+ffV, ffF = read_obj(remeshed_obj)
+
+# Load picke information
 def load_data():
     """ Function to load the data from a pickle file
     """
@@ -55,18 +59,22 @@ def load_data():
 
 data = load_data()
 
+# Get u and v points 
 u_pts = data['u_pts']
 v_pts = data['v_pts']
 
+# Get the B-spline and its derivatives
 BSurf = data['surf']
 rsurf = data['r_uv']
 
 
+# Sample size of the B-spline
 sample = (len(u_pts), len(v_pts))   
-# End of constraints ===================================
+
+# Evaluate the B-spline at the u and v points
 V, F = Bspline_to_mesh(BSurf, u_pts, v_pts, sample)
 
-# Compute footpoints of remeshed mesh onto the B-spline
+# Compute footpoints (u,v) coordinates of remeshed mesh onto the B-spline
 foot_pts = foot_points(ffV, V, u_pts, v_pts, BSurf)
 foot_pts = foot_pts.reshape(-1, 2)
 
@@ -74,8 +82,6 @@ foot_pts = foot_pts.reshape(-1, 2)
 f_pts = np.zeros((len(foot_pts), 3))
 r_pts = np.zeros((len(foot_pts), 3))
 n_dir = np.zeros((len(foot_pts), 3))
-
-
 for i in range(len(foot_pts)):
     f_pts[i] = BSurf(foot_pts[i, 0], foot_pts[i, 1])
     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
@@ -97,24 +103,17 @@ vc = np.sum(f_pts[ffF], axis=1)/4
 # Compute radius of spheres
 rads = np.linalg.norm(vc - cc, axis=1)
 
-
-
 # Create HE mesh 
 mesh = Mesh()
 mesh.make_mesh(f_pts, ffF)
 
-print(f"Number of faces: {len(ffF)}")
-print(f"Number of ccs:   {len(cc)}")
-
 # Get the face-face adjacency list 
 f_f_adj = mesh.face_face_adjacency_list()
-
+# Get inner faces indices
 inn_f = mesh.inner_faces()
-# Prepare sphere date for export
-# (cc, rads, vc, f_f_adj)
 
 # Open file
-exp_file = open(os.path.join(exp_dir, 'spheres_exp.dat'), 'w')
+exp_file = open(os.path.join(remeshing_dir, name+'_sphs.dat'), 'w')
 
 # Write inn_f in the first line
 for i in inn_f:
@@ -131,7 +130,6 @@ for i in range(len(ffF)):
     exp_file.write("\n")
 
 exp_file.close()
-
 
 
 

@@ -263,6 +263,22 @@ def draw_plane(p0, n, size=(1,1), name="_"):
     ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=(0.1, 0.1, 0.1), transparency=0.6)
 
 
+def write_obj(filename, vertices, faces):
+    """
+        Write obj file
+    """
+    file_name = str(filename)
+    obj_file = open(file_name, 'w')
+    for v in vertices:
+        obj_file.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
+    for f in faces:
+        obj_file.write('f ')
+        for idx in f:
+            obj_file.write('{} '.format(idx+1))
+        obj_file.write('\n')
+        
+    obj_file.close()
+
 def read_obj(filename):
     """
         Read obj file and return vertices and faces
@@ -932,7 +948,7 @@ def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path=""):
     # Check if path exist
     if not os.path.exists(path):
         os.makedirs(path)
-        
+
 
     # Create two files for each vector field
     file1 = os.path.join(path, name+'_TD1.obj')

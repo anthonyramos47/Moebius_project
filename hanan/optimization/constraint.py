@@ -4,6 +4,7 @@
 import numpy as np
 import geometry as geo
 from scipy.sparse import csc_matrix
+from time import time
 
 
 class Constraint():
@@ -67,11 +68,13 @@ class Constraint():
         # print("shape i:", len(self._i)) 
         # print("shape j:", len(self._j))
         # print("shape values:", len(self._values))
+
+        in_t = time()
         if self.sparse:
             self._J = csc_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
         else:
             self._J = csc_matrix(self._J)
-
+        
         #print("Jacobian", self.J.toarray())
 
     def compute(self, X) -> None:

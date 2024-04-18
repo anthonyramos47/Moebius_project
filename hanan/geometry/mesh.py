@@ -440,20 +440,13 @@ class Mesh():
         """
             Returns the adjacency list of the mesh
         """
-        # Get halfedges
-        H = self.halfedges
-
-        # Get the origin of the halfedges
-        vs = H[:, 0]
-
-        # Get the destination of the halfedges
-        vd = H[H[:, 1], 0]
+        v, vi = self.vertex_ring_vertices_iterators(order=True)
 
         adjacency = [[] for i in range(self.V)]
         
         # Store the destination of the halfedges in the adjacency list
-        for i in range(len(vs)):
-            adjacency[vs[i]].append(vd[i])
+        for i in range(len(v)):
+            adjacency[v[i]].append(vi[i])
 
         return adjacency
     
@@ -465,13 +458,13 @@ class Mesh():
         if order:
             i  = self.vertex_ring_ordered_halfedges()
             v  = v[i]
-            vj = vj[i]
+            vj = vj[i]    
         elif sort:
             i  = np.argsort(v)
             v  = v[i]
             vj = vj[i]
-        else:
-            return v, vj
+        
+        return v, vj
 
     def vertex_face_adjacency_list(self):
         """
@@ -495,6 +488,12 @@ class Mesh():
 
         return adjacency
     
+    # Half-Edge r-th row   :  | Origin | Twin | Face | Next | Previous | Edge |
+    #                             0        1     2      3       4          5
+                                 
+    # PrevHalf-Edge r-th row: | Origin | Face | Next | Prev |  Twin    | Edge |
+    #                             0        1     2      3       4          5
+    
 
     def face_face_adjacency_list(self):
         """
@@ -504,18 +503,17 @@ class Mesh():
         # Get halfedges
         H = self.halfedges
 
-        # Get the faces of the halfedges
-        fs = H[H[:, 2] != -1, :]
+        # Order indices
+        ord_idx = self.face_ordered_halfedges()
 
-        # Sort indices
-        idx = np.argsort(fs[:, 2])
+        # Start face
+        fs  =  H[ord_idx, 2]
 
         # Get Neighbors of each face
-        fs_n = H[fs[idx, 1], 2]
+        #fs_n = H[fs[idx, 1], 2]
+        fs_n = H[H[ord_idx, 1], 2]
 
-        # Order faces
-        fs = fs[idx, 2]
-
+      
         # Init adjacency list
         adjacency = [[] for i in range(self.F)]
 
@@ -542,6 +540,51 @@ class Mesh():
             if len(ring) == self.V:
                 return ring
         return np.unique(ring)
+    
+
+    def face_ordered_halfedges(self):
+        """
+        Code made by Davide Pellis and commented using ChatGPT 4. 
+        Modification of the indices Anthony
+        """
+        
+        # Make a copy of the halfedges array to avoid modifying the original data.
+        H = np.copy(self.halfedges)
+
+        # Sort the indices of halfedges based on the second column (presumably face indices).
+        i = np.argsort(H[:, 2])
+
+        # Filter out indices where the corresponding face index is non-negative (valid faces).
+        i = i[np.where(H[i, 2] >= 0)]
+
+        # Extract the face indices from the sorted and filtered list of halfedges.
+        f = H[i, 2]
+
+        # Create an array of indices from 0 to the number of items in i.
+        index = np.arange(i.shape[0])
+
+        # Find the first occurrence of each unique face in the sorted list of faces.
+        _, j = np.unique(f, True)
+
+        # Remove the first occurrence from the list of faces and index since we do not need to reorder the first half-edge of each face.
+        f = np.delete(f, j)
+        index = np.delete(index, j)
+
+        # Loop until there are no more faces to process.
+        while f.shape[0] > 0:
+            # Find the first occurrence of each remaining unique face.
+            _, j = np.unique(f, True)
+
+            # Update the indices to point to the next halfedge in the cycle for each face.
+            # H[i[index[j] - 1], 3] presumably accesses the 'next halfedge' index in the half-edge data structure.
+            i[index[j]] = H[i[index[j] - 1], 3]
+
+            # Again, remove the processed halfedges.
+            f = np.delete(f, j)
+            index = np.delete(index, j)
+
+        # Return the ordered indices of halfedges.
+        return i
         
     # Boundary and interior functions ----------------------------------------------------------
 
