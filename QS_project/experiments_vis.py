@@ -21,7 +21,7 @@ path = os.getcwd()
 print(path)
 
 # experiment dir
-exp_dir = os.path.join(path, 'experiments')
+exp_dir = os.path.join(path, 'QS_project', 'experiments')
 
 # Create the parser
 parser = argparse.ArgumentParser(description="Visualizer Parser")
