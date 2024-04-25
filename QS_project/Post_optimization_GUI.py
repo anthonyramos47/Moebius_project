@@ -222,7 +222,6 @@ for i, f_i in enumerate(dual_top):
 
 
 
-
 # Find zero nd
 #print(nd[np.where(np.linalg.norm(nd, axis=1) == 0)[0]])
 
@@ -320,6 +319,7 @@ w_supp = 1
 iter_per_opt = 10
 state = 0
 counter = 0
+init_opt = False
 name_saved = "Post_optimization"
 def optimization():
 
@@ -361,7 +361,7 @@ def optimization():
             opt.add_variable("r" , len(rads)   ) # Radii of spheres
 
             # Initialize Optimizer ("Method", step, verbosity)
-            opt.initialize_optimizer("LM", 0.6, 1)
+            opt.initialize_optimizer("LM", 0.3, 1)
 
             # Initialize variables
             opt.init_variable("c"  , cc.flatten()) 
@@ -372,19 +372,19 @@ def optimization():
             # Constraints ==========================================
             # Line congruence l.cu, l.cv = 0
             Supp_E = Supp()
-            opt.add_constraint(Supp_E, args=(dual_top, 2), w=1)
+            opt.add_constraint(Supp_E, args=(dual_top, 2), w=w_supp)
 
             # Sphericity
             Sph_E = Sphericity()
-            opt.add_constraint(Sph_E, args=(ffF, 2), w=1)
+            opt.add_constraint(Sph_E, args=(ffF, 2), w=w_sphericity)
 
             # Fairness
             Fair_M = QM_Fairness()
-            opt.add_constraint(Fair_M, args=(inn_v, adj_v, "v", 3), w=1)
+            opt.add_constraint(Fair_M, args=(inn_v, adj_v, "v", 3), w=w_fairness)
 
             # Proximity
             Prox_M = Proximity()
-            opt.add_constraint(Prox_M, args=(ref_V, ref_F, 0.001), w=0.5)
+            opt.add_constraint(Prox_M, args=(ref_V, ref_F, 0.0001), w=w_proximity)
 
             # Fair_C = QM_Fairness()
             # opt.add_constraint(Fair_C, args=(in_v_c, ad_v_c, "c", 3), w=0.002)
@@ -403,15 +403,16 @@ def optimization():
                     opt.optimize() # Solve linear system and update variables
                 
                 # Get Line congruence
-                vk, sph_c, _, rf = opt.uncurry_X("v", "c", "nd", "r")
+                vk, sph_c, nd, rf = opt.uncurry_X("v", "c", "nd", "r")
                 sph_c = sph_c.reshape(-1, 3)
                 vk = vk.reshape(-1,3)
-
+                nd = nd.reshape(-1,3)
                 
 
                 mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
                 mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
-                ps.register_surface_mesh("Opt_C", sph_c, dual_top)
+                c_surf = ps.register_surface_mesh("Opt_C", sph_c, dual_top)
+                c_surf.add_vector_quantity("Normals", nd, defined_on='faces', enabled=True)
 
                 
             else:
@@ -512,7 +513,8 @@ def optimization():
 
          
 ps.init()
-ps.register_surface_mesh("mesh", ffV, ffF)
+mesh = ps.register_surface_mesh("mesh", ffV, ffF)
+
 ps.register_surface_mesh("S_uv", ref_V, ref_F)
 
 
