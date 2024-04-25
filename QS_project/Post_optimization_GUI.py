@@ -514,7 +514,7 @@ def optimization():
 ps.init()
 ps.register_surface_mesh("mesh", ffV, ffF)
 ps.register_surface_mesh("S_uv", ref_V, ref_F)
-ps.register_point_cloud("Boundary", vb, color=(1,0,0))
+
 
 ps.set_user_callback(optimization)
 ps.show()
