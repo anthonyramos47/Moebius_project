@@ -69,7 +69,7 @@ exp_dir = os.path.join(working_path, 'experiments')
 remeshing_dir = os.path.join(working_path, 'data', 'Remeshing', name)
 
 # Frame Field remeshed obj
-remeshed_obj = os.path.join( remeshing_dir,  name+'_backmapped.obj')
+remeshed_obj = os.path.join( remeshing_dir,  name+'_Remeshed.obj')
 
 # Read remeshed mesh
 ffV, ffF = read_obj(remeshed_obj)
