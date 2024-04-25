@@ -175,9 +175,9 @@ class BS_Torsal(Constraint):
 
         # Add E_lc_nt E = || lc/||lc||.nt ||^2
         self.E_lc_nt(lc, nt1, nt2, var_idx)
-        
+
         #final_t = time()
-        self.print_per_const_energy()
+        #self.print_per_const_energy()
         #print("Time to compute BTorsal:", final_t - init_t)
  
     def E_t_unit(self, t1, t2, var_idx):
@@ -274,7 +274,7 @@ class BS_Torsal(Constraint):
             d_nt1_E_t_nt1
         )
 
-        assert np.einsum('ij,ij->i', t1, nt1)== np.sum(t1*nt1, axis=1), "Error"
+        #assert np.einsum('ij,ij->i', t1, nt1) == np.sum(t1*nt1, axis=1), "Error"
         # Set residual  
         self.set_r(cols, np.einsum('ij,ij->i', t1, nt1))
 

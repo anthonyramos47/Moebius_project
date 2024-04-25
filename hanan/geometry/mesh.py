@@ -22,7 +22,7 @@ import copy
 import scipy as sp
 from scipy.sparse import coo_matrix
 from igl import per_vertex_normals
-from geometry.utils import vec_dot, unit
+from geometry.utils import vec_dot, unit, np_pop
 
 class Mesh():
 
@@ -627,8 +627,12 @@ class Mesh():
         # Get halfedges
         H = self.halfedges
 
-        # Get the boundary edges
+        # Get the boundary Half edges
         idx = np.where(H[:, 2] == -1)
+
+    
+        # Get the faces of the halfedges
+        fs = H[H[:, 2] != -1, :]
 
         # Get the origin of the halfedges
         vs = H[idx, 0][0]
@@ -723,7 +727,50 @@ class Mesh():
         face_neighbors = self.vertex_ring_faces_list()
         dual = [face_neighbors[i] for i in in_v]
         return dual
+    
+    def boundaries(self):
+        # Get halfedges
+        H = self.halfedges
 
+        vi = self.boundary_vertices()
+
+        # Get twin origin
+        vj = H[H[vi, 1], 0] 
+
+        ls = np.c_[vi, vj]
+
+        boundaries = []
+
+        while len(ls) != 0: 
+            boundary  = []
+            val, ls = np_pop(ls, 0)
+
+            boundary.extend(val.flatten())
+            finsih = False
+
+            next = val[1]
+
+            while not finsih:
+                
+                idx = np.where( ls[:, 1] == next)[0]
+    
+                if len(idx) == 0:
+                    finsih = True
+                elif idx[0] == boundary[0]:
+                    finsih = True
+                elif ls[idx[0]][0] == next:
+                    val, ls = np_pop(ls, idx[0])
+                    boundary.extend(val.flatten())
+                    next = val[1]
+                elif ls[idx[0]][1] == next:
+                    val, ls = np_pop(ls, idx[0])
+                    val = np.flip(val)
+                    boundary.extend(val.flatten())
+                    next = val[1]
+        
+            boundaries.append(boundary)
+            
+        return boundaries
 
     def edge_faces(self):
         """ Returns the faces of each edge 

@@ -178,16 +178,16 @@ def central_spheres(bsp1, u_vals, v_vals):
     # Compute mean curvature
     _, H, n = curvatures_par(bsp1, u_vals, v_vals)
 
-    mean_H = np.mean(H)
+    #mean_H = np.mean(H)
 
     # Search for H close to zero
-    idx = np.where(H < 0.0001)
+    #idx = np.where(H < 0.0001)
 
-    print("idx len", len(idx[0]))
+    #print("idx len", len(idx[0]))
 
-    H0 = H.copy()
+    #H0 = H.copy()
 
-    H[idx[0]] = mean_H
+    #H[idx[0]] = mean_H
 
     # Compute the radius
     r_H = 1/H
@@ -198,7 +198,7 @@ def central_spheres(bsp1, u_vals, v_vals):
     # Compute the center
     c = s_uv + r_H[:,:,None]*n
 
-    return c, r_H, H0, n
+    return c, r_H, H, n
 
 def line_congruence_uv(bsp, r_uv, u_vals, v_vals):
     """
@@ -601,14 +601,13 @@ def init_sphere_congruence(mid_init, bsp1, u_pts, v_pts, sample):
     return r, n
 
 
-def Bspline_to_mesh(bsp1, u_pts, v_pts, sample):
+def Bspline_to_mesh(bsp1, u_pts, v_pts):
     """
     Function to convert the B-spline surface to a mesh.
     Input:
         bsp1: B-spline surface
         u_pts: u points
         v_pts: v points
-        sample: sample size
     Output:
         V: Vertices of the mesh
         F: Faces of the mesh
@@ -616,6 +615,8 @@ def Bspline_to_mesh(bsp1, u_pts, v_pts, sample):
 
     # Mesh Visualization ========================== 
     S_flat = bsp1(u_pts, v_pts).reshape(-1,3)
+
+    sample = (len(u_pts), len(v_pts))
 
     # Get Grid as quad mesh V and F
     V = S_flat

@@ -22,6 +22,7 @@ class BS_Torsal_Angle(Constraint):
         super().__init__()
         self.name = "BS_Torsal_Angle" # Name of the constraint
         self.cos_a_2 = None # Cosine of the angle threshold
+        self.cont = 0 # Cont for weight decrease
       
     def initialize_constraint(self, X, var_idx, angle, angle2) -> None:
         """ 
@@ -88,3 +89,5 @@ class BS_Torsal_Angle(Constraint):
         # r = (nt1.nt2)^2 - cos(a)^2 + theta^2
         r = vec_dot(nt1, nt2)**2 - self.cos_a_2 + theta**2
         self.set_r(self.const_idx["nt1_nt2"], r)
+
+      

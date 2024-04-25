@@ -243,7 +243,7 @@ def draw_polygon(vertices, color, name="_"):
     """
         Register a polygon as a surface
     """
-    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=color, transparency=0.6)
+    ps.register_surface_mesh(name, vertices, [np.arange(len(vertices))[:, None]], color=color, transparency=0.8)
     
 def draw_plane(p0, n, size=(1,1), name="_"):
     """
@@ -1085,3 +1085,13 @@ def closest_point_on_mesh(mesh_vertices, mesh_triangles, query_points):
     closest_points_on_triangles, bar_coord  = distance_point_to_triangle(query_points, v0, v1, v2)
 
     return closest_points_on_triangles, bar_coord
+
+def np_pop(arr, idx):
+    # Step 1: Retrieve the element at the given index
+    element = arr[idx]
+
+    # Step 2: Create a new array without the element at 'idx'
+    new_arr = np.delete(arr, idx, axis=0)
+
+    # Return the popped element and the new array
+    return element, new_arr

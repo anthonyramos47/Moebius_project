@@ -66,7 +66,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-bspline_surf_name, dir = "Complex_test_S2", 1
+#bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
@@ -76,11 +76,14 @@ bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Dat name
 #bspline_surf_name, dir = "inv_1", 1
+#bspline_surf_name, dir = "data_hyp", 1
+#bspline_surf_name, dir = "Sample_C", 1
+bspline_surf_name, dir = "Tunel", -1
 
 # Sample size
 sample = (25, 25)
-delta = 0.1
-choice_data = 0 # 0: Json , 1: data_hyp2.dat
+delta = 0.15
+choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
 tangle = 45 # Torsal angle threshold for torsal planes
@@ -156,7 +159,7 @@ def optimization():
 
             # Initialize variables
             opt.init_variable("rij" ,         cp )
-            opt.init_variable("mu"  ,         11  )
+            opt.init_variable("mu"  ,         50  )
             opt.init_variable("l"   , l.flatten())
 
 
@@ -224,7 +227,7 @@ def optimization():
             opt.initialize_optimizer("LM", step_2, 1)
 
             # Init variables 
-            opt.init_variable("theta" , 10)
+            opt.init_variable("theta" , 50)
             opt.init_variable("l"     , f_l.flatten())  
             opt.init_variable("rij"   , f_cp)
             opt.init_variable("mu"    , f_mu)
@@ -283,7 +286,7 @@ def optimization():
     
     
     if psim.Button("Optimize 2"):
-
+        if init_opt_2:
             for _ in range(iter_per_opt):
                 # Optimize
                 opt.get_gradients() # Compute J and residuals
@@ -441,7 +444,7 @@ cp = r_uv[2].copy()
 
 # End of constraints ===================================
 
-V, F = Bspline_to_mesh(bsp1, u_pts, v_pts, sample)
+V, F = Bspline_to_mesh(bsp1, u_pts, v_pts)
 
 ps.init()
 # Surface

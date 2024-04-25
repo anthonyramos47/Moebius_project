@@ -220,14 +220,18 @@ class Optimizer():
                 #initial_time = tm.time()
                 # Compute J, r for the constraint
                 constraint._compute(self.X, self.var_idx)
-                final_time = tm.time()
-                #total += final_time - initial_time
-                #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
+                # final_time = tm.time()
+                # total += final_time - initial_time
+                # print(f"Time to compute {constraint.name}: {final_time - initial_time}")
 
+                #initial_time = tm.time()
                 # Add J, r to the optimizer                
                 #stacked_J.append(np.sqrt(constraint.w) * constraint._J)
                 stacked_H.append( constraint.w * constraint._J.T.dot(constraint._J))
-                stacked_b.append( constraint.w * constraint._J.T.dot(constraint._r))          
+                stacked_b.append( constraint.w * constraint._J.T.dot(constraint._r))    
+                # final_time = tm.time()
+                # total += final_time - initial_time
+                # print(f"Time to stack and Hess {constraint.name}: {final_time - initial_time}")
 
                 # Add energy to the energy dictionary
                 if constraint.name is not None:

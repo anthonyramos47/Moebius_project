@@ -28,7 +28,7 @@ from scipy.interpolate import bisplev
 # Geometry classes
 from geometry.mesh import Mesh
 from geometry.utils import *
-from geometry.bsplines_functions import *
+from utils.bsplines_functions import *
 
 # Optimization classes
 from energies.BS_approx import BS_approx
@@ -52,7 +52,9 @@ print("surface dir:", surface_dir)
 #bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Rhino Bad test 
-bspline_surf_name, dir = "Surfjson", -1
+#bspline_surf_name, dir = "Surfjson", -1
+#bspline_surf_name, dir = "Sample_C", 1
+bspline_surf_name, dir = "Tunel", -1
 
 # Define the path to the B-spline surface
 bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
@@ -72,12 +74,10 @@ basis_v = sp.BSplineBasis(order_v, knots_v)
 bsp1 = sp.Surface(basis_u, basis_v, control_points)
 
 # Sample the grid points to evaluate the B-spline surface
-u_vals, v_vals = sample_grid(sample, sample)
+u_vals, v_vals = sample_grid(sample, sample, delta=0.15)
 
 # Evaluate the B-spline surface
 eval_surf = bsp1(u_vals, v_vals)
-
-print("eval_surf:", eval_surf.shape)
 
 # Compute the curvature
 K, H, _ = curvatures_par(bsp1, u_vals, v_vals)
@@ -89,73 +89,74 @@ hist.set_title("Mean Curvature")
 hist.hist(H.flatten(), bins=20)
 
 
-# Init figure
-fig     = plt.figure()
+# # Init figure
+fig       = plt.figure()
 surface_ax = fig.add_subplot(1,2,1, projection='3d') 
 central_ax = fig.add_subplot(1,2,2, projection='3d')
 
-# Compute central spheres centers and radius
-c_z, r_z = central_spheres(bsp1, u_vals, v_vals)
+# # Compute central spheres centers and radius
+# c_z, r_z, H, _= central_spheres(bsp1, u_vals, v_vals)
 
 
-# Create r(u,v)  Bspline surface
-r_uv = r_uv_fitting(u_vals, v_vals, r_z)
+# # Create r(u,v)  Bspline surface
+# r_uv = r_uv_fitting(u_vals, v_vals, r_z)
 
-# Get grid points
-u_pts, v_pts = np.meshgrid(u_vals, v_vals, indexing='ij')
+# # Get grid points
+# u_pts, v_pts = np.meshgrid(u_vals, v_vals, indexing='ij')
 
-r_uv_surf = bisplev(u_vals, v_vals, r_uv)
+# r_uv_surf = bisplev(u_vals, v_vals, r_uv)
 
-X_ruv = np.stack((u_pts, v_pts, r_uv_surf), axis=2)
+# X_ruv = np.stack((u_pts, v_pts, r_uv_surf), axis=2)
 
-nu, nv = normal_derivatives_uv(bsp1, u_vals, v_vals)
+# nu, nv = normal_derivatives_uv(bsp1, u_vals, v_vals)
 
-cu, cv = sphere_congruence_derivatives(bsp1, r_uv, u_vals, v_vals)
-
-
-# Line congruence of offset surfaces
-#cof, rof = offset_spheres(bsp1, u_vals, v_vals, 5)
-
-# Fit rof to a B-spline surface
-# r_uv_of = r_uv_fitting(u_vals, v_vals, rof)
-l_uv = line_congruence_uv(bsp1, r_uv, u_vals, v_vals)
+# cu, cv = sphere_congruence_derivatives(bsp1, r_uv, u_vals, v_vals)
 
 
-eval_surf_flat = eval_surf.reshape(-1,3)
-l_uv_flat = l_uv.reshape(-1,3)
+# # Line congruence of offset surfaces
+# #cof, rof = offset_spheres(bsp1, u_vals, v_vals, 5)
 
-# # Offset surface
-# s_n = bsp1.normal(u_vals, v_vals)
-# offset_surf = eval_surf  + dir*5*s_n
-
-# Plot the B-spline surface
-plot_surface(surface_ax, eval_surf,  "B-spline Surface")
+# # Fit rof to a B-spline surface
+# # r_uv_of = r_uv_fitting(u_vals, v_vals, rof)
+# l_uv = line_congruence_uv(bsp1, r_uv, u_vals, v_vals)
 
 
-#add_control_points(surface_ax, control_points)
+# eval_surf_flat = eval_surf.reshape(-1,3)
+# l_uv_flat = l_uv.reshape(-1,3)
 
-# Plot the central spheres
-#plot_surface(central_ax, c_z, "Central Surface")
+# # # Offset surface
+# # s_n = bsp1.normal(u_vals, v_vals)
+# # offset_surf = eval_surf  + dir*5*s_n
 
-#add_control_points(surface_ax, control_points)
+# # Plot the B-spline surface
+# plot_surface(surface_ax, eval_surf,  "B-spline Surface")
 
-# Plot the offset surface
-#plot_surface(/Users/cisneras/Downloads/Assignment_3.pdfsurface_ax, offset_surf, None, "B-spline Surface Offset")
+
+# #add_control_points(surface_ax, control_points)
+
+# # Plot the central spheres
+# #plot_surface(central_ax, c_z, "Central Surface")
+
+# #add_control_points(surface_ax, control_points)
+
+# # Plot the offset surface
+# #plot_surface(/Users/cisneras/Downloads/Assignment_3.pdfsurface_ax, offset_surf, None, "B-spline Surface Offset")
 plot_scalar_value(surface_ax, eval_surf,  H, "Mean")
 
 
-# Plot 
-for _ in range(100):
-    
-    id = np.random.randint(0, len(l_uv_flat))
-
-    l = l_uv_flat[id]
-    p1 = eval_surf_flat[id]
-    p2 = dir*5*l
-
-    #sph_x, sph_y, sph_z = drawSphere(c_z_flat[id][0], c_z_flat[id][1], c_z_flat[id][2],  abs(r_z_flat[id]))
-    #    surface_ax.plot_surface(sph_x, sph_y, sph_z, color='r', alpha=0.3)
-    #surface_ax.quiver(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], color='black', alpha=0.5, pivot='tail')
-    central_ax.quiver(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], color='black', alpha=0.5, pivot='tail')
-
 plt.show()
+# # Plot 
+# for _ in range(100):
+    
+#     id = np.random.randint(0, len(l_uv_flat))
+
+#     l = l_uv_flat[id]
+#     p1 = eval_surf_flat[id]
+#     p2 = dir*5*l
+
+#     #sph_x, sph_y, sph_z = drawSphere(c_z_flat[id][0], c_z_flat[id][1], c_z_flat[id][2],  abs(r_z_flat[id]))
+#     #    surface_ax.plot_surface(sph_x, sph_y, sph_z, color='r', alpha=0.3)
+#     #surface_ax.quiver(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], color='black', alpha=0.5, pivot='tail')
+#     central_ax.quiver(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], color='black', alpha=0.5, pivot='tail')
+
+# plt.show()
