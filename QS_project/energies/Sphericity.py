@@ -37,8 +37,7 @@ class Sphericity(Constraint):
         self.vertex_sph = vertex_sph.flatten()
 
         # Row indices
-        self.row_vk =  np.repeat( np.arange(len(self.vertex_sph)), 3)
-        self.row_cf =  np.repeat( np.arange(len(self.vertex_sph)), 3)
+        self.row_vk =  self.row_cf = np.repeat( np.arange(len(self.vertex_sph)), 3)
         self.row_rf =  np.arange(len(self.vertex_sph))
 
         # Col indices
@@ -62,12 +61,12 @@ class Sphericity(Constraint):
         vk = X[self.vk_idx]
         cf = X[self.cf_idx]
         rf = X[self.rf_idx]
-        
+
         # D_vk E_sph = 2(v_k - c_f)
         d_vk_E_sph = 2*(vk[self.vk_idx] - cf[self.cf_idx])
 
         # D_cf E_sph = 2(c_f - v_k)
-        d_cf_E_sph = - d_vk_E_sph
+        d_cf_E_sph = -2*(vk[self.vk_idx] - cf[self.cf_idx])
 
         # D_rf E_sph = 2(r_f)
         d_rf_E_sph = - 2*rf

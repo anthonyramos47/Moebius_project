@@ -3,6 +3,7 @@ import numpy as np
 import time as tm
 import pandas as pd
 from optimization.Unit import Unit
+from optimization.Step_Control import Step_Control
 from geometry.utils import unit
 from scipy.sparse import diags, vstack
 from scipy.sparse.linalg import spsolve
@@ -153,6 +154,25 @@ class Optimizer():
         constraint.set_weigth(w)
 
         self.constraints.append(constraint)
+
+    def control_var(self, var_name, w) -> None:
+        """
+            Method to add a unit constraint to the optimizer. The unit constraint is a constraint that forces the variable to be unit.
+            Input:
+                var_name: Name of the variable
+                var_indices: Indices of the variable
+                dim: Dimension of the variable
+        """
+        # Initialize constraint
+        SC = Step_Control()
+        #unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
+        SC._initialize_constraint(self.X, self.var_idx, var_name)
+        SC.w = w
+        SC.name = var_name + "_step_control"
+        #self.energy_vector = np.zeros(len(self.X))
+        self.constraints.append(SC)
+        # Add constraint
+        #self.get_gradients(unit)
 
 
 

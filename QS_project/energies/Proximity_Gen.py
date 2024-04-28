@@ -17,9 +17,10 @@ class Proximity(Constraint):
         self.ref_v = None # Reference vertices
         self.ref_f = None # Reference faces
         self.nf = None # Normal of the reference faces
+        self.var_name = None # Name of the variable
 
       
-    def initialize_constraint(self, X, var_idx, ref_v, ref_f, epsilon) -> None:
+    def initialize_constraint(self, X, var_idx, var_name, ref_v, ref_f, epsilon) -> None:
         """ 
         We assume knots are normalized
         Input:
@@ -30,16 +31,21 @@ class Proximity(Constraint):
             epsilon     : Proximity distance
 
         """
-        self.ref_f = ref_f
-        self.ref_v = ref_v
-        # # Get the closest points on the remeshed mesh
-        # sd, l, cpts = igl.point_mesh_squared_distance(rV, dV, dF)
-        
 
+        # Set the variable name
+        self.var_name = var_name 
+        self.name = "Proximity_" + var_name # Name of the constraint
+        
+        # Set faces of the reference mesh
+        self.ref_f = ref_f
+        # Set vertices of the reference mesh
+        self.ref_v = ref_v
+        
+        # Set the epsilon value for proximity
         self.epsilon = epsilon
 
         # Get vertices
-        v = self.uncurry_X(X, var_idx, "v")
+        v = self.uncurry_X(X, var_idx, self.var_name)
 
         # Distance Energy  E_D = epsilon(v - vf)
         self.add_constraint("E_D", len(v))
@@ -48,8 +54,6 @@ class Proximity(Constraint):
 
         # Tangential Energy E_T = (v - vf)nf
         self.add_constraint("E_T", len(v))
-
-
 
         # Get the closest points on the remeshed mesh
         _, _, vf = igl.point_mesh_squared_distance(v, self.ref_v, self.ref_f)
@@ -63,8 +67,7 @@ class Proximity(Constraint):
     def compute(self, X, var_idx):
         
         # Get vertices
-        v = self.uncurry_X(X, var_idx, var_name)
-
+        v = self.uncurry_X(X, var_idx, self.var_name)
         v = v.reshape(-1, 3)
 
         # Get the closest points on the remeshed mesh
@@ -77,20 +80,22 @@ class Proximity(Constraint):
         # Distance Energy  E_D = epsilon(v - vf)
         dv_ED = (np.ones_like(v) * self.epsilon).flatten() 
         E_D = self.epsilon*(v_vf).flatten()
-        self.add_derivatives(self.const_idx["E_D"], var_idx["v"], dv_ED)
+        self.add_derivatives(self.const_idx["E_D"], var_idx[self.var_name], dv_ED)
         # res
         self.set_r(self.const_idx["E_D"], E_D)
+        
         
         # Tangential Energy E_T = (v - vf)nf
         dv_ET = nf.flatten() 
         E_T = np.einsum('ij,ij->i', v_vf, nf).flatten()
-        self.add_derivatives(self.const_idx["E_T"].repeat(3), var_idx["v"], dv_ET)
+        self.add_derivatives(self.const_idx["E_T"].repeat(3), var_idx[self.var_name], dv_ET)
+        
         # res
         self.set_r(self.const_idx["E_T"], E_T)
 
+        # Update value of the normal
         nf  =  v_vf
         nf /= np.linalg.norm(nf, axis=1)[:, None]
-
         self.nf = nf
         
 

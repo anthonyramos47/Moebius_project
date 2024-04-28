@@ -42,7 +42,7 @@ from utils.visualization import *
 # Optimization classes
 from energies.Support import Supp
 from energies.Sphericity import Sphericity
-from energies.Proximity import Proximity
+from energies.Proximity_Gen import Proximity
 from energies.QM_Fairness import QM_Fairness
 from optimization.Optimizer import Optimizer
 
@@ -103,7 +103,6 @@ ref_u = np.linspace(0, 1, 300)
 ref_v = np.linspace(0, 1, 300)
 
 # Get the vertices and faces of the mesh
-
 ref_V, ref_F = Bspline_to_mesh(BSurf, ref_u, ref_v)
 
 ref_F = np.array(triangulate_quads(ref_F))
@@ -115,16 +114,28 @@ foot_pts = foot_pts.reshape(-1, 2)
 
 # Evaluate the B-spline functions at the foot points bsurf(u, v), r(u, v) and n(u, v)
 f_pts = np.zeros((len(foot_pts), 3))
-r_pts = np.zeros((len(foot_pts), 3))
+r_pts = np.zeros((len(foot_pts)))
 n_dir = np.zeros((len(foot_pts), 3))
 for i in range(len(foot_pts)):
-    f_pts[i] = BSurf(foot_pts[i, 0], foot_pts[i, 1])
     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
+    f_pts[i] =   BSurf(foot_pts[i, 0], foot_pts[i, 1])
     r_pts[i] = bisplev(foot_pts[i, 0], foot_pts[i, 1], rsurf)
 
 # Compute the vertices of the mid mesh
 VR = f_pts + r_pts[:,None]*n_dir
 VR = VR.reshape(-1, 3)
+
+# Get vertices of C(u, v) 
+# Evaluate r(u,v) in ref_u ref_v
+ref_r_uv = bisplev(ref_u, ref_v, rsurf)
+# Compute the normals of the reference mesh
+ref_n = BSurf.normal(ref_u, ref_v)
+ref_rn = ref_r_uv[:, :, None]*ref_n
+
+ref_v = BSurf(ref_u, ref_v)
+ref_C = ref_v + ref_rn
+ref_C = ref_C.reshape(-1, 3)
+
 
 
 # Create mesh for Mid mesh (sphere centers)
@@ -141,8 +152,6 @@ e_f_f = mesh.edge_faces()
 # Vertices of each edge
 e_v_v = mesh.edge_vertices()
 
-
-
 # Get inner faces indices
 inn_f = mesh.inner_faces()
 
@@ -155,9 +164,7 @@ adj_v = mesh.vertex_adjacency_list()
 # Get adjacent faces
 ffF = mesh.faces()
 
-# print(mesh.boundaries())
 
-# vb = f_pts[mesh.boundary_vertices()]
 
 # Compute the nodes of the mid mesh
 c0, c1, c2, c3 = VR[ffF[:, 0]], VR[ffF[:, 1]], VR[ffF[:, 2]], VR[ffF[:, 3]]
@@ -170,44 +177,6 @@ vc = np.sum(f_pts[ffF], axis=1)/4
 
 # Compute radius of spheres
 rads = np.linalg.norm(vc - cc, axis=1)
-
-# dual_top = []
-# for f_i in inn_f:
-#     dual_top.append(f_f_adj[f_i])
-#     if len(f_f_adj[f_i]) != 4:
-#         print(len(f_f_adj[f_i]))
-
-# OPTIMIZATION ===============================================================
-
-# Creat a set of 8 random centers
-# cc = np.array([ 
-#     [0,0,1],  #0
-#     [1,0,0],  #1
-#     [1,1,0],  #2
-#     [0,1,0],  #3
-#    [-1,1,0],  #4
-#     [-1,0,0], #5
-#     [-1,-1,0],#6
-#     [0,-1,0], #7
-#     [1,-1,0]  #8
-# ])
-
-# dual_top = np.array([
-#     [0, 1, 2, 3],
-#     [0, 3, 4, 5],
-#     [0, 5, 6, 7],
-#     [0, 7, 8, 1]
-# ])
-        
-
-# dual_mesh = Mesh()
-# dual_mesh.make_mesh(cc, dual_top)
-
-# in_v_c = dual_mesh.inner_vertices()
-# ad_v_c = dual_mesh.vertex_adjacency_list()
-
-# cc = dual_mesh.vertices
-# dual_top = dual_mesh.faces()
 
 # # Normals of dual faces
 nd = np.zeros((len(dual_top), 3))
@@ -351,7 +320,8 @@ def optimization():
 
             # Set init to True
             init_opt = True
-                        
+
+
             opt = Optimizer()
 
             # Add variables to the optimizer
@@ -369,6 +339,7 @@ def optimization():
             opt.init_variable("v"  , f_pts.flatten())
             opt.init_variable("r"  , rads)
 
+                        
             # Constraints ==========================================
             # Line congruence l.cu, l.cv = 0
             Supp_E = Supp()
@@ -384,13 +355,20 @@ def optimization():
 
             # Proximity
             Prox_M = Proximity()
-            opt.add_constraint(Prox_M, args=(ref_V, ref_F, 0.0001), w=w_proximity)
+            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=w_proximity)
+
+            Prox_C = Proximity()
+            opt.add_constraint(Prox_C, args=("c", ref_C, ref_F, 0.001), w=w_proximity)
 
             # Fair_C = QM_Fairness()
             # opt.add_constraint(Fair_C, args=(in_v_c, ad_v_c, "c", 3), w=0.002)
 
             # Define unit variables
             opt.unitize_variable("nd", 3, 10)
+
+            opt.control_var("v", 0.01)
+
+            opt.control_var("c", 0.1)
 
             ps.info("Finished Initialization of Optimization 1")
 
@@ -407,12 +385,28 @@ def optimization():
                 sph_c = sph_c.reshape(-1, 3)
                 vk = vk.reshape(-1,3)
                 nd = nd.reshape(-1,3)
-                
 
+                v0, v1, v2, v3 = vk[ffF[:, 0]], vk[ffF[:, 1]], vk[ffF[:, 2]], vk[ffF[:, 3]]
+
+                dif0 = np.linalg.norm(v0 - sph_c, axis=1)**2 - rf**2
+                dif1 = np.linalg.norm(v1 - sph_c, axis=1)**2 - rf**2
+                dif2 = np.linalg.norm(v2 - sph_c, axis=1)**2 - rf**2
+                dif3 = np.linalg.norm(v3 - sph_c, axis=1)**2 - rf**2
+
+
+                sphericity =  dif0**2 + dif1**2 + dif2**2 + dif3**2
+
+                idx_max = np.argmax(sphericity)
+
+                max_sph = ps.register_point_cloud("Max_Sphericity", np.array([sph_c[idx_max]]), enabled=True, transparency=0.2, color=(0.1, 0.1, 0.1))
+                max_sph.set_radius(rf[idx_max], relative=False)
+
+            
                 mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
                 mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
+                mesh.add_scalar_quantity("Sphericity", np.array(sphericity), defined_on="faces", enabled=True )
                 c_surf = ps.register_surface_mesh("Opt_C", sph_c, dual_top)
-                c_surf.add_vector_quantity("Normals", nd, defined_on='faces', enabled=True)
+                #c_surf.add_vector_quantity("Normals", nd, defined_on='faces', enabled=True)
 
                 
             else:
@@ -511,11 +505,14 @@ def optimization():
         exp_file.close()
 
 
+#print("Mesh", ffV[:10])
          
 ps.init()
-mesh = ps.register_surface_mesh("mesh", ffV, ffF)
+mesh = ps.register_surface_mesh("mesh", f_pts, ffF)
 
 ps.register_surface_mesh("S_uv", ref_V, ref_F)
+ps.register_surface_mesh("C_uv", ref_C, ref_F)
+ps.register_surface_mesh("Mid_mesh", VR, ffF)
 
 
 ps.set_user_callback(optimization)
