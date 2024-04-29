@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser(description="Visualizer Parser")
 parser.add_argument('file_name', type=str, help='File name to load')
 
 # Parse the command line arguments
-file_name = parser.parse_args().file_name
+file_name = name = parser.parse_args().file_name
 
 file_name += '.pickle'
 
@@ -66,6 +66,19 @@ def main():
     l = l.reshape(-1, 3)
     l /= np.linalg.norm(l, axis=1)[:,None]
     n = n.reshape(-1, 3)
+
+    # Working directory
+    working_path = os.getcwd()
+
+
+    # Remeshing data folder
+    remeshing_dir = os.path.join(working_path, 'QS_project', 'data', 'Remeshing', name)
+
+    # Frame Field remeshed obj
+    remeshed_obj = os.path.join( remeshing_dir,  name+'_Remeshed.obj')
+
+    # Read remeshed mesh
+    ffV, ffF = read_obj(remeshed_obj)
    
 
     # Compute Torsal angles
@@ -110,6 +123,8 @@ def main():
     V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
 
     ps.register_surface_mesh("C_uv", V_R, F)
+
+    ps.register_surface_mesh("Remeshed", ffV, ffF)
 
     # Visualize the data
     

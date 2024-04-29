@@ -50,7 +50,6 @@ class Proximity(Constraint):
         self.add_constraint("E_T", len(v))
 
 
-
         # Get the closest points on the remeshed mesh
         _, _, vf = igl.point_mesh_squared_distance(v, self.ref_v, self.ref_f)
 

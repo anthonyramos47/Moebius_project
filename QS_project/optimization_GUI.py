@@ -76,14 +76,15 @@ experiment_dir = os.path.join(dir_path, "experiments")
 
 # Dat name
 #bspline_surf_name, dir = "inv_1", 1
-#bspline_surf_name, dir = "data_hyp", 1
+bspline_surf_name, dir = "data_hyp", 1 # delta = 0.3
 #bspline_surf_name, dir = "Sample_C", 1
-bspline_surf_name, dir = "Tunel", -1
+#bspline_surf_name, dir = "Neg_Surf", 1
+#bspline_surf_name, dir = "Tunel", -1
 
 # Sample size
-sample = (25, 25)
-delta = 0.15
-choice_data = 0 # 0: Json , 1: data_hyp.dat
+sample = (15, 15)
+delta = 0.3
+choice_data = 1 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
 tangle = 45 # Torsal angle threshold for torsal planes

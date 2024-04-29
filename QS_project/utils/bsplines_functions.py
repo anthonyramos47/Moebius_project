@@ -772,7 +772,7 @@ def closest_grid_points(p, grid_v):
 
     return grid_v[i], i
 
-def foot_points(p, V, u_pts, v_pts, Bsp):
+def foot_points(p, V, u_pts, v_pts, Bsp, u_range=(0,1), v_range=(0,1)):
     """
     Find the foot point of a point p in the B-spline surface
     """
@@ -797,7 +797,7 @@ def foot_points(p, V, u_pts, v_pts, Bsp):
         return np.linalg.norm(ev_b - p)
     
     for i in range(len(x0)):
-        res = minimize(min_dist, x0[i], args=(p[i]), bounds=[(0, 1), (0, 1)])
+        res = minimize(min_dist, x0[i], args=(p[i]), bounds=[u_range, v_range])
         x0[i] = res.x
 
     print("res: ", res)

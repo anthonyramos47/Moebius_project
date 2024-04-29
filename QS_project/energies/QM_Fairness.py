@@ -37,7 +37,7 @@ class QM_Fairness(Constraint):
         
 
       
-    def initialize_constraint(self, X, var_idx, inn_v, adj_v, var_name, dim) -> None:
+    def initialize_constraint(self, X, var_idx, bd_v, adj_v, var_name, dim) -> None:
         """ 
         We assume knots are normalized
         Input:
@@ -72,9 +72,12 @@ class QM_Fairness(Constraint):
         dv_j = []
 
         dv_k = []
+
+        # Non boundary vertices
+        n_b = [] 
         for i, _ in enumerate(adj_v):
 
-            if len(adj_v[i]) == 4:
+            if len(adj_v[i]) == 4 and i not in bd_v:
                 num_rows_Q += 1
 
                 dv_k.extend([i])
@@ -83,12 +86,20 @@ class QM_Fairness(Constraint):
 
                 dv_i.extend([adj_v[i][1]])
                 dv_j.extend([adj_v[i][3]])
-            elif len(adj_v[i]) == 3:
-                num_rows_B += 1
 
-                vk_3.extend([i])
-                vi_3.extend([adj_v[i][0]])
-                vj_3.extend([adj_v[i][2]])
+            elif (len(adj_v[i]) == 4  or len(adj_v[i]) == 3 ) and i in bd_v:
+                neigh = []
+                for j in range(len(adj_v[i])):      
+                    if adj_v[i][j] in bd_v:
+                        neigh.append(adj_v[i][j])
+
+                if len(neigh) == 2: 
+                    num_rows_B += 1
+
+                    vk_3.extend([i])           
+                    vi_3.extend([neigh[0]])
+                    vj_3.extend([neigh[1]])
+                
             
             elif len(adj_v[i]) == 2:
                 num_rows_C += 1
@@ -97,6 +108,7 @@ class QM_Fairness(Constraint):
                 vi_2.extend([adj_v[i][0]])
                 vj_2.extend([adj_v[i][1]])
 
+        
         # Tansform to numpy arrays
         # Quadrilateral vertices
         du_i = np.array(du_i)
@@ -109,6 +121,8 @@ class QM_Fairness(Constraint):
         vk_3 = np.array(vk_3)
         vi_3 = np.array(vi_3)
         vj_3 = np.array(vj_3)
+
+        
 
         # Corner vertices
         vk_2 = np.array(vk_2)
@@ -216,10 +230,10 @@ class QM_Fairness(Constraint):
 
         self.cont+=1
 
-        if self.cont %5 == 0:
-            self.w = self.w/2
-        if self.cont %25 == 0:
-            self.w = 0
+        if self.cont %10 == 0:
+            self.w *= 0.8
+        #if self.cont %25 == 0:
+        #    self.w = 0
             #print(f"Weight decrease to {self.w}")
         
 

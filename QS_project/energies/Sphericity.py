@@ -63,14 +63,13 @@ class Sphericity(Constraint):
         rf = X[self.rf_idx]
 
         # D_vk E_sph = 2(v_k - c_f)
-        d_vk_E_sph = 2*(vk[self.vk_idx] - cf[self.cf_idx])
+        d_vk_E_sph =  2*(vk[self.vk_idx] - cf[self.cf_idx])
 
         # D_cf E_sph = 2(c_f - v_k)
         d_cf_E_sph = -2*(vk[self.vk_idx] - cf[self.cf_idx])
 
         # D_rf E_sph = 2(r_f)
         d_rf_E_sph = - 2*rf
-
 
         # d_vk
         self.add_derivatives(self.row_vk, self.vk_idx, d_vk_E_sph)
@@ -80,7 +79,6 @@ class Sphericity(Constraint):
 
         # d_rf
         self.add_derivatives(self.row_rf, self.rf_idx, d_rf_E_sph)
-
 
         # residual
         vk = vk.reshape(-1,3)

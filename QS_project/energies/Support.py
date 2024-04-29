@@ -41,8 +41,11 @@ class Supp(Constraint):
         # Number of constraints
         const = 0
         for i, f_i in enumerate(sph_sph_adj):
-            spheres_number = len(f_i)
-            const += spheres_number
+            if len(f_i) < 3:
+                print(f_i)
+            else:
+                spheres_number = len(f_i)
+                const += spheres_number
 
             
         # Define length of the edges
@@ -50,15 +53,18 @@ class Supp(Constraint):
         for f_i in sph_sph_adj:
             spheres_number = len(f_i)
 
-            edges_face = []
+            if spheres_number < 3:
+                print(f_i)
+            else:
+                edges_face = []
 
-            cij_norm_f = []
-            for i in range(spheres_number):
-                cij_norm_f.append(np.linalg.norm(c[f_i[(i+1)%spheres_number]] - c[f_i[i]]))
-                edges_face.append((f_i[i], f_i[(i+1)%spheres_number]))
+                cij_norm_f = []
+                for i in range(spheres_number):
+                    cij_norm_f.append(np.linalg.norm(c[f_i[(i+1)%spheres_number]] - c[f_i[i]]))
+                    edges_face.append((f_i[i], f_i[(i+1)%spheres_number]))
 
-            self.cij_norm.append(np.array(cij_norm_f))
-            self.edge_indices.append(np.array(edges_face))
+                self.cij_norm.append(np.array(cij_norm_f))
+                self.edge_indices.append(np.array(edges_face))
 
         self.add_constraint("supp", const)
         
@@ -78,8 +84,10 @@ class Supp(Constraint):
 
         #rows = [np.hstack((np.arange(self.const).repeat(6), np.arange(self.const).repeat(3) ))]
         cols_ci = []
+        cols_cj = []
         cols_nd = []
         values_ci = []
+        values_cj = []
         values_nd = []
 
         res = []
@@ -95,25 +103,26 @@ class Supp(Constraint):
             cij_nd /= self.cij_norm[i]
 
             # Get edges index
-            edges_idx = 3 * np.repeat(edges.flatten(), 3) + np.tile(range(3), len(edges.flatten()))
+            edges_idx_i = 3 * np.repeat(edges[:,0], 3) + np.tile(range(3), len(edges[:,0]))
+            edges_idx_j = 3 * np.repeat(edges[:,1], 3) + np.tile(range(3), len(edges[:,1]))
 
             # Edges indices
-            edg_idx = var_idx["c"][edges_idx]
+            edg_idx_i = var_idx["c"][edges_idx_i]
+            edg_idx_j = var_idx["c"][edges_idx_j]
 
             # Constraint
-            cols_ci.extend(edg_idx)
+            cols_ci.extend(edg_idx_i)
+            cols_cj.extend(edg_idx_j)
 
             nd_cjnorm = np.array([nd[i]]).repeat(len(edges), axis=0)/self.cij_norm[i][:,None]
             # d_c(i+1) E_supp_f = nd
             d_cj_E_f  =   nd_cjnorm 
             # d_c(i) E_supp_f = - nd
             d_ci_E_f  =  -nd_cjnorm
-    
-            # Values
-            d_E_f = np.hstack((d_ci_E_f, d_cj_E_f))
 
             # Values extend
-            values_ci.extend(d_E_f.flatten()) 
+            values_ci.extend(d_ci_E_f.flatten()) 
+            values_cj.extend(d_cj_E_f.flatten())
             
             # DN E_supp_f
             # d_n E_supp_f = (c_{i+1} - c_i)/||c_{i+1} - c_i||
@@ -127,7 +136,8 @@ class Supp(Constraint):
             res.extend(cij_nd)
             self.cij_norm[i] = np.linalg.norm(c[edges[:, 1]] - c[edges[:, 0]], axis=1)
 
-        self.add_derivatives(np.arange(self.const).repeat(6), cols_ci, values_ci)
+        self.add_derivatives(np.arange(self.const).repeat(3), cols_ci, values_ci)
+        self.add_derivatives(np.arange(self.const).repeat(3), cols_cj, values_cj)
         self.add_derivatives(np.arange(self.const).repeat(3), cols_nd, values_nd)
         self.set_r(self.const_idx["supp"], res)
 
