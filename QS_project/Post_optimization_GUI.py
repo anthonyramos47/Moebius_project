@@ -125,6 +125,8 @@ VR = data['VR']
 
 dual_edges = np.array(list(extract_edges(dual_top)))
 
+
+
 # # Sample size of the B-spline
 # sample = (len(u_pts), len(v_pts))   
 
@@ -397,15 +399,11 @@ def optimization():
             Prox_M = Proximity()
             opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=w_proximity)
 
-            # Edge Length
-            Edge_l = Edge_L()
-            opt.add_constraint(Edge_l, args=("c", dual_edges, 3), w=1)
-
             # Lap = Laplacian()
             #opt.add_constraint(Lap, args=(f_f_adj, "c", 3), w=w_lap)
 
-            Prox_C = Proximity()
-            opt.add_constraint(Prox_C, args=("c", ref_C, ref_F, 0.001), w=w_proximity)
+            #Prox_C = Proximity()
+            #opt.add_constraint(Prox_C, args=("c", ref_C, ref_F, 0.001), w=0.1)
 
             # Fair_C = QM_Fairness()
             # opt.add_constraint(Fair_C, args=(in_v_c, ad_v_c, "c", 3), w=0.002)
@@ -413,8 +411,8 @@ def optimization():
             # Define unit variables
             opt.unitize_variable("nd", 3, 10)
 
-            #opt.control_var("v", 0.001)
-            #opt.control_var("c", 0.001)
+            opt.control_var("v", 0.001)
+            opt.control_var("c", 0.001)
 
             ps.info("Finished Initialization of Optimization 1")
 
@@ -550,20 +548,34 @@ def optimization():
         # Open file
         exp_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
 
+        exp_file2 = open(os.path.join(remeshing_dir, name+'_sphs_Comp.dat'), 'w')
+
         # Write inn_f in the first line
         for i in inn_f:
             exp_file.write(f"{i} ")
+            exp_file2.write(f"{i} ")
         exp_file.write("\n")
+        exp_file2.write("\n")
+
 
         for i in range(len(ffF)):
-
+            
             exp_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
+
+            v0, v1, v2, v3 = vk[ffF[i]]
+
+            fit_c, fit_r = find_sphere(v0, v1, v2, v3)
+
+            exp_file2.write(f"{fit_c[0]} {fit_c[1]} {fit_c[2]} {fit_r} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
 
             for j in f_f_adj[i]:
                 exp_file.write(f"{j} ")
 
             exp_file.write("\n")
 
+            exp_file2.write("\n")
+
+        exp_file2.close()
         exp_file.close()
 
 

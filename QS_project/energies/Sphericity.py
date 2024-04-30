@@ -75,7 +75,7 @@ class Sphericity(Constraint):
         self.add_derivatives(self.row_vk, self.vk_idx, d_vk_E_sph)
 
         # d_cf
-        self.add_derivatives(self.row_cf, self.cf_idx, d_cf_E_sph)
+        #self.add_derivatives(self.row_cf, self.cf_idx, d_cf_E_sph)
 
         # d_rf
         self.add_derivatives(self.row_rf, self.rf_idx, d_rf_E_sph)

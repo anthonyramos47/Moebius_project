@@ -85,8 +85,10 @@ foot_pts = foot_pts.reshape(-1, 2)
 # Evaluate the B-spline functions at the foot points bsurf(u, v), r(u, v) and n(u, v)
 f_pts = np.zeros((len(foot_pts), 3))
 r_pts = np.zeros((len(foot_pts)))
+l_dir = np.zeros((len(foot_pts), 3))
 n_dir = np.zeros((len(foot_pts), 3))
 for i in range(len(foot_pts)):
+    l_dir[i] = sph_ln_cong_at_pt(BSurf, rsurf, foot_pts[i, 0], foot_pts[i, 1])[1]
     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
     f_pts[i] =   BSurf(foot_pts[i, 0], foot_pts[i, 1])
     r_pts[i] = bisplev(foot_pts[i, 0], foot_pts[i, 1], rsurf)
@@ -199,6 +201,7 @@ data["ref_C"] = ref_C
 data["ref_F"] = ref_F
 data["nd"] = nd
 data["VR"] = VR
+data["l_dir"] = l_dir
 
 # Step 4: Dump the updated data back into the pickle file
 with open(os.path.join(exp_dir, pickle_name), 'wb') as file:
@@ -230,4 +233,3 @@ if parser.parse_args().vis == 1:
 
 
     ps.show()
-

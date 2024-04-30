@@ -1153,3 +1153,27 @@ def extract_edges(faces):
 def indices_flatten_dim(arr, n=3):
     
     return 3 * np.repeat(arr, n) + np.tile(range(n), len(arr))
+
+
+
+def find_sphere(p1, p2, p3, p4):
+    # Create matrix A from coordinates subtraction
+    A = np.array([
+        [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]],
+        [p3[0] - p1[0], p3[1] - p1[1], p3[2] - p1[2]],
+        [p4[0] - p1[0], p4[1] - p1[1], p4[2] - p1[2]]
+    ])
+    
+    # Create vector d from squared distances difference
+    d = 0.5 * np.array([
+        np.dot(p2, p2) - np.dot(p1, p1),
+        np.dot(p3, p3) - np.dot(p1, p1),
+        np.dot(p4, p4) - np.dot(p1, p1)
+    ])
+    
+    # Solve the linear system A * center = d
+    center = np.linalg.solve(A, d)
+    # Calculate the radius
+    radius = np.sqrt(np.sum((p1 - center)**2))
+    
+    return center, radius
