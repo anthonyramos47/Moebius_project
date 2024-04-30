@@ -1095,3 +1095,61 @@ def np_pop(arr, idx):
 
     # Return the popped element and the new array
     return element, new_arr
+
+def compute_volume_of_tetrahedron(p1, p2, p3, p4):
+    # Each p should be an array of coordinates [x, y, z]
+    mat = np.ones((4, 4))
+    mat[0, 1:] = p1
+    mat[1, 1:] = p2
+    mat[2, 1:] = p3
+    mat[3, 1:] = p4
+    volume = np.abs(np.linalg.det(mat)) / 6
+    return volume
+
+
+def compute_planarity(p1,p2,p3,p4):
+    """ Function to compute planarity of 4 points
+    """
+
+    # p1 --v0--> p2
+    #  |        |
+    # v1        |
+    #  |        |
+    # p4 --v2--> p3
+
+    # Define v0 vector
+    v0 = unit(p2 - p1)
+
+    # Definve v1 vector
+    v1 = unit(p4 - p1)
+
+    # Define v2 vector
+    v2 = unit(p3 - p4)
+
+    # Compute the normal
+    n = np.cross(v0, v1)
+
+    # Compute the planarity
+    planarity = np.abs(vec_dot(n, v2))
+
+    return planarity
+    
+
+def extract_edges(faces):
+    edges = set()
+    for face in faces:
+        num_vertices = len(face)
+        if num_vertices < 2:
+            continue  # Skip if the face has less than two vertices (not a valid face)
+        # Loop through each vertex in the face
+        for i in range(num_vertices):
+            # Create an edge from the current vertex to the next, wrapping around to the first
+            v1 = face[i]
+            v2 = face[(i + 1) % num_vertices]  # Wrap around using modulo
+            edge = tuple(sorted([v1, v2]))  # Sort the tuple to avoid duplicates like (v2, v1)
+            edges.add(edge)
+    return edges
+
+def indices_flatten_dim(arr, n=3):
+    
+    return 3 * np.repeat(arr, n) + np.tile(range(n), len(arr))
