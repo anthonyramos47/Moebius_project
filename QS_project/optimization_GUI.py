@@ -66,7 +66,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-#bspline_surf_name, dir = "Complex_test_S2", 1
+bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
@@ -76,7 +76,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 
 # Dat name
 #bspline_surf_name, dir = "inv_1", 1
-bspline_surf_name, dir = "data_hyp", 1 # delta = 0.3
+#bspline_surf_name, dir = "data_hyp", 1 # delta = 0.3
 #bspline_surf_name, dir = "Sample_C", 1
 #bspline_surf_name, dir = "Neg_Surf", 1
 #bspline_surf_name, dir = "Tunel", -1
@@ -84,7 +84,7 @@ bspline_surf_name, dir = "data_hyp", 1 # delta = 0.3
 # Sample size
 sample = (15, 15)
 delta = 0.3
-choice_data = 1 # 0: Json , 1: data_hyp.dat
+choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
 tangle = 45 # Torsal angle threshold for torsal planes

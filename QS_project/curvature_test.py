@@ -49,12 +49,12 @@ print("surface dir:", surface_dir)
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-#bspline_surf_name, dir = "Complex_test_S2", 1
+bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
 #bspline_surf_name, dir = "Sample_C", 1
-bspline_surf_name, dir = "Tunel", -1
+#bspline_surf_name, dir = "Tunel", -1
 
 # Define the path to the B-spline surface
 bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
