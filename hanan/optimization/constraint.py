@@ -3,7 +3,7 @@
 # The main idea is to pass a mesh and return a residual and a Jacobian
 import numpy as np
 import geometry as geo
-from scipy.sparse import csc_matrix
+from scipy.sparse import csr_matrix
 from time import time
 
 
@@ -71,9 +71,9 @@ class Constraint():
 
         in_t = time()
         if self.sparse:
-            self._J = csc_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+            self._J = csr_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
         else:
-            self._J = csc_matrix(self._J)
+            self._J = csr_matrix(self._J)
         
         #print("Jacobian", self.J.toarray())
 

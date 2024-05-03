@@ -1177,3 +1177,37 @@ def find_sphere(p1, p2, p3, p4):
     radius = np.sqrt(np.sum((p1 - center)**2))
     
     return center, radius
+
+
+def get_Implicit_sphere(c, r):
+
+    A = 1/(2*r)
+
+    B = (2*A)[:,None]*c
+
+    C = (1 - np.linalg.norm(B, axis=1)**2 )/(-4*A)
+
+    # Check if value is 1 or close to 1
+    for i in range(len(c)):
+        assert np.isclose(B[i]@B[i] - 4*A[i]*C[i], 1), "Error in the implicit sphere" 
+
+    return A, B, C
+
+def Implicit_to_CR(A,B,C):
+
+    c = B/(2*A)[:,None]
+
+
+    r = np.sqrt(np.einsum('ij,ij->i',B,B) - 4*A*C)/(2*A)
+
+    return c, r
+
+def remove_edges_by_ls(edges, ls):
+
+    new_ls = []
+    for i in range(len(edges)):
+        
+        if edges[i][0] in ls and edges[i][1] in ls:
+            new_ls.append(edges[i])
+
+    return np.array(new_ls)

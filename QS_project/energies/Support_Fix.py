@@ -2,10 +2,9 @@
 from optimization.constraint import Constraint
 import splipy as sp
 import numpy as np
-from geometry.utils import indices_flatten_dim
 
 
-class Supp(Constraint):
+class Supp_F(Constraint):
 
     def __init__(self) -> None:
         """ Template constraint
@@ -13,13 +12,13 @@ class Supp(Constraint):
         E_{supp} = \sum_{f\in Mesh Dual} \sum_{i in f} || (c_{i+1} - c_i)/||norm cii1|| *n_aux||^2
         """
         super().__init__()
-        self.name = "Support" # Name of the constraint
+        self.name = "Support_Fix" # Name of the constraint
         self.sph_sph_adj = None # Faces list
         self.edge_indices = None # Edges indices per face
 
 
       
-    def initialize_constraint(self, X, var_idx, sph_sph_adj, inn_v) -> None:
+    def initialize_constraint(self, X, var_idx, sph_sph_adj, l_f) -> None:
         """ 
         We assume knots are normalized
         Input:
@@ -31,7 +30,7 @@ class Supp(Constraint):
             v_sample  : V sample points
         """
 
-
+        self.nd = l_f
         # Define u_points and v_points
         self.sph_sph_adj = sph_sph_adj
 
@@ -46,7 +45,6 @@ class Supp(Constraint):
                 const += spheres_number
 
             
-        self.nd_idx = var_idx["nd"][indices_flatten_dim(inn_v, n=3)]
         # Define length of the edges
         
         for f_i in sph_sph_adj:
@@ -71,10 +69,9 @@ class Supp(Constraint):
         """ 
 
         # Get centers of spheres
-        A, B= self.uncurry_X(X, var_idx, "A", "B")
-        nd = X[self.nd_idx]
+        A, B = self.uncurry_X(X, var_idx, "A", "B")
         B = B.reshape(-1, 3)
-        nd = nd.reshape(-1, 3)
+        nd = self.nd
 
         #rows = [np.hstack((np.arange(self.const).repeat(6), np.arange(self.const).repeat(3) ))]
         cols_A1 = []
@@ -127,10 +124,10 @@ class Supp(Constraint):
             cols_B2.extend(B_idx_2)
             values_B2.extend( (A1[:,None]*ext_nd).flatten()) 
 
-            # d_nd = (A1 B2 - A2 B1)
+            #d_nd = (A1 B2 - A2 B1)
             d_nd = A1[:, None]*B2 - A2[:, None]*B1
-            cols_nd.extend(np.tile(var_idx["nd"][3*i:3*(i+1)], len(edges)))
-            values_nd.extend(d_nd.flatten())
+            # cols_nd.extend(np.tile(var_idx["nd"][3*i:3*(i+1)], len(edges)))
+            # values_nd.extend(d_nd.flatten())
             
             # Residual
             res.extend( np.sum(d_nd*nd[i], axis=1) )
@@ -139,7 +136,7 @@ class Supp(Constraint):
         self.add_derivatives(np.arange(self.const), cols_A2, values_A2)
         self.add_derivatives(np.arange(self.const).repeat(3), cols_B1, values_B1)
         self.add_derivatives(np.arange(self.const).repeat(3), cols_B2, values_B2)
-        self.add_derivatives(np.arange(self.const).repeat(3), cols_nd, values_nd)
+        #self.add_derivatives(np.arange(self.const).repeat(3), cols_nd, values_nd)
         self.set_r(self.const_idx["supp"], res)
 
 

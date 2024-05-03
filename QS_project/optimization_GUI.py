@@ -100,7 +100,7 @@ weights = {
 ang_normal = np.zeros((sample[0], sample[1]))
 state = 0
 state2 = 0  
-counter = 1
+counter = 0
 init_opt_1 = False
 init_opt_2 = False
 name_saved = "Results"
@@ -117,9 +117,11 @@ def optimization():
     # Title
     psim.TextUnformatted("Sphere and Lince Congruence Optimization")
 
+
     if psim.Button("Stop"):
         state = 0
         state2 = 0
+
 
     psim.PushItemWidth(150)
     changed, iter_per_opt = psim.InputInt("Num of Iterations per Run: ", iter_per_opt)
@@ -131,6 +133,7 @@ def optimization():
        
     # Inputs Opt 1
     if psim.CollapsingHeader("Optimization 1:"):
+
         changed, weights["LC"][0] = psim.InputFloat("Line Congruence", weights["LC"][0])
         changed, weights["LC_Orth"][0] = psim.InputFloat("LC Surf Orth", weights["LC_Orth"][0])
         changed, step_1 = psim.InputFloat("Optimization step size", step_1)

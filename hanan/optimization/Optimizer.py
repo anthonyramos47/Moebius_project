@@ -6,7 +6,7 @@ from optimization.Unit import Unit
 from optimization.Step_Control import Step_Control
 from geometry.utils import unit
 from scipy.sparse import diags, vstack
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, gmres 
 import matplotlib.pyplot as plt
 
 
@@ -231,7 +231,7 @@ class Optimizer():
         stacked_H = []
         stacked_b = []
 
-        total = 0
+        #total = 0
         for constraint in self.constraints:
             
             # Add J, r to the optimizer
@@ -240,18 +240,18 @@ class Optimizer():
                 #initial_time = tm.time()
                 # Compute J, r for the constraint
                 constraint._compute(self.X, self.var_idx)
-                # final_time = tm.time()
+                #final_time = tm.time()
                 # total += final_time - initial_time
-                # print(f"Time to compute {constraint.name}: {final_time - initial_time}")
+                #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
 
                 #initial_time = tm.time()
                 # Add J, r to the optimizer                
                 #stacked_J.append(np.sqrt(constraint.w) * constraint._J)
                 stacked_H.append( constraint.w * constraint._J.T.dot(constraint._J))
                 stacked_b.append( constraint.w * constraint._J.T.dot(constraint._r))    
-                # final_time = tm.time()
-                # total += final_time - initial_time
-                # print(f"Time to stack and Hess {constraint.name}: {final_time - initial_time}")
+                final_time = tm.time()
+                # # total += final_time - initial_time
+                #print(f"Time to stack and Hess {constraint.name}: {final_time - initial_time}\n\n")
 
                 # Add energy to the energy dictionary
                 if constraint.name is not None:
@@ -262,14 +262,18 @@ class Optimizer():
             self.H = stacked_H[0]
             self.b = stacked_b[0]
         else:
+            #initial_time = tm.time()
             self.H = sum(H_i for H_i in stacked_H)
             self.b = sum(b_i for b_i in stacked_b)
+            #final_time = tm.time()
+
+            #print(f"Time to sum Hessians: {final_time - initial_time}")
 
 
  
     def optimize(self):
         
-        if self.prevdx is None or (self.prevdx > 1e-8 and self.energy[-1] > 1e-9 and self.e_diff > 1e-7) :
+        if self.prevdx is None or (self.prevdx > 1e-8 and self.energy[-1] > 1e-9 and self.e_diff > 1e-9) :
             if self.method == 'LM': # Levenberg-Marquardt
                 self.LM()
             elif self.method == 'PG': # Projected Gauss-Newton
@@ -290,18 +294,43 @@ class Optimizer():
         # Compute pseudo Hessian
         #H = (J.T * J).tocsc()
         
-        # Calculate the value to add to the diagonal
-        add_value = self.H.max() * 1e-8
+        # # Calculate the value to add to the diagonal
+        # add_value = self.H.max() * 1e-8
 
-        # Create a diagonal matrix with the values to add
-        diagonal_values = np.array([add_value] * self.H.shape[0])
-        diagonal_matrix = diags(diagonal_values, 0, format='csc')
+        # # Create a diagonal matrix with the values to add
+        # diagonal_values = np.array([add_value] * self.H.shape[0])
+        # diagonal_matrix = diags(diagonal_values, 0, format='csc')
 
-        # Add the diagonal_matrix to H
-        self.H = self.H + diagonal_matrix
-       
-        #b = -J.T@self.r
+        # # Add the diagonal_matrix to H
+        # self.H = self.H + diagonal_matrix
+
+
+        #mu = 1e-3 # Regularization parameter
+        mu = self.H.max() * 1e-8
+        
+
+        #initial_time = tm.time()
+        # Extract the diagonal elements from the matrix H_csr
+        diagonal = self.H.diagonal()
+
+        # Create a diagonal matrix where each diagonal entry is the reciprocal of the original matrix's diagonal
+        #M = diags(1.0 / diagonal)
+        
+        self.H.setdiag(diagonal + mu)
+
         dx = spsolve(self.H, -self.b)
+
+        # # Solve the linear system
+        # dx, exitCode = gmres(self.H, -self.b, M=M)
+        # if exitCode != 0:
+        #     print(f"Solver did not converge at iteration, exit code: {exitCode}")
+    
+        #final_time = tm.time()
+        #print(f"Time to solve linear system: {final_time - initial_time}")
+        
+        #b = -J.T@self.r
+        
+ 
 
         # Store previous dx norm
         self.prevdx = np.linalg.norm(self.step*dx)
