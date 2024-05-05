@@ -49,7 +49,11 @@ print("surface dir:", surface_dir)
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-bspline_surf_name, dir = "Complex_test_S2", 1
+#bspline_surf_name, dir = "Complex_test_S2", 1
+
+#bspline_surf_name, dir = "Test_SubD", 1
+bspline_surf_name, dir = "Sph_inv_2", 1
+
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
@@ -61,7 +65,7 @@ bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
 print("bspline_surf_path:", bspline_surf_path)
 
 # Sample in each direction
-sample = 100 
+sample = 1000
 
 # Load the B-spline surface
 control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
@@ -74,7 +78,7 @@ basis_v = sp.BSplineBasis(order_v, knots_v)
 bsp1 = sp.Surface(basis_u, basis_v, control_points)
 
 # Sample the grid points to evaluate the B-spline surface
-u_vals, v_vals = sample_grid(sample, sample, delta=0.15)
+u_vals, v_vals = sample_grid(sample, sample, delta=0.2)
 
 # Evaluate the B-spline surface
 eval_surf = bsp1(u_vals, v_vals)

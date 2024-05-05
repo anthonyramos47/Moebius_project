@@ -1211,3 +1211,11 @@ def remove_edges_by_ls(edges, ls):
             new_ls.append(edges[i])
 
     return np.array(new_ls)
+
+def search_edge(edges, e):
+    # Find indices where both elements match in any order
+    matching_indices = np.where((edges[:, 0] == e[0]) & (edges[:, 1] == e[1]) |
+                            (edges[:, 0] == e[1]) & (edges[:, 1] == e[0]))
+    
+    # Return the first matching index
+    return matching_indices[0][0] if len(matching_indices[0]) > 0 else None

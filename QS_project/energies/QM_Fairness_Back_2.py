@@ -18,9 +18,14 @@ class QM_Fairness(Constraint):
         self.dv_i = None # Direction v
         self.dv_j = None # Direction v
 
-        self.vk = None # Valence n!=4 vertices
-        self.vk_n = None # Neighbors of valence n!=4 vertices
-        
+        self.vk_3 = None # Valence 3 vertices
+        self.vi_3 = None # Valence 3 vertices
+        self.vj_3 = None # Valence 3 vertices
+
+        self.vk_2 = None # Valence 2 vertices
+        self.vi_2 = None # Valence 2 vertices
+        self.vj_2 = None # Valence 2 vertices
+
         self.row_du = None # Row indices du
         self.row_dv = None # Row indices dv
 
@@ -32,7 +37,7 @@ class QM_Fairness(Constraint):
         
 
       
-    def initialize_constraint(self, X, var_idx, adj_v, var_name, dim) -> None:
+    def initialize_constraint(self, X, var_idx, bd_v, adj_v, var_name, dim) -> None:
         """ 
         We assume knots are normalized
         Input:
@@ -46,12 +51,18 @@ class QM_Fairness(Constraint):
         self.name = "QM_Fairness_"+var_name
 
         num_rows_Q = 0 # Rows for quadrilateral vertices
-        num_rows_L = 0 # Rows for Laplacian
-        
+        num_rows_B = 0 # Rows for boundary vertices
+        num_rows_C = 0 # Rows for corner vertices
 
-        # Valence != 4 vertices  Laplacian
-        vk = []
-        vk_n = []
+        # Valence 2 vertices vi - 2 vj + vk = 0
+        vk_2 = []
+        vi_2 = []
+        vj_2 = []
+
+        # Valence 3 vertices vi - 2 vj + vk = 0
+        vk_3 = []
+        vi_3 = []
+        vj_3 = []
 
         # Quadrilateral vertices indices
         du_i = []
@@ -62,9 +73,11 @@ class QM_Fairness(Constraint):
 
         dv_k = []
 
+        # Non boundary vertices
+        n_b = [] 
         for i, _ in enumerate(adj_v):
 
-            if len(adj_v[i]) == 4:
+            if len(adj_v[i]) == 4 and i not in bd_v:
                 num_rows_Q += 1
 
                 dv_k.extend([i])
@@ -74,12 +87,27 @@ class QM_Fairness(Constraint):
                 dv_i.extend([adj_v[i][1]])
                 dv_j.extend([adj_v[i][3]])
 
-            elif len(adj_v[i]) != 4:
-                num_rows_L += 1
+            elif (len(adj_v[i]) == 4  or len(adj_v[i]) == 3 ) and i in bd_v:
+                neigh = []
+                for j in range(len(adj_v[i])):      
+                    if adj_v[i][j] in bd_v:
+                        neigh.append(adj_v[i][j])
 
-                vk_n.append(adj_v[i])
-                vk.extend([i])
+                if len(neigh) == 2: 
+                    num_rows_B += 1
+
+                    vk_3.extend([i])           
+                    vi_3.extend([neigh[0]])
+                    vj_3.extend([neigh[1]])
                 
+            
+            elif len(adj_v[i]) == 2:
+                num_rows_C += 1
+
+                vk_2.extend([i])
+                vi_2.extend([adj_v[i][0]])
+                vj_2.extend([adj_v[i][1]])
+
         
         # Tansform to numpy arrays
         # Quadrilateral vertices
@@ -89,7 +117,16 @@ class QM_Fairness(Constraint):
         dv_j = np.array(dv_j)
         dv_k = np.array(dv_k)
 
-    
+        # Boundary vertices
+        vk_3 = np.array(vk_3)
+        vi_3 = np.array(vi_3)
+        vj_3 = np.array(vj_3)
+
+        
+
+        # Corner vertices
+        vk_2 = np.array(vk_2)
+        vi_2 = np.array(vi_2)
 
         if dim > 1:
             self.du_j = var_idx[var_name][3 * np.repeat(du_j, dim) + np.tile(range(dim), len(du_j))]
@@ -98,13 +135,13 @@ class QM_Fairness(Constraint):
             self.dv_i = var_idx[var_name][3 * np.repeat(dv_i, dim) + np.tile(range(dim), len(dv_i))]
             self.dv_k = var_idx[var_name][3 * np.repeat(dv_k, dim) + np.tile(range(dim), len(dv_k))]
 
-            self.vk = var_idx[var_name][3 * np.repeat(vk, dim) + np.tile(range(dim), len(vk))]
+            self.vi_3 = var_idx[var_name][3 * np.repeat(vi_3, dim) + np.tile(range(dim), len(vi_3))]
+            self.vj_3 = var_idx[var_name][3 * np.repeat(vj_3, dim) + np.tile(range(dim), len(vj_3))]
+            self.vk_3 = var_idx[var_name][3 * np.repeat(vk_3, dim) + np.tile(range(dim), len(vk_3))]
 
-            for i in range(len(vk_n)):
-                vk_n[i] = var_idx[var_name][3 * np.repeat(vk_n[i], dim) + np.tile(range(dim), len(vk_n[i]))]
-
-            self.vk_n = vk_n
-
+            self.vi_2 = var_idx[var_name][3 * np.repeat(vi_2, dim) + np.tile(range(dim), len(vi_2))]
+            self.vj_2 = var_idx[var_name][3 * np.repeat(vj_2, dim) + np.tile(range(dim), len(vj_2))]
+            self.vk_2 = var_idx[var_name][3 * np.repeat(vk_2, dim) + np.tile(range(dim), len(vk_2))]
         else:
             self.du_j = var_idx[var_name][du_j]
             self.du_i = var_idx[var_name][du_i]
@@ -112,18 +149,25 @@ class QM_Fairness(Constraint):
             self.dv_i = var_idx[var_name][dv_i]
             self.dv_k = var_idx[var_name][dv_k]
 
-           
+            self.vi_3 = var_idx[var_name][vi_3]
+            self.vj_3 = var_idx[var_name][vj_3]
+            self.vk_3 = var_idx[var_name][vk_3]
+
+            self.vi_2 = var_idx[var_name][vi_2]
+            self.vj_2 = var_idx[var_name][vj_2]
 
         self.add_constraint("Du_Fair", 3*num_rows_Q)
         self.add_constraint("Dv_Fair", 3*num_rows_Q)
         
-        self.add_constraint("Lap_Fair", 3*num_rows_L)
-        
+        self.add_constraint("V3_Fair", 3*num_rows_B)
+        self.add_constraint("V2_Fair", 3*num_rows_C)
 
         # Row indices
         self.row_du_Q =  self.const_idx["Du_Fair"]
         self.row_dv_Q =  self.const_idx["Dv_Fair"]
 
+        self.row_v_3 =  self.const_idx["V3_Fair"]
+        self.row_v_2 =  self.const_idx["V2_Fair"]
 
 
         
@@ -154,39 +198,39 @@ class QM_Fairness(Constraint):
         self.set_r(self.const_idx["Dv_Fair"], dv)
 
 
-        # Laplacian
-        vk = X[self.vk].reshape(-1, 3)
-        vk_n = [X[i] for i in self.vk_n]
+        # # Fairnes boundary vertices
+        # v3 = X[self.vi_3] +  X[self.vj_3] - 2*X[self.vk_3]
 
-        vk_indices = self.vk.reshape(-1, 3)
+        # # Compute derivatives d_vi,j (v3) = 1, d_vk = -2
+        # d_v  =  np.ones(len(self.vi_3))
+        # d_vk = -2*np.ones(len(self.vi_3))
 
-        for i in range(len(vk_n)):
-            
-            # Get the neighbors
-            vn = vk_n[i].reshape(-1, 3)
+        # # Compute derivatives
+        # self.add_derivatives(self.row_v_3, self.vi_3, d_v)
+        # self.add_derivatives(self.row_v_3, self.vj_3, d_v)
+        # self.add_derivatives(self.row_v_3, self.vk_3, d_vk)
 
-            # Get the number of neighbors
-            Nk = len(vn)
+        # # Compute residuals
+        # self.set_r(self.const_idx["V3_Fair"], v3)
 
-            # Indices
-            vk_n_idx = self.vk_n[i]
+        # Fairnes corner vertices
+        v2 = X[self.vi_2] +  X[self.vj_2] - 2*X[self.vk_2]
 
-            # L = (vk - 1/n \sum_{vj in N(vk)} vj)^2
-            # d_vk = 1 
-            self.add_derivatives(self.const_idx["Lap_Fair"][3*i: 3*(i+1)], vk_indices[i], np.ones(3))
+        # Compute derivatives d_vi,j (v2) = 1, d_vk = -2
+        d_v  =  np.ones(len(self.vi_2))
+        d_vk = -2*np.ones(len(self.vi_2))
 
-            # d_vj = -1/n
-            self.add_derivatives(self.const_idx["Lap_Fair"][3*i: 3*(i+ 1)].repeat(Nk), vk_n_idx, -np.ones(len(vk_n_idx))/Nk)
+        # Compute derivatives
+        self.add_derivatives(self.row_v_2, self.vi_2, d_v)
+        self.add_derivatives(self.row_v_2, self.vj_2, d_v)
+        self.add_derivatives(self.row_v_2, self.vk_2, d_vk)
 
-            # Compute residuals
-            res = (vk[i] - np.mean(vn, axis=0)).flatten()
-
-            self.set_r(self.const_idx["Lap_Fair"][3*i: 3*(i+1)], res)
-
+        # Compute residuals
+        self.set_r(self.const_idx["V2_Fair"], v2)
 
         self.cont+=1
 
-        if self.cont %8 == 0:
+        if self.cont %10 == 0:
             self.w *= 0.8
         #if self.cont %25 == 0:
         #    self.w = 0

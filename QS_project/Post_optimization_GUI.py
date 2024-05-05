@@ -51,7 +51,7 @@ from energies.Support_Fix import Supp_F
 from energies.Sphere_Fix_V import Sphere_Fix
 from energies.Sph_unit import Sph_Unit
 from energies.Tor_Planarity import Tor_Planarity
-from energies.Reg_E_Back import Reg_E
+from energies.Reg_E import Reg_E
 
 from optimization.Optimizer import Optimizer
 
@@ -131,13 +131,15 @@ l_f = data['l_dir']
 
 A, B, C = get_Implicit_sphere(cc, rads)
 
-
-print(np.einsum('ij,ij->i',B,B) - 4*A*C) 
-
-
 dual_edges = np.array(list(extract_edges(dual_top)))
 
 mesh_edges = e_v_v
+
+tuples_edges = np.vstack((mesh_edges[0], mesh_edges[1])).T
+
+
+
+
 
 
 
@@ -345,12 +347,14 @@ state = 0
 state2 = 0
 counter = 0
 init_opt = False
+w_tor = 0.1
+w_reg = 0.1
 init_opt_2 = False
 idx_sph = 0
 name_saved = "Post_optimization"
 def optimization():
 
-    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph
+    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, w_reg
 
     # Title
     psim.TextUnformatted("Post Optimization GUI")
@@ -414,12 +418,9 @@ def optimization():
 
             # Proximity
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=1e-7)
-
-
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.01), w=0.1)
 
             opt.unitize_variable("nd", 3, 10)
-            
             #opt.control_var("v", 0.01)
             # opt.control_var("c", 0.001)
 
@@ -440,6 +441,8 @@ def optimization():
         changed, w_fairness   = psim.InputFloat("Fairness W", w_fairness)
         changed, w_sphericity = psim.InputFloat("Sphericity W", w_sphericity)
         changed, w_supp       = psim.InputFloat("Support W", w_supp)
+        changed, w_tor        = psim.InputFloat("Tor Planarity W", w_tor)
+        changed, w_reg        = psim.InputFloat("Reg W", w_reg)
 
         if psim.Button("Init Second opt"):
 
@@ -460,7 +463,7 @@ def optimization():
             #opt.add_variable("mu", len(dual_edges))
 
             # Initialize Optimizer ("Method", step, verbosity)
-            opt.initialize_optimizer("LM", 0.65, 1)
+            opt.initialize_optimizer("LM", 0.1, 1)
 
             # Initialize variables
             opt.init_variable("A"  , A) 
@@ -484,28 +487,28 @@ def optimization():
 
             # # Fairness
             Fair_M = QM_Fairness()
-            opt.add_constraint(Fair_M, args=(bd_v, adj_v, "v", 3), w=w_fairness)
+            opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=w_fairness)
 
             # Torosal Planarity
             Tor_P = Tor_Planarity()
-            opt.add_constraint(Tor_P, args=(mesh_edges, inn_v), w=1)
+            opt.add_constraint(Tor_P, args=(mesh_edges, inn_v), w=w_tor)
 
             # # Proximity
             Prox_M = Proximity()
             opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=w_proximity)
 
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=1e-7)
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.001), w=w_proximity_c)
             
             # Reg 
-            # reg = Reg_E()
-            # opt.add_constraint(reg, args=(e_f_f, 2), w=0.1)
+            reg = Reg_E()
+            opt.add_constraint(reg, args=(e_f_f, e_v_v), w=w_reg)
 
             # # Define unit variables
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v", 0.001)
+            opt.control_var("v", 0.05)
             #opt.control_var("c", 0.0001)
 
             ps.info("Finished Initialization of Optimization 2")
@@ -544,8 +547,6 @@ def optimization():
         planarity1 = np.zeros(len(dual_top))
         planarity  = np.zeros(len(dual_top))
         for i in range(len(dual_top)):
-            if len(dual_top[i]) != 4:
-                print(dual_top[i])
             if len(dual_top[i]) == 4:
                 c0, c1, c2, c3 = sph_c[dual_top[i]]
                 planarity1[i] =  compute_volume_of_tetrahedron(c0, c1, c2, c3)
@@ -555,8 +556,6 @@ def optimization():
         sphericity =  dif0**2 + dif1**2 + dif2**2 + dif3**2
 
         idx_max = np.argmax(sphericity)
-
-        
         #max_sph = ps.register_point_cloud("Max_Sphericity", np.array([sph_c[idx_max]]), enabled=True, transparency=0.2, color=(0.1, 0.1, 0.1))
         #max_sph.set_radius(rf[idx_max], relative=False)
 
@@ -603,8 +602,7 @@ def optimization():
         planarity1 = np.zeros(len(dual_top))
         planarity  = np.zeros(len(dual_top))
         for i in range(len(dual_top)):
-            if len(dual_top[i]) != 4:
-                print(dual_top[i])
+
             if len(dual_top[i]) == 4:
                 c0, c1, c2, c3 = sph_c[dual_top[i]]
                 planarity1[i] =  compute_volume_of_tetrahedron(c0, c1, c2, c3)
@@ -681,11 +679,11 @@ def optimization():
         # # Get vertices per edge
         vi, vj = vk[mesh_edges[0]], vk[mesh_edges[1]]
 
+
         vij = vj - vi
         dist = np.linalg.norm(vij, axis=1)
-        
 
-        # Define basis for plane
+        vij = vij - np.einsum('ij,ij->i', vij, n_l)[:, None]*n_l
         b1 = vij/np.linalg.norm(vij, axis=1)[:, None]
 
         print(b1.shape, n_l.shape)
@@ -731,10 +729,11 @@ def optimization():
         # Get results
                   
         # Get Variables
-        vk, oA, oB, oC = opt.uncurry_X("v", "A", "B", "C")
+        vk, oA, oB, oC, nl = opt.uncurry_X("v", "A", "B", "C", "n_l")
         
         vk = vk.reshape(-1,3)
         oB = oB.reshape(-1,3)
+        nl = nl.reshape(-1,3)
 
         sph_c, rf = Implicit_to_CR(oA,oB,oC)
 
@@ -747,32 +746,50 @@ def optimization():
         # Open file
         exp_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
 
-        exp_file2 = open(os.path.join(remeshing_dir, name+'_sphs_Comp.dat'), 'w')
+        exp_file2 = open(os.path.join(remeshing_dir, name+'_sphs_p_cut.dat'), 'w')
 
         # Write inn_f in the first line
         for i in inn_f:
             exp_file.write(f"{i} ")
-            exp_file2.write(f"{i} ")
         exp_file.write("\n")
-        exp_file2.write("\n")
 
 
         for i in range(len(ffF)):
             
             exp_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
 
-            v0, v1, v2, v3 = vk[ffF[i]]
+            string_data_sph_panel = f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} "
 
-            fit_c, fit_r = find_sphere(v0, v1, v2, v3)
+            for j in range(len(ffF[i])):
 
-            exp_file2.write(f"{fit_c[0]} {fit_c[1]} {fit_c[2]} {fit_r} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
+                #edge
+                e = [ffF[i][j], ffF[i][(j+1) % len(ffF[i])]]
+
+                # find index of edge
+                idx = search_edge(tuples_edges, e)
+
+                # Get the normal of the edge
+                n = nl[idx]
+
+                # Get the vertices of the edge
+                vi, vj = vk[e[0]], vk[e[1]]
+
+                # Compute the mid point of the edge
+                mid = (vi + vj)/2
+                string_data_sph_panel += f"{vi[0]} {vi[1]} {vi[2]} {mid[0]} {mid[1]} {mid[2]} {n[0]} {n[1]} {n[2]} "
+        
+
+                
+
+            exp_file2.write(string_data_sph_panel + "\n")
+            
 
             for j in f_f_adj[i]:
                 exp_file.write(f"{j} ")
 
             exp_file.write("\n")
 
-            exp_file2.write("\n")
+            
 
         exp_file2.close()
         exp_file.close()
@@ -785,14 +802,14 @@ ps.init()
 mesh = ps.register_surface_mesh("mesh", f_pts, ffF)
 #ps.register_surface_mesh("S_uv", ref_V, ref_F)
 #ps.register_surface_mesh("Remeshed", ffV, ffF)
-ps.register_surface_mesh("Dual mesh", vc, dual_top)
-centers = ps.register_point_cloud("cc", cc[465:468])
+#ps.register_surface_mesh("Dual mesh", vc, dual_top)
+#centers = ps.register_point_cloud("cc", cc[465:468])
 
-centers.add_vector_quantity("Dir", 1.2*(vc[465:468] - cc[465:468]), enabled=True, vectortype="ambient")
+#centers.add_vector_quantity("Dir", 1.2*(vc[465:468] - cc[465:468]), enabled=True, vectortype="ambient")
 
 
 #ps.register_point_cloud("Boundary", f_pts[bd_v], enabled=True, color=(0.1, 0.1, 0.1))
-#ps.register_surface_mesh("C_uv", ref_C, ref_F)
+ps.register_surface_mesh("C_uv", ref_C, ref_F, enabled=False)
 #ps.register_surface_mesh("Mid_mesh", VR, ffF)
 
 

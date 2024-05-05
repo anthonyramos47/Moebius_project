@@ -66,7 +66,9 @@ experiment_dir = os.path.join(dir_path, "experiments")
 #bspline_surf_name, dir = "Complex_test_S", -1
 
 # Rhino Test 2
-bspline_surf_name, dir = "Complex_test_S2", 1
+#bspline_surf_name, dir = "Complex_test_S2", 1
+#bspline_surf_name, dir = "Sph_inv1", 1
+bspline_surf_name, dir = "Sph_inv_2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
@@ -83,7 +85,7 @@ bspline_surf_name, dir = "Complex_test_S2", 1
 
 # Sample size
 sample = (15, 15)
-delta = 0.3
+delta = 0.2
 choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface

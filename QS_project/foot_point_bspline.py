@@ -75,8 +75,8 @@ sample = (len(u_pts), len(v_pts))
 V, F = Bspline_to_mesh(BSurf, u_pts, v_pts)
 
 
-range_u = (0.1, 0.9)
-range_v = (0.1, 0.9)
+range_u = (0, 1)
+range_v = (0, 1)
 
 # Compute footpoints (u,v) coordinates of remeshed mesh onto the B-spline
 foot_pts = foot_points(ffV, V, u_pts, v_pts, BSurf, u_range=range_u, v_range=range_v)
@@ -126,6 +126,8 @@ ref_C = ref_C.reshape(-1, 3)
 # Create mesh for Mid mesh (sphere centers)
 mesh = Mesh()
 mesh.make_mesh(VR, ffF)
+
+
 
 # Get the face-face adjacency list 
 f_f_adj = mesh.face_face_adjacency_list()
