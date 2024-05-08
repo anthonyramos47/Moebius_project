@@ -139,7 +139,7 @@ class Supp(Constraint):
         self.add_derivatives(np.arange(self.const), cols_A2, values_A2)
         self.add_derivatives(np.arange(self.const).repeat(3), cols_B1, values_B1)
         self.add_derivatives(np.arange(self.const).repeat(3), cols_B2, values_B2)
-        self.add_derivatives(np.arange(self.const).repeat(3), cols_nd, values_nd)
+        #self.add_derivatives(np.arange(self.const).repeat(3), cols_nd, values_nd)
         self.set_r(self.const_idx["supp"], res)
 
 

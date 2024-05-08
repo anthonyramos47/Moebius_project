@@ -2,6 +2,7 @@
 import os
 import sys
 from pathlib import Path
+import argparse
 
 # Obtain the path HananLab; this is the parent directory of the hananLab/hanan directory
 # <Here you can manually add the path direction to the hananLab/hanan directory>
@@ -60,6 +61,17 @@ experiment_dir = os.path.join(dir_path, "experiments")
 
 # Optimization options ======================================
 
+
+# Create the parser
+parser = argparse.ArgumentParser(description="Optimization")
+# Add an argument
+parser.add_argument('file_name', type=str, help='File name to load')
+
+parser.add_argument('deltaumin', type=float, help='delta value')
+parser.add_argument('deltaumax', type=float, help='delta value')
+parser.add_argument('deltavmin', type=float, help='delta value')
+parser.add_argument('deltavmax', type=float, help='delta value')
+
 # Name surface file
 
 # Rhino Test  1
@@ -68,7 +80,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 # Rhino Test 2
 #bspline_surf_name, dir = "Complex_test_S2", 1
 #bspline_surf_name, dir = "Sph_inv1", 1
-bspline_surf_name, dir = "Sph_inv_2", 1
+#bspline_surf_name, dir = "Sph_inv_2", 1
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
@@ -83,9 +95,11 @@ bspline_surf_name, dir = "Sph_inv_2", 1
 #bspline_surf_name, dir = "Neg_Surf", 1
 #bspline_surf_name, dir = "Tunel", -1
 
+bspline_surf_name = parser.parse_args().file_name
+dir =  1
+
 # Sample size
 sample = (15, 15)
-delta = 0.2
 choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
@@ -114,7 +128,7 @@ step_2 = 0.5
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1
 
     # Title
     psim.TextUnformatted("Sphere and Lince Congruence Optimization")
@@ -127,7 +141,7 @@ def optimization():
 
     psim.PushItemWidth(150)
     changed, iter_per_opt = psim.InputInt("Num of Iterations per Run: ", iter_per_opt)
-    psim.SameLine()
+
     changed, angle  = psim.InputFloat("Angle: ", angle)
     changed, tangle = psim.InputFloat("Torsal Angle: ", tangle)
     psim.Separator()
@@ -233,7 +247,7 @@ def optimization():
             opt.initialize_optimizer("LM", step_2, 1)
 
             # Init variables 
-            opt.init_variable("theta" , 50)
+            opt.init_variable("theta" , 20)
             opt.init_variable("l"     , f_l.flatten())  
             opt.init_variable("rij"   , f_cp)
             opt.init_variable("mu"    , f_mu)
@@ -260,6 +274,10 @@ def optimization():
             opt.unitize_variable("nt1", 3, 10)
             opt.unitize_variable("nt2", 3, 10)
 
+            opt.control_var("nt1", 0.05)
+            opt.control_var("nt2", 0.05)
+            #opt.control_var("l", 0.1)
+
             ps.info("Finished Initialization of Optimization 2")
 
         # if psim.Button("Optimize 2"):
@@ -285,7 +303,9 @@ def optimization():
                 # Get Line congruence
                 l, cp = opt.uncurry_X("l", "rij" )
 
+
                 visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp)
+                #visualize_LC(surf, bsp1, r_uv, l, np.linspace(0, 1, 200), np.linspace(0, 1, 200), cp)
             else:
                 ps.warning("First Optimization not initialized")
                 state = 0
@@ -405,6 +425,7 @@ def optimization():
                     'V_R': V_R,
                     'F': F,
                     'l': l,
+                    'init_l': init_l,
                     'n': n,
                     't1': t1,
                     't2': t2,
@@ -429,7 +450,7 @@ def optimization():
 bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
 
 # Get Grid Information
-u_pts, v_pts = sample_grid(sample[0], sample[1], delta=delta)
+u_pts, v_pts = sample_grid(sample[0], sample[1], deltaum=parser.parse_args().deltaumin, deltauM=parser.parse_args().deltaumax, deltavm = parser.parse_args().deltavmin, deltavM = parser.parse_args().deltavmax)
 n_squares = (len(u_pts)-1)*(len(v_pts)-1)
 
 r_H, n = init_sphere_congruence(mid_init, bsp1, u_pts, v_pts, sample)
@@ -443,6 +464,8 @@ l = flip(l, n)
 
 # Store initial line congruence for visualization
 init_l = l.copy()
+
+
 
 # Get the number of control points
 cp = r_uv[2].copy()

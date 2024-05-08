@@ -59,7 +59,7 @@ from optimization.Optimizer import Optimizer
 
 
 # Create the parser
-parser = argparse.ArgumentParser(description="Visualizer Parser")
+parser = argparse.ArgumentParser(description="Post Optimization")
 
 # Add an argument
 parser.add_argument('file_name', type=str, help='File name to load')
@@ -351,10 +351,11 @@ w_tor = 0.1
 w_reg = 0.1
 init_opt_2 = False
 idx_sph = 0
+step = 0.5
 name_saved = "Post_optimization"
 def optimization():
 
-    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, w_reg
+    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, w_reg, step, l_f
 
     # Title
     psim.TextUnformatted("Post Optimization GUI")
@@ -366,6 +367,8 @@ def optimization():
 
     psim.PushItemWidth(150)
     changed, iter_per_opt = psim.InputInt("Num of Iterations per Run: ", iter_per_opt)
+    changed, step = psim.InputFloat("Setp per Optimization: ", step)
+    
     psim.Separator()
 
         # State handler
@@ -392,7 +395,7 @@ def optimization():
             opt.add_variable("A" , len(vc)  ) # Centers of spheres
             opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
             opt.add_variable("C" , len(vc)  ) # Centers of spheres
-            opt.add_variable("nd", len(l_f)*3   ) # Normals of dual faces
+            
             
             
 
@@ -403,7 +406,7 @@ def optimization():
             opt.init_variable("A"  , A) 
             opt.init_variable("B"  , B.flatten())
             opt.init_variable("C"  , C)
-            opt.init_variable("nd" , l_f.flatten())
+            
 
     
             # Sphericity
@@ -412,15 +415,16 @@ def optimization():
             Sph_U = Sph_Unit()
             opt.add_constraint(Sph_U, args=(), w=10)
 
-            Supp_E = Supp()
-            opt.add_constraint(Supp_E, args=(dual_top, inn_v), w=w_supp)
+            
+            Supp_E = Supp_F()
+            opt.add_constraint(Supp_E, args=(dual_top, l_f), w=w_supp)
 
 
             # Proximity
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.01), w=0.1)
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.001), w=1)
 
-            opt.unitize_variable("nd", 3, 10)
+            #opt.unitize_variable("nd", 3, 10)
             #opt.control_var("v", 0.01)
             # opt.control_var("c", 0.001)
 
@@ -456,14 +460,14 @@ def optimization():
             opt.add_variable("A" , len(vc)  ) # Centers of spheres
             opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
             opt.add_variable("C" , len(vc)  ) # Centers of spheres
-            opt.add_variable("nd", len(nd)*3   ) # Normals of dual faces
+            opt.add_variable("nd", len(l_f)*3   ) # Normals of dual faces
             opt.add_variable("v" , len(f_pts)*3) # Vertices of mid mesh
             opt.add_variable("n_l" , len(mesh_edges[0])*3   ) # Radii of spheres
             #opt.add_variable("r" , len(rads)   ) # Radii of spheres
             #opt.add_variable("mu", len(dual_edges))
 
             # Initialize Optimizer ("Method", step, verbosity)
-            opt.initialize_optimizer("LM", 0.1, 1)
+            opt.initialize_optimizer("LM", step, 1)
 
             # Initialize variables
             opt.init_variable("A"  , A) 
@@ -495,10 +499,10 @@ def optimization():
 
             # # Proximity
             Prox_M = Proximity()
-            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=w_proximity)
+            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=w_proximity)
 
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.001), w=w_proximity_c)
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.00001), w=w_proximity_c)
             
             # Reg 
             reg = Reg_E()
@@ -508,7 +512,7 @@ def optimization():
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v", 0.05)
+            opt.control_var("v", 0.1)
             #opt.control_var("c", 0.0001)
 
             ps.info("Finished Initialization of Optimization 2")
@@ -528,11 +532,11 @@ def optimization():
         opt.optimize() # Solve linear system and update variables
         
         # Get Variables
-        oA, oB, oC, nd = opt.uncurry_X("A", "B", "C", "nd")
+        oA, oB, oC = opt.uncurry_X("A", "B", "C")
         
         vk = f_pts
         oB = oB.reshape(-1,3)
-        nd = nd.reshape(-1,3)
+        
 
         sph_c, rf = Implicit_to_CR(oA,oB,oC)
 
@@ -566,11 +570,12 @@ def optimization():
     
         mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
         mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
+        mesh.add_vector_quantity("lc", l_f, enabled=True, length=0.12)
         mesh.add_scalar_quantity("Sphericity", np.array(sphericity), defined_on="faces", enabled=True )
         c_surf = ps.register_surface_mesh("Opt_C", sph_c, dual_top)
         c_surf.add_scalar_quantity("Planarity", planarity, defined_on='faces', enabled=True)
         c_surf.add_scalar_quantity("Face_Vol" , planarity1, defined_on='faces', enabled=True)
-        c_surf.add_vector_quantity("Normals", nd[inn_v], defined_on='faces', enabled=True)
+        #c_surf.add_vector_quantity("Normals", nd[inn_v], defined_on='faces', enabled=True)
         ps.register_curve_network("Edges", sph_c, dual_edges, radius=0.001)
         ps.register_point_cloud("cc", sph_c, radius=0.002)
 
@@ -625,6 +630,7 @@ def optimization():
         mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
         mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
         mesh.add_scalar_quantity("Sphericity", np.array(sphericity), defined_on="faces", enabled=True )
+        mesh.add_vector_quantity("lc", nd, enabled=True, length=0.12)
         c_surf = ps.register_surface_mesh("Opt_C", sph_c, dual_top)
         c_surf.add_scalar_quantity("Planarity", planarity, defined_on='faces', enabled=True)
         # c_surf.add_scalar_quantity("Face_Vol" , planarity1, defined_on='faces', enabled=True)
@@ -800,6 +806,7 @@ def optimization():
 ps.init()
 
 mesh = ps.register_surface_mesh("mesh", f_pts, ffF)
+mesh.add_vector_quantity("lc", l_f, enabled=True)
 #ps.register_surface_mesh("S_uv", ref_V, ref_F)
 #ps.register_surface_mesh("Remeshed", ffV, ffF)
 #ps.register_surface_mesh("Dual mesh", vc, dual_top)

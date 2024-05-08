@@ -3,6 +3,7 @@
 # Import the necessary libraries
 import os
 import sys
+import argparse
 from pathlib import Path
 
 # Obtain the path HananLab; this is the parent directory of the hananLab/hanan directory
@@ -52,13 +53,26 @@ print("surface dir:", surface_dir)
 #bspline_surf_name, dir = "Complex_test_S2", 1
 
 #bspline_surf_name, dir = "Test_SubD", 1
-bspline_surf_name, dir = "Sph_inv_2", 1
+#bspline_surf_name, dir = "Sph_inv_2", 1
 
 
 # Rhino Bad test 
 #bspline_surf_name, dir = "Surfjson", -1
 #bspline_surf_name, dir = "Sample_C", 1
 #bspline_surf_name, dir = "Tunel", -1
+
+
+# Create the parser
+parser = argparse.ArgumentParser(description="Curvature Vis")
+# Add an argument
+parser.add_argument('file_name', type=str, help='File name to load')
+
+parser.add_argument('deltaumin', type=float, help='delta value')
+parser.add_argument('deltaumax', type=float, help='delta value')
+parser.add_argument('deltavmin', type=float, help='delta value')
+parser.add_argument('deltavmax', type=float, help='delta value')
+
+bspline_surf_name = parser.parse_args().file_name
 
 # Define the path to the B-spline surface
 bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
@@ -70,6 +84,7 @@ sample = 1000
 # Load the B-spline surface
 control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
 
+
 # Create the B-splines basis
 basis_u = sp.BSplineBasis(order_u, knots_u) 
 basis_v = sp.BSplineBasis(order_v, knots_v) 
@@ -78,7 +93,8 @@ basis_v = sp.BSplineBasis(order_v, knots_v)
 bsp1 = sp.Surface(basis_u, basis_v, control_points)
 
 # Sample the grid points to evaluate the B-spline surface
-u_vals, v_vals = sample_grid(sample, sample, delta=0.2)
+u_vals, v_vals = sample_grid(sample, sample, deltaum=parser.parse_args().deltaumin, deltauM=parser.parse_args().deltaumax, deltavm = parser.parse_args().deltavmin, deltavM = parser.parse_args().deltavmax)
+
 
 # Evaluate the B-spline surface
 eval_surf = bsp1(u_vals, v_vals)

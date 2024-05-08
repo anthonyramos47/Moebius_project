@@ -18,6 +18,9 @@ sys.path.append(hanan_path)
 
 from geometry.utils import *
 from geometry.mesh import Mesh
+from optimization.Optimizer import Optimizer
+from energies.Proximity_Gen import Proximity
+from energies.QM_Fairness import QM_Fairness
 from utils.bsplines_functions import *
 
 
@@ -64,6 +67,13 @@ data = load_data()
 u_pts = data['u_pts']
 v_pts = data['v_pts']
 
+init_l = data['init_l'].reshape(-1, 3)
+opt_l  = data['l'].reshape(-1, 3)
+
+V = data['V']
+
+
+
 # Get the B-splines
 BSurf = data['surf']
 rsurf = data['r_uv']
@@ -74,12 +84,67 @@ sample = (len(u_pts), len(v_pts))
 # Evaluate the B-spline at the u and v points
 V, F = Bspline_to_mesh(BSurf, u_pts, v_pts)
 
-
 range_u = (0, 1)
 range_v = (0, 1)
 
+# Define the finer reference mesh
+ref_u = np.linspace(range_u[0],  range_u[1], 300)
+ref_v = np.linspace(range_v[0],  range_v[1], 300)
+# Compute the vertices and faces of the finer reference mesh
+ref_V, ref_F = Bspline_to_mesh(BSurf, ref_u, ref_v)
+# Triangulate the quads
+
+
+
+# Create mesh for Mid mesh (sphere centers)
+aux_mesh = Mesh()
+aux_mesh.make_mesh(ffV, ffF)
+
+# Get adjacent vertices
+adj_v = aux_mesh.vertex_adjacency_list()
+
+
+
+# Foot Point optimization initializer
+opt = Optimizer()
+ 
+
+# Add variables to the optimizer
+opt.add_variable("v" , len(ffV)*3) # Vertices of mid mesh
+#opt.add_variable("r" , len(rads)   ) # Radii of spheres
+#opt.add_variable("mu", len(dual_edges))
+
+# Initialize Optimizer ("Method", step, verbosity)
+opt.initialize_optimizer("LM", 0.65, 1)
+
+# Initialize variables
+opt.init_variable("v"  , ffV.flatten())
+
+# # Fairness
+Fair_M = QM_Fairness()
+opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.02)
+
+# # Proximity
+Prox_M = Proximity()
+opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=5)
+
+opt.control_var("v", 0.1)
+
+for i in range(10):
+
+    opt.get_gradients() # Compute J and residuals
+    opt.optimize() # Solve linear system and update variables
+
+opt.get_energy_per_constraint()
+
+ffV = opt.uncurry_X("v")
+
+ffV = ffV.reshape(-1, 3)
+
+
+
 # Compute footpoints (u,v) coordinates of remeshed mesh onto the B-spline
-foot_pts = foot_points(ffV, V, u_pts, v_pts, BSurf, u_range=range_u, v_range=range_v)
+foot_pts, cls_pts = foot_points(ffV, ref_V, ref_F, ref_u, ref_v, BSurf, u_range=range_u, v_range=range_v)
 foot_pts = foot_pts.reshape(-1, 2)
 
 # Evaluate the B-spline functions at the foot points bsurf(u, v), r(u, v) and n(u, v)
@@ -96,30 +161,6 @@ for i in range(len(foot_pts)):
 # Compute the vertices of the mid mesh C(u,v)
 VR = f_pts + r_pts[:,None]*n_dir
 VR = VR.reshape(-1, 3)
-
-# REFERENCE MESHES ======================================================================
-
-
-# Define the finer reference mesh
-ref_u = np.linspace(range_u[0],  range_u[1], 300)
-ref_v = np.linspace(range_v[0],  range_v[1], 300)
-# Compute the vertices and faces of the finer reference mesh
-ref_V, ref_F = Bspline_to_mesh(BSurf, ref_u, ref_v)
-# Triangulate the quads
-ref_F = np.array(triangulate_quads(ref_F))
-
-# Get vertices of C(u, v) 
-# Evaluate r(u,v) in ref_u ref_v
-ref_r_uv = bisplev(ref_u, ref_v, rsurf)
-# Compute the normals of the reference mesh
-ref_n = BSurf.normal(ref_u, ref_v)
-ref_rn = ref_r_uv[:, :, None]*ref_n
-
-ref_v = BSurf(ref_u, ref_v)
-ref_C = ref_v + ref_rn
-ref_C = ref_C.reshape(-1, 3)
-
-# REFERENCE MESHES ======================================================================
 
 # Topological information ===============================================================
 
@@ -182,6 +223,66 @@ for i, f_i in enumerate(dual_top):
         nd[i] = np.cross(cc[f_i[1]] - cc[f_i[0]], cc[f_i[2]] - cc[f_i[1]])
         nd[i] /= np.linalg.norm(nd[i])
 
+ref_F = np.array(triangulate_quads(ref_F))
+
+# Get vertices of C(u, v) 
+# Evaluate r(u,v) in ref_u ref_v
+ref_r_uv = bisplev(ref_u, ref_v, rsurf)
+# Compute the normals of the reference mesh
+ref_n = BSurf.normal(ref_u, ref_v)
+ref_rn = ref_r_uv[:, :, None]*ref_n
+
+ref_v_aux = BSurf(ref_u, ref_v)
+ref_C = ref_v_aux + ref_rn
+ref_C = ref_C.reshape(-1, 3)
+
+
+# Write relevant information as obj 
+# =================================================================================================
+
+# reference surfaces save
+# Surface
+ref_mesh = os.path.join(remeshing_dir, name+'_Ref_surf.obj')
+write_obj(ref_mesh, ref_V, ref_F)
+# Centers of sphere congruences
+ref_c_mesh = os.path.join(remeshing_dir, name+'_Ref_C.obj')
+write_obj(ref_c_mesh, ref_C, ref_F)
+
+
+# Initial line congruence
+LC_path = os.path.join(remeshing_dir, name+'_init_LC.obj')
+
+# Compute line congruence
+
+v_lc = np.vstack((V, V + init_l))
+
+f_lc = np.array([[i, i+len(V)] for i in range(len(V))])
+
+# Write info
+with open(LC_path, 'w') as f:
+    for v in v_lc:
+        f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
+    for l in f_lc:
+        f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
+
+
+# Optimized line congruence
+LC_path = os.path.join(remeshing_dir, name+'_opt_LC.obj')
+
+# Compute line congruence
+v_lc = np.vstack((V, V + opt_l))
+# Write info
+with open(LC_path, 'w') as f:
+    for v in v_lc:
+        f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
+    for l in f_lc:
+        f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
+
+
+
+# =================================================================================================
+
+
 # Update the data dictionary
 data["projected"] = True
 data["dual_top"] = dual_top
@@ -221,11 +322,12 @@ if parser.parse_args().vis == 1:
     #     sph = ps.register_point_cloud(f"s_"+str(idx), np.array([cc[idx]]), transparency=0.4, color=(0.1, 0.1, 0.1))
     #     r = np.linalg.norm(vc[idx] - cc[idx])
     #     sph.set_radius(r, relative=False)
-        
 
     or_mesh = ps.register_surface_mesh("mesh", ffV, ffF)
+    or_mesh.add_vector_quantity("l", l_dir, enabled=True)
     ps.register_surface_mesh("S_uv", V, F)
     ps.register_surface_mesh("foot_pts", f_pts, ffF)
+    ps.register_surface_mesh("IGL", cls_pts, ffF)
     ps.register_surface_mesh("C_uv", VR, ffF)
     ps.register_surface_mesh("ref_mesh", ref_V, ref_F)
     ps.register_surface_mesh("ref_C", ref_C, ref_F)

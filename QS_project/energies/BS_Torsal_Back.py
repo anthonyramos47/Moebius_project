@@ -36,7 +36,6 @@ class BS_Torsal(Constraint):
         self.i3_flat = None # Index of the fourth variable in flat array
         self.u_sample = None 
         self.v_sample = None
-        self.counter = 0
 
         
       
@@ -145,7 +144,6 @@ class BS_Torsal(Constraint):
                 X: Variables
                 var_idx: dictionary of indices of variables
         """
-        self.counter += 1
         
         # Get variables
         l, u1, v1, u2, v2, nt1, nt2 = self.uncurry_X(X, var_idx, "l", "u1", "v1", "u2", "v2", "nt1", "nt2")
@@ -177,9 +175,6 @@ class BS_Torsal(Constraint):
 
         # Add E_lc_nt E = || lc/||lc||.nt ||^2
         self.E_lc_nt(lc, nt1, nt2, var_idx)
-
-        # if self.counter % 25 == 0 and self.w > 0.5:
-        #     self.w *= 0.6
 
         #final_t = time()
         #self.print_per_const_energy()

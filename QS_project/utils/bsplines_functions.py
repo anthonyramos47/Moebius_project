@@ -4,6 +4,7 @@ import splipy as sp
 import polyscope as ps
 import json
 import os
+import igl
 from scipy.interpolate import bisplev, bisplrep
 from geomdl.fitting import approximate_surface
 import splipy as sp
@@ -139,13 +140,25 @@ def read_bspline_json(dir):
     knots_u = data["knotsU"]
     knots_v = data["knotsV"]
 
+    # Get max knots values
+    max_knots_u = knots_u[-1]
+    max_knots_v = knots_v[-1]
+
+    # Get min knots values
+    min_knots_u = knots_u[0]
+    min_knots_v = knots_v[0]
+
     # Fix knots, add one copy of the first and last knot
     knots_u = [knots_u[0]] + knots_u + [knots_u[-1]]
     knots_v = [knots_v[0]] + knots_v + [knots_v[-1]]
 
-    # Normalized knots to the interval [0, 1]
-    knots_u = np.array(knots_u) / knots_u[-1]
-    knots_v = np.array(knots_v) / knots_v[-1]
+     # Normalize knots to the interval [0, 1]
+    knots_u = (np.array(knots_u) - min_knots_u) / (max_knots_u-min_knots_u)
+    knots_v = (np.array(knots_v) - min_knots_v) / (max_knots_v-min_knots_v)
+
+    # # Normalized knots to the interval [0, 1]
+    # knots_u = np.array(knots_u) / knots_u[-1]
+    # knots_v = np.array(knots_v) / knots_v[-1]
 
     # Get the control points
     control_points = np.array(data["controlPoints"]).reshape(-1,4)
@@ -155,14 +168,14 @@ def read_bspline_json(dir):
     return control_points, knots_u, knots_v, order_u, order_v
 
 
-def sample_grid(u_sample, v_sample, delta=0.05):
+def sample_grid(u_sample, v_sample, deltaum=0.01, deltauM=0.01, deltavm=0.01,deltavM=0.01):
     """
     Function to sample the grid points to be used for the Bspline surface
     """
 
     # Compute the grid points
-    u_pts = np.linspace(0 + delta, 1 - delta, u_sample)
-    v_pts = np.linspace(0 + delta, 1 - delta, v_sample)
+    u_pts = np.linspace(0 + deltaum, 1 - deltauM, u_sample)
+    v_pts = np.linspace(0 + deltavm, 1 - deltavM, v_sample)
 
     return u_pts, v_pts
 
@@ -626,7 +639,7 @@ def Bspline_to_mesh(bsp1, u_pts, v_pts):
     return V, F
 
 
-def visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp):
+def visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F, cp ):
     """ 
     Function to visualize the line congruence and centers of the spheres
     Here we visualized the optimize line congruence, the angles with the normal and the optimized centers of the spheres.
@@ -648,7 +661,11 @@ def visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp):
     # Evaluate r(u,v) at grid points
     r_uv_surf = bisplev(u_pts, v_pts, r_uv)
 
-    # Reshape Line congruence
+    #V, F = Bspline_to_mesh(bspl, u_pts, v_pts)
+
+    #n = bspl.normal(u_pts, v_pts).reshape(-1,3)
+
+    # # Reshape Line congruence
     l = l.reshape(len(u_pts), len(v_pts), 3)
     l /= np.linalg.norm(l, axis=2)[:,:,None]
 
@@ -772,21 +789,46 @@ def closest_grid_points(p, grid_v):
 
     return grid_v[i], i
 
-def foot_points(p, V, u_pts, v_pts, Bsp, u_range=(0,1), v_range=(0,1)):
+def foot_points(p, V, F, u_pts, v_pts, Bsp, u_range=(0,1), v_range=(0,1)):
     """
     Find the foot point of a point p in the B-spline surface
     """
     #n = len(u_pts)
     m = len(v_pts)
-    # Find the closest grid point
-    _, idx = closest_grid_points(p, V)
+
+    idx = np.zeros(len(p), dtype=int)
+
+
+    _, f_i, vf = igl.point_mesh_squared_distance(p, V, F)
+
+    prop_vf = np.zeros((len(p), 3))
+    for i in range(len(p)):
+        _, vertex_face_idx = closest_grid_points(vf[i], V[F[f_i[i]]])
+        
+        idx[i] = F[f_i[i],vertex_face_idx]
+       
+        prop_vf[i] = V[F[f_i[i],vertex_face_idx]]
 
     u_idx = idx//m
     v_idx = idx%m
 
-    x0 = np.hstack((u_pts[u_idx], v_pts[v_idx]))
+    # print("u_idx, v_idx", u_idx[:5], v_idx[:5])
 
-    x0 = x0.reshape(-1, 2)
+
+    # print("Shape F", F.shape)
+    # # Test conversion
+    # print("\n \n Test")
+    # print("V[ u*m + v]", V[u_idx[0]*m + v_idx[0]])
+    # print("upt, vpt", u_pts[73], v_pts[60])
+    # print("bsp", Bsp(u_pts[73], v_pts[60]))
+
+    x0 = np.c_[u_pts[u_idx], v_pts[v_idx]]
+
+
+    # print("x0 shape", x0.shape)
+
+    # print("bsp X0 1", Bsp(u_pts[u_idx][0], v_pts[u_idx][0]))
+    # print("bsp X0", Bsp(x0[0,0], x0[1,0]))
 
     # Find the closest point in the B-spline surface
     # Define function to minimize 
@@ -802,4 +844,4 @@ def foot_points(p, V, u_pts, v_pts, Bsp, u_range=(0,1), v_range=(0,1)):
 
     print("res: ", res)
 
-    return x0
+    return x0, prop_vf
