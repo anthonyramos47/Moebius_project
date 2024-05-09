@@ -95,6 +95,8 @@ if __name__ == '__main__':
     V = data["V"]
     aux_F = data["F"]
 
+    
+
     F = np.array(triangulate_quads(aux_F))
 
 
@@ -102,12 +104,15 @@ if __name__ == '__main__':
     t1 = data["t1"]
     t2 = data["t2"]
 
+
+
     t1 = t1.repeat(2, axis=0)
     t2 = t2.repeat(2, axis=0)
 
     # print("args.w_fairness: ", args)
     # print("args.w_closeness: ", args.w_closeness)
 
+    
     # Scale factor
     v0, v1, v2 = V[F[:,0]], V[F[:,1]], V[F[:,2]]
 
@@ -137,6 +142,8 @@ if __name__ == '__main__':
     D1 = t1 
     D2 = t2
 
+    
+
     # -------------------------------------------------------------------------
     plotter = geo.plotter()
 
@@ -149,9 +156,9 @@ if __name__ == '__main__':
     plotter.plot_vectors(D2, anchor=B, position='center', scale_factor=scale, color='black')
 
     opt = OrthoOptimizer(V, H, D1, D2)
-    #opt.iterations = int(args.it)
-    opt.iterations = 300
-    opt.step = 0.5
+    opt.iterations = int(args.it)
+    #opt.iterations = 
+    opt.step = 0.3
     opt.set_weight('mesh_fairness', w_f)
     opt.set_weight('closeness', w_c)
     opt.optimize()
@@ -160,16 +167,27 @@ if __name__ == '__main__':
         opt.save_mesh('{}_deformed'.format(file_path), field_scale=1, save_all=True)
         geo.save_mesh_obj(V, F, '{}_start'.format(file_path), overwrite=True)
 
-    v1, v2 = opt.vectors()
+    ov1, ov2 = opt.vectors()
 
     V = opt.optimized_vertices()
     #V += np.array([0,0,1])
+
+    # Scale factor
+    v0, v1, v2 = V[F[:,0]], V[F[:,1]], V[F[:,2]]
+
+    du = v1 - v0
+    dv = v2 - v0
+
+    # Get mean diagonals
+    mean_diag =  np.min(np.vstack([du, dv]).mean(axis=1) )
+
+    scale = mean_diag*0.5
 
     B1 = geo.faces_centroid(V, H)
     
 
     plotter.plot_faces(V, H, color='b')
     plotter.plot_edges(V, H, color='white', width=4)
-    plotter.plot_vectors(v1, anchor=B1, position='center', scale_factor=scale)
-    plotter.plot_vectors(v2, anchor=B1, position='center', scale_factor=scale)
+    plotter.plot_vectors(ov1, anchor=B1, position='center', scale_factor=scale)
+    plotter.plot_vectors(ov2, anchor=B1, position='center', scale_factor=scale)
     plotter.show()
