@@ -18,6 +18,7 @@ print(path)
 # Import the necessary libraries for visualization and computation
 import igl
 import polyscope as ps
+import polyscope.imgui as psim
 import numpy as np
 import matplotlib.pyplot as plt
 import splipy as sp
@@ -67,11 +68,6 @@ parser = argparse.ArgumentParser(description="Curvature Vis")
 # Add an argument
 parser.add_argument('file_name', type=str, help='File name to load')
 
-parser.add_argument('deltaumin', type=float, help='delta value')
-parser.add_argument('deltaumax', type=float, help='delta value')
-parser.add_argument('deltavmin', type=float, help='delta value')
-parser.add_argument('deltavmax', type=float, help='delta value')
-
 bspline_surf_name = parser.parse_args().file_name
 
 # Define the path to the B-spline surface
@@ -79,7 +75,7 @@ bspline_surf_path = os.path.join(surface_dir, bspline_surf_name + ".json")
 print("bspline_surf_path:", bspline_surf_path)
 
 # Sample in each direction
-sample = 1000
+sample = 100
 
 # Load the B-spline surface
 control_points, knots_u, knots_v, order_u, order_v = read_bspline_json(bspline_surf_path)
@@ -92,27 +88,62 @@ basis_v = sp.BSplineBasis(order_v, knots_v)
 # Create the B-spline surface
 bsp1 = sp.Surface(basis_u, basis_v, control_points)
 
-# Sample the grid points to evaluate the B-spline surface
-u_vals, v_vals = sample_grid(sample, sample, deltaum=parser.parse_args().deltaumin, deltauM=parser.parse_args().deltaumax, deltavm = parser.parse_args().deltavmin, deltavM = parser.parse_args().deltavmax)
 
 
 # Evaluate the B-spline surface
-eval_surf = bsp1(u_vals, v_vals)
-
-# Compute the curvature
-K, H, _ = curvatures_par(bsp1, u_vals, v_vals)
+#eval_surf = bsp1(u_vals, v_vals)
 
 
-hist_fig = plt.figure()
-hist = hist_fig.add_subplot(1,1,1)
-hist.set_title("Mean Curvature")
-hist.hist(H.flatten(), bins=20)
+delta_u_m = 0.05 
+delta_u_M = 0.05  
+delta_v_m = 0.05
+delta_v_M = 0.05
 
+
+def curvature_sel():
+    global bsp1, sample, delta_u_m, delta_u_M, delta_v_m, delta_v_M, u_vals, v_vals, surf
+
+    _, delta_u_m = psim.SliderFloat("deltaumin", delta_u_m, 0.01, 1)
+    _, delta_u_M = psim.SliderFloat("deltaumax", delta_u_M, 0.01, 1)
+    _, delta_v_m = psim.SliderFloat("deltavmin", delta_v_m, 0.01, 1)
+    _, delta_v_M = psim.SliderFloat("deltavmax", delta_v_M, 0.01, 1)
+
+    
+
+    if psim.Button("Draw Surface"):
+        # Sample the grid points to evaluate the B-spline surface
+        u_vals, v_vals = sample_grid(sample, sample, deltaum=delta_u_m, deltauM=delta_u_M, deltavm = delta_v_m, deltavM = delta_v_M)
+       
+
+        V,F =Bspline_to_mesh(bsp1, u_vals, v_vals)
+        surf = ps.register_surface_mesh("mesh", V, F)
+
+        # Compute the curvature
+        K, H, _ = curvatures_par(bsp1, u_vals, v_vals)
+
+        H = H.flatten()
+        K = K.flatten()
+        valid = np.zeros_like(H)
+
+        idx = np.where(H < 0)[0]
+
+        valid[idx] = 1
+        
+        surf.add_scalar_quantity("Mean Curvature", H, enabled=True)
+        surf.add_scalar_quantity("Gaussian Curvature", K, enabled=False)
+        surf.add_scalar_quantity("Near Vanishing Curv", valid, enabled=True)
+
+
+
+ps.init()
+
+ps.set_user_callback(curvature_sel)
+ps.show()
 
 # # Init figure
-fig       = plt.figure()
-surface_ax = fig.add_subplot(1,2,1, projection='3d') 
-central_ax = fig.add_subplot(1,2,2, projection='3d')
+# fig       = plt.figure()
+# surface_ax = fig.add_subplot(1,2,1, projection='3d') 
+# central_ax = fig.add_subplot(1,2,2, projection='3d')
 
 # # Compute central spheres centers and radius
 # c_z, r_z, H, _= central_spheres(bsp1, u_vals, v_vals)
@@ -161,11 +192,11 @@ central_ax = fig.add_subplot(1,2,2, projection='3d')
 
 # # Plot the offset surface
 # #plot_surface(/Users/cisneras/Downloads/Assignment_3.pdfsurface_ax, offset_surf, None, "B-spline Surface Offset")
-plot_scalar_value(surface_ax, eval_surf,  H, "Mean")
+# plot_scalar_value(surface_ax, eval_surf,  H, "Mean")
 
 
-plt.show()
-# # Plot 
+# plt.show()
+# # # Plot 
 # for _ in range(100):
     
 #     id = np.random.randint(0, len(l_uv_flat))

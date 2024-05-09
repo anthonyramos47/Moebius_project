@@ -44,6 +44,7 @@ from energies.BS_LineCong import BS_LC
 from energies.BS_LineCong_Orth import BS_LC_Orth
 from energies.BS_Torsal import BS_Torsal
 from energies.BS_Torsal_Angle import BS_Torsal_Angle
+from energies.Lap_Fairness import Lap_Fairness
 
 from optimization.Optimizer import Optimizer
 
@@ -108,7 +109,8 @@ weights = {
     "LC": [1,1], # Line congruence l.cu = 0, l.cv = 0
     "LC_Orth": [2,1], # Line congruence orthogonality with surface
     "Torsal": 1, # Torsal constraint
-    "Torsal_Angle": 3 # Torsal angle constraint
+    "Torsal_Angle": 3, # Torsal angle constraint
+    "Fairness": 0.1 # Fairness constraint
 }
 
 
@@ -125,10 +127,11 @@ step_1 = 0.5
 step_2 = 0.5
 
 
+
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v
 
     # Title
     psim.TextUnformatted("Sphere and Lince Congruence Optimization")
@@ -212,6 +215,7 @@ def optimization():
         changed, weights["LC_Orth"][1] = psim.InputFloat("LC Surf Orth W", weights["LC_Orth"][1])
         changed, weights["Torsal"] = psim.InputFloat("Torsal W", weights["Torsal"])
         changed, weights["Torsal_Angle"] = psim.InputFloat("Torsal Angle W", weights["Torsal_Angle"])
+        changed, weights["Fairness"] = psim.InputFloat("Fairness W", weights["Fairness"])
         changed, step_2 = psim.InputFloat("Optimization step size", step_2)
         
         if psim.Button("Init Second opt"):
@@ -269,6 +273,10 @@ def optimization():
             # Torsal angle constraint
             LC_torsal_ang = BS_Torsal_Angle()
             opt.add_constraint(LC_torsal_ang, args=(tangle, 0), w=weights["Torsal_Angle"])
+
+            # Fairness
+            Fair_L = Lap_Fairness()
+            opt.add_constraint(Fair_L, args=(adj_v, "l", 3), w=weights["Fairness"])
 
             opt.unitize_variable("l", 3, 10)
             opt.unitize_variable("nt1", 3, 10)
@@ -474,6 +482,16 @@ cp = r_uv[2].copy()
 # End of constraints ===================================
 
 V, F = Bspline_to_mesh(bsp1, u_pts, v_pts)
+
+
+# GET TOPOLOGY INFO
+
+# Initialize Mesh 
+mesh = Mesh()
+mesh.make_mesh(V, F)
+
+# Get the vertex vertex adj list
+adj_v = mesh.vertex_adjacency_list()
 
 ps.init()
 # Surface

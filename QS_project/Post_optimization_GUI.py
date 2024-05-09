@@ -380,6 +380,7 @@ def optimization():
     if psim.CollapsingHeader("Optimization 1:"):
         changed, w_sphericity = psim.InputFloat("Sphericity W", w_sphericity)
         changed, w_supp       = psim.InputFloat("Support W", w_supp)
+        changed, w_proximity_c  = psim.InputFloat("Proximity C", w_proximity_c)
         #changed, w_lap        = psim.InputFloat("Laplacian W", w_lap)
 
   
@@ -422,7 +423,7 @@ def optimization():
 
             # Proximity
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.001), w=1)
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.001), w=w_proximity_c)
 
             #opt.unitize_variable("nd", 3, 10)
             #opt.control_var("v", 0.01)
@@ -502,7 +503,7 @@ def optimization():
             opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=w_proximity)
 
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.00001), w=w_proximity_c)
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=w_proximity_c)
             
             # Reg 
             reg = Reg_E()

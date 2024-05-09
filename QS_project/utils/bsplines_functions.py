@@ -765,7 +765,7 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
 
     surf.add_scalar_quantity("Torsal_Angles", torsal_angles, defined_on="faces", enabled=True)
 
-    surf.add_scalar_quantity("Planarity", planarity_opt, defined_on="faces", enabled=True)
+    surf.add_scalar_quantity("Planarity", planarity_opt, defined_on="faces", enabled=False)
 
     torsal_dir_show(barycenters, t1, t2, size=size_torsal, rad=0.0014)
 
@@ -845,3 +845,31 @@ def foot_points(p, V, F, u_pts, v_pts, Bsp, u_range=(0,1), v_range=(0,1)):
     print("res: ", res)
 
     return x0, prop_vf
+
+def interpolate_lc(foot_points, V, TF, l):
+    """
+    Function to interpolate the line congruence of the remeshed quad mesh with the original mesh used for optimization.
+    Input:
+        foot_points: Foot points of the remeshed mesh
+        V: Vertices of the original mesh
+        TF: Faces of the original mesh (Traingulated)
+        l: Line congruence of the remeshed mesh
+    """
+
+
+    # Get the closest points on the remeshed mesh
+    _, f_idx, cpts = igl.point_mesh_squared_distance(foot_points, V, TF)
+
+    # Get vertices of the nearest triangles
+    v0, v1, v2 = V[TF[f_idx, 0]], V[TF[f_idx, 1]], V[TF[f_idx, 2]]
+
+    # Compute the barycentric coordinates of each point projected on the mesh
+    iglbar = igl.barycentric_coordinates_tri(cpts, v0, v1, v2)
+
+    # Get lines at the original mesh
+    l0, l1, l2 = l[TF[f_idx, 0]], l[TF[f_idx, 1]], l[TF[f_idx, 2]]
+
+    # Interpolate the line congruence
+    interpolate_lc = iglbar[:,0][:,None]*l0 + iglbar[:,1][:,None]*l1 + iglbar[:,2][:,None]*l2
+
+    return interpolate_lc

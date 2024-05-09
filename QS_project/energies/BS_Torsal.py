@@ -101,12 +101,12 @@ class BS_Torsal(Constraint):
         # Compute the torsal directions 
         t1, t2, ut1, vt1, ut2, vt2, _ = torsal_directions(lc, lu, lv, self.du, self.dv)
 
-        lt1 = unit(ut1[:, None]*lu + vt1[:, None]*lv)
-        lt2 = unit(ut2[:, None]*lu + vt2[:, None]*lv)
+        #lt1 = unit(ut1[:, None]*lu + vt1[:, None]*lv)
+        #lt2 = unit(ut2[:, None]*lu + vt2[:, None]*lv)
 
         # Compute the torsal plane normal
-        nt1 = unit(np.cross(lc, lt1))
-        nt2 = unit(np.cross(lc, lt2))
+        nt1 = unit(np.cross(lc, t1))
+        nt2 = unit(np.cross(lc, t2))
     
         # Init the torsal directions
         X[var_idx["u1"]] = ut1 

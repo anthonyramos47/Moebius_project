@@ -122,7 +122,7 @@ opt.init_variable("v"  , ffV.flatten())
 
 # # Fairness
 Fair_M = QM_Fairness()
-opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.02)
+opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.2)
 
 # # Proximity
 Prox_M = Proximity()
@@ -130,7 +130,7 @@ opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=5)
 
 opt.control_var("v", 0.1)
 
-for i in range(10):
+for i in range(20):
 
     opt.get_gradients() # Compute J and residuals
     opt.optimize() # Solve linear system and update variables
@@ -147,13 +147,15 @@ ffV = ffV.reshape(-1, 3)
 foot_pts, cls_pts = foot_points(ffV, ref_V, ref_F, ref_u, ref_v, BSurf, u_range=range_u, v_range=range_v)
 foot_pts = foot_pts.reshape(-1, 2)
 
+
+
 # Evaluate the B-spline functions at the foot points bsurf(u, v), r(u, v) and n(u, v)
 f_pts = np.zeros((len(foot_pts), 3))
 r_pts = np.zeros((len(foot_pts)))
-l_dir = np.zeros((len(foot_pts), 3))
+
 n_dir = np.zeros((len(foot_pts), 3))
 for i in range(len(foot_pts)):
-    l_dir[i] = sph_ln_cong_at_pt(BSurf, rsurf, foot_pts[i, 0], foot_pts[i, 1])[1]
+    #l_dir[i] = sph_ln_cong_at_pt(BSurf, rsurf, foot_pts[i, 0], foot_pts[i, 1])[1]
     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
     f_pts[i] =   BSurf(foot_pts[i, 0], foot_pts[i, 1])
     r_pts[i] = bisplev(foot_pts[i, 0], foot_pts[i, 1], rsurf)
@@ -161,6 +163,11 @@ for i in range(len(foot_pts)):
 # Compute the vertices of the mid mesh C(u,v)
 VR = f_pts + r_pts[:,None]*n_dir
 VR = VR.reshape(-1, 3)
+
+# Interpolate line congruence
+TF = np.array(triangulate_quads(F))
+l_dir = interpolate_lc(f_pts, V, TF, opt_l)
+
 
 # Topological information ===============================================================
 
@@ -325,7 +332,8 @@ if parser.parse_args().vis == 1:
 
     or_mesh = ps.register_surface_mesh("mesh", ffV, ffF)
     or_mesh.add_vector_quantity("l", l_dir, enabled=True)
-    ps.register_surface_mesh("S_uv", V, F)
+    start_m = ps.register_surface_mesh("S_uv", V, F)
+    start_m.add_vector_quantity("l", opt_l, enabled=True)
     ps.register_surface_mesh("foot_pts", f_pts, ffF)
     ps.register_surface_mesh("IGL", cls_pts, ffF)
     ps.register_surface_mesh("C_uv", VR, ffF)
