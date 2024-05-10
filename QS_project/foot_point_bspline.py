@@ -122,15 +122,15 @@ opt.init_variable("v"  , ffV.flatten())
 
 # # Fairness
 Fair_M = QM_Fairness()
-opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.2)
+opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.02)
 
 # # Proximity
 Prox_M = Proximity()
-opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.001), w=5)
+opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=5)
 
-opt.control_var("v", 0.1)
+opt.control_var("v", 1)
 
-for i in range(20):
+for i in range(50):
 
     opt.get_gradients() # Compute J and residuals
     opt.optimize() # Solve linear system and update variables
@@ -330,18 +330,16 @@ if parser.parse_args().vis == 1:
     #     r = np.linalg.norm(vc[idx] - cc[idx])
     #     sph.set_radius(r, relative=False)
 
-    or_mesh = ps.register_surface_mesh("mesh", ffV, ffF)
-    or_mesh.add_vector_quantity("l", l_dir, enabled=True)
-    start_m = ps.register_surface_mesh("S_uv", V, F)
+    start_m = ps.register_surface_mesh("S_uv", V, F, enabled=False)
     start_m.add_vector_quantity("l", opt_l, enabled=True)
-    ps.register_surface_mesh("foot_pts", f_pts, ffF)
-    ps.register_surface_mesh("IGL", cls_pts, ffF)
-    ps.register_surface_mesh("C_uv", VR, ffF)
-    ps.register_surface_mesh("ref_mesh", ref_V, ref_F)
-    ps.register_surface_mesh("ref_C", ref_C, ref_F)
+    or_mesh = ps.register_surface_mesh("foot_pts", f_pts, ffF)
+    or_mesh.add_vector_quantity("l", l_dir, enabled=True)
+    ps.register_surface_mesh("C_uv", VR, ffF, enabled=False)
+    ps.register_surface_mesh("ref_mesh", ref_V, ref_F, enabled=False)
+    ps.register_surface_mesh("ref_C", ref_C, ref_F, enabled=False)
 
-    ps.register_point_cloud("C centers", cc)
-    ps.register_point_cloud("V centers", vc)
+    #ps.register_point_cloud("C centers", cc)
+    #ps.register_point_cloud("V centers", vc)
 
 
     ps.show()
