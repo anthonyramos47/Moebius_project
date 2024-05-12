@@ -59,8 +59,6 @@ F = data['F']  # Faces
 
 TF = np.array(triangulate_quads(F))
 
-
-
 or_l = data['l']  # Line congruence
 or_l = or_l.reshape(-1, 3)
 
@@ -136,6 +134,9 @@ ot2 = ot2.reshape(-1, 3)
 
 #     C_uv[i], l_uv[i]  = sph_ln_cong_at_pt(BSurf, rsurf, ui_vj[i][0], ui_vj[i][1])
 
+_, _, vc  = get_torsal_QMesh(V, F,  or_l)
+
+save_torsal(vc, ot1, ot2, path=save_dir, type=2)
 
 _, _, vc  = get_torsal_Mesh(V, TF,  or_l)
 t1 = ot1.repeat(2, axis=0)

@@ -922,7 +922,7 @@ def torsal_dir_show(baricenter, t1, t2, size=0.005, rad=0.0005,  color=(1,1,1), 
     t1_net.set_radius(rad, relative=False) 
     t2_net.set_radius(rad, relative=False)
 
-def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path=""):
+def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path="", type=1):
 
     # Get the last name of name
     name = path.split('/')[-1]
@@ -947,10 +947,14 @@ def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path=""):
     if not os.path.exists(path):
         os.makedirs(path)
 
-
-    # Create two files for each vector field
-    file1 = os.path.join(path, name+'_TD1.obj')
-    file2 = os.path.join(path, name+'_TD2.obj')
+    
+    if type==1:
+        # Create two files for each vector field
+        file1 = os.path.join(path, name+'_TD1.obj')
+        file2 = os.path.join(path, name+'_TD2.obj')
+    else: 
+        file1 = os.path.join(path, name+'_QD1.obj')
+        file2 = os.path.join(path, name+'_QD2.obj')
 
 
     # Write the first vector field
@@ -966,7 +970,35 @@ def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path=""):
             f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
         for l in t1_edges:
             f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
-        
+
+def get_torsal_QMesh(V, F, L):
+    """ Function that compute the torsal directions given a polyhedral surface
+    with a line congruence per vertex
+    Input:
+        V: Vertices
+        F: Faces
+        L: Line congruence
+    Output:
+        t1: Torsal direction 1
+        t2: Torsal direction 2
+    """
+
+    l0, l1, l2, l3 = L[F[:, 0]], L[F[:, 1]], L[F[:, 2]], L[F[:, 3]]
+
+    lu = l2 - l0
+    lv = l1 - l3
+
+    v0, v1, v2, v3 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]], V[F[:, 3]]
+
+    du = v2 - v0
+    dv = v1 - v3
+
+    lc = (l0 + l1 + l2 + l3)/4
+    vc = (v0 + v1 + v2 + v3)/4
+
+    t1, t2, _, _, _, _, _  = torsal_directions(lc, lu, lv, du, dv)
+
+    return t1, t2, vc
 
 def get_torsal_Mesh(V, F, L):
     """ Function that compute the torsal directions given a polyhedral surface

@@ -166,6 +166,7 @@ if __name__ == '__main__':
     if save:
         opt.save_mesh('{}_deformed'.format(file_path), field_scale=1, save_all=True)
         geo.save_mesh_obj(V, F, '{}_start'.format(file_path), overwrite=True)
+        geo.save_mesh_obj(V, aux_F, '{}_Qstart'.format(file_path), overwrite=True)
 
     ov1, ov2 = opt.vectors()
 

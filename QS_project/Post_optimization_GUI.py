@@ -346,6 +346,7 @@ w_lap = 0.1
 state = 0
 state2 = 0
 counter = 0
+counter2 = 0
 init_opt = False
 w_tor = 0.1
 w_reg = 0.1
@@ -355,7 +356,7 @@ step = 0.5
 name_saved = "Post_optimization"
 def optimization():
 
-    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, w_reg, step, l_f
+    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, w_reg, step, l_f, counter2
 
     # Title
     psim.TextUnformatted("Post Optimization GUI")
@@ -372,7 +373,7 @@ def optimization():
     psim.Separator()
 
         # State handler
-    if counter%iter_per_opt == 0:
+    if counter%iter_per_opt == 0 or counter2%iter_per_opt == 0:
         state = 0
         state2 = 0
        
@@ -513,7 +514,8 @@ def optimization():
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v", 0.1)
+            opt.control_var("v" , 0.2)
+            opt.control_var("nd", 1)
             #opt.control_var("c", 0.0001)
 
             ps.info("Finished Initialization of Optimization 2")
@@ -581,7 +583,7 @@ def optimization():
         ps.register_point_cloud("cc", sph_c, radius=0.002)
 
     if state2:    
-        counter += 1
+        counter2 += 1
         # Optimize
         opt.get_gradients() # Compute J and residuals
         opt.optimize() # Solve linear system and update variables

@@ -73,6 +73,12 @@ opt_l  = data['l'].reshape(-1, 3)
 V = data['V']
 
 
+print("Topology cleaning")
+for f in ffF:
+    if len(f) != 4:
+        print(f)
+
+
 
 # Get the B-splines
 BSurf = data['surf']
