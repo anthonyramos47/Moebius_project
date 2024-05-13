@@ -69,6 +69,7 @@ v_pts = data['v_pts']
 
 init_l = data['init_l'].reshape(-1, 3)
 opt_l  = data['l'].reshape(-1, 3)
+lc  = data['lc'].reshape(-1, 3)
 
 V = data['V']
 
@@ -88,6 +89,7 @@ ffF = np.array(new_ffF)
 # Get the B-splines
 BSurf = data['surf']
 rsurf = data['r_uv']
+
 
 # Sample size of the B-spline
 sample = (len(u_pts), len(v_pts))   
@@ -176,8 +178,16 @@ VR = f_pts + r_pts[:,None]*n_dir
 VR = VR.reshape(-1, 3)
 
 # Interpolate line congruence
-TF = np.array(triangulate_quads(F))
-l_dir = interpolate_lc(f_pts, V, TF, opt_l)
+TF, EV = triangulate_quads(F, V)
+
+TF = np.array(TF)
+
+
+# Extend opt_l by interpolation at barycenter
+opt_l_ext = np.vstack((opt_l, lc))
+
+
+l_dir = interpolate_lc(f_pts, EV, TF, opt_l_ext)
 
 
 # Topological information ===============================================================
@@ -241,7 +251,9 @@ for i, f_i in enumerate(dual_top):
         nd[i] = np.cross(cc[f_i[1]] - cc[f_i[0]], cc[f_i[2]] - cc[f_i[1]])
         nd[i] /= np.linalg.norm(nd[i])
 
-ref_F = np.array(triangulate_quads(ref_F))
+ref_F = triangulate_quads_diag(ref_F)
+
+ref_F = np.array(ref_F)
 
 # Get vertices of C(u, v) 
 # Evaluate r(u,v) in ref_u ref_v

@@ -57,9 +57,11 @@ data = load_data()
 V = data['V']  # Vertices
 F = data['F']  # Faces
 
-TF = np.array(triangulate_quads(F))
+TF = np.array(triangulate_quads_diag(F))
+
 
 or_l = data['l']  # Line congruence
+lc = data['lc']  # Line congruence at the center of the face
 or_l = or_l.reshape(-1, 3)
 
 u_pts = data['u_pts']  # U points
@@ -133,47 +135,64 @@ ot2 = ot2.reshape(-1, 3)
 #     V_R[i] = BSurf(ui_vj[i][0], ui_vj[i][1])
 
 #     C_uv[i], l_uv[i]  = sph_ln_cong_at_pt(BSurf, rsurf, ui_vj[i][0], ui_vj[i][1])
+ot1 /= np.linalg.norm(ot1, axis=1)[:, None]
+ot2 /= np.linalg.norm(ot2, axis=1)[:, None]
+#int1, int2, nbc =interpolate_torsal_Q_tri(ot1, ot2, V, F)
+tF, tV = triangulate_quads(F, V)
 
-_, _, vc  = get_torsal_QMesh(V, F,  or_l)
+tF = np.array(tF)
 
-save_torsal(vc, ot1, ot2, path=save_dir, type=2)
+ext_l = np.vstack((or_l, lc))
 
-_, _, vc  = get_torsal_Mesh(V, TF,  or_l)
-t1 = ot1.repeat(2, axis=0)
-t2 = ot2.repeat(2, axis=0)
+v0, v1, v2, v3 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]], V[F[:, 3]]
+vc  = (v0 + v1 + v2 + v3)/4
 
-print(len(TF))
-print(len(F))
-
-#ot1, ot2, bc = get_torsal_Mesh(V, F, or_l)
-
-
-# V_R = 
-# C_uv = np.zeros((len(ui_vj), 3))
-# l_uv = np.zeros((len(ui_vj), 3))
+t1, t2, bc, idx = get_torsal_Mesh(tV, tF, ext_l)
 
 
-# # If you want to save the remeshed mesh to a file
+
+# _, _, vc  = get_torsal_QMesh(V, F,  or_l)
+
+# save_torsal(vc, ot1, ot2, path=save_dir, type=2)
+
+# _, _, vc  = get_torsal_Mesh(V, TF,  or_l)
+# t1 = ot1.repeat(2, axis=0)
+# t2 = ot2.repeat(2, axis=0)
+
+# print(len(TF))
+# print(len(F))
+
+# #ot1, ot2, bc = get_torsal_Mesh(V, F, or_l)
+
+
+# # V_R = 
+# # C_uv = np.zeros((len(ui_vj), 3))
+# # l_uv = np.zeros((len(ui_vj), 3))
+valid = np.zeros(len(tF))
+
+valid[idx] = 1
+
+# # # If you want to save the remeshed mesh to a file
 # ps.init()
 
 # ps.remove_all_structures()
 
+# tri = ps.register_surface_mesh("tri_mesh", tV, tF)
+# tri.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
 # or_mesh = ps.register_surface_mesh("mesh", V, F)
+
 # or_mesh.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
 # or_mesh.add_vector_quantity("l", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.0, 1.0, 0.0))
 
 # ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
 
-# torsal_dir_show(vc, t1, t2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
-# torsal_dir_show(bc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,0,1), name="Or")
-# torsal_dir_show(bc, ct1, ct2, size=0.02, rad=0.0005,  color=(1,0,0), name="ReComp")
+# torsal_dir_show(bc, t1, t2, size=0.02, rad=0.0005,  color=(1,1,1), name="Tri")
+# torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
 
-# mesh = ps.register_surface_mesh("remeshed", V, TF)
-# mesh.add_vector_quantity("l_uv", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.1, 0.0, 0.0))
-# #ps.register_surface_mesh("Proj", V_R, TF)
-# #ps.register_surface_mesh("C_uv", C_uv, TF)
-#ps.show()
+# ps.register_surface_mesh("Proj", V_R, TF)
+# ps.register_surface_mesh("C_uv", C_uv, TF)
+# ps.show()
 
-save_torsal(vc, t1, t2, path=save_dir)
+save_torsal(vc, ot1, ot2, path=save_dir)
 
 

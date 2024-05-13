@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import polyscope as ps
+import igl
 from scipy.optimize import minimize
 from scipy.spatial import KDTree
 
@@ -1025,11 +1026,53 @@ def get_torsal_Mesh(V, F, L):
     lc = (l0 + l1 + l2)/3
     vc = (v0 + v1 + v2)/3
 
-    t1, t2, _, _, _, _, _  = torsal_directions(lc, lu, lv, du, dv)
+    t1, t2, _, _, _, _, valid  = torsal_directions(lc, lu, lv, du, dv)
 
-    return t1, t2, vc
+    return t1, t2, vc, valid
 
-def triangulate_quads(quads):
+
+def triangulate_quads(quads, vertices):
+    """
+    Triangulate a list of quads into triangles.
+
+    Args:
+    - quads (list of list of int): List of quads, where each quad is a list of four vertex indices.
+
+    Returns:
+    - list of list of int: List of triangles, where each triangle is a list of three vertex indices.
+    """
+    triangles = []
+
+    Num_V = len(vertices)
+    print("Num_V", Num_V)
+    new_vertices = np.array(vertices)
+    for quad in quads:
+        # Ensure the quad has exactly 4 vertices
+        if len(quad) == 4:
+
+            Num_V += 1
+
+            # Compute barycenter
+            vc = np.sum(vertices[quad], axis=0)/4
+
+            # Add the barycenter to the vertices
+            new_vertices = np.vstack((new_vertices, vc))
+        
+            # First triangle 
+            triangles.append([quad[0], quad[1], Num_V-1])
+            # Second triangle
+            triangles.append([quad[1], quad[2], Num_V-1])
+            # Third triangle
+            triangles.append([quad[2], quad[3], Num_V-1])
+            # Fourth triangle
+            triangles.append([quad[3], quad[0], Num_V-1])
+
+        else:
+            print("Error: Quad does not have exactly 4 vertices.", quad)
+
+    return triangles, new_vertices
+
+def triangulate_quads_diag(quads):
     """
     Triangulate a list of quads into triangles.
 
@@ -1304,4 +1347,180 @@ def init_torsal_opt(n, l, du, dv ):
     # X[var_idx["nt1"]] = nt1.flatten()
     # X[var_idx["nt2"]] = nt2.flatten()
 
-  
+def orient_crossfield(M1, M2, M3):
+    """
+    Function to orient the cross fields, M1, M2, M3 represent the cross field directions vectors in matrix form.
+    """
+
+    # Compute angles between cross fields M1 M2 
+    angles_matrix = M1.T@M2
+
+    # Check which cross field is the closest to the other by checking tuples at each row min
+    idx = np.argmin(angles_matrix, axis=1)
+
+    # Transform idx into a matrix if [1, 0] then P = I if [0, 1] then P = [0 ,1 ; 1, 0]
+    if idx[0] == 0:
+        P = np.array([[1, 0], [0, 1]])
+    else:
+        P = np.array([[0, 1], [1, 0]])
+
+    M2 = M2@P
+
+
+    # Compute angles between cross fields M1 M3
+    angles_matrix = M1.T@M3
+
+    # Check which cross field is the closest to the other by checking tuples at each row min
+    idx = np.argmin(angles_matrix, axis=1)
+
+    # Transform idx into a matrix if [1, 0] then P = I if [0, 1] then P = [0 ,1 ; 1, 0]
+    if idx[0] == 0:
+        P = np.array([[1, 0], [0, 1]])
+    else:
+        P = np.array([[0, 1], [1, 0]])
+    
+
+    M3 = M3@P
+
+    return M1, M2, M3
+
+
+def interpolate_torsal_Q_tri(t1, t2, V, F):
+    from geometry.mesh import Mesh
+
+
+    # Get the vertices
+    v0, v1, v2, v3 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]], V[F[:, 3]]
+
+    # Compute the barycenter
+    vc = (v0 + v1 + v2 + v3)/4
+
+    # Get topology of V F 
+    m = Mesh()
+    m.make_mesh(V, F)
+
+    # Get adjacent faces
+    f_f_adj = m.face_face_adjacency_list()
+
+    # Get number of vertices
+    #new_idx = len(V)-1
+
+    # New torsal directions
+    t1_new = []
+    t2_new = []
+
+    # New vc
+    vc_new = []
+
+    # Loop 
+    for i in range(len(F)):
+        print(f"Face {i}")
+
+        f = F[i]
+
+        # Subdivide the quad into four triangles
+        local_F = np.array([
+            [0, 1, 4],
+            [1, 2, 4],
+            [2, 3, 4],
+            [3, 0, 4]
+            ])
+
+        # Local vertices
+        local_V = np.vstack((v0[i], v1[i], v2[i], v3[i], vc[i]))
+        
+
+        # Compute barycenters of new triangles
+        local_vc = np.sum(local_V[local_F], axis=1)/3
+        
+
+        for bary in local_vc:
+            vc_new.append(bary)
+
+        # Interpolation
+        if len(f_f_adj[i]) == 4:
+            print("Im in 4")
+            adj_f = f_f_adj[i]
+            # create local triangle mesh for interpolation
+            B = np.vstack((vc[i], vc[adj_f]))
+
+            # Triangles 
+            T = np.array(
+                [[0, 1, 2], 
+                 [0, 2, 3], 
+                 [0, 3, 4], 
+                 [0, 4, 1]])
+                        
+            # Get the closest points on the remeshed mesh
+            _, id_T, cpts = igl.point_mesh_squared_distance(local_vc, B, T)
+
+            # Get vertices of the nearest triangles
+            tv0, tv1, tv2 = B[T[id_T, 0]], B[T[id_T, 1]], B[T[id_T, 2]]
+
+            # Compute the barycentric coordinates of each point projected on the mesh
+            iglbar = igl.barycentric_coordinates_tri(cpts, tv0, tv1, tv2)
+
+            # Interpolate per point at corresponding triangle
+            for i, idx_t in enumerate(id_T):
+                M1 = np.array([t1[i], t2[i]]).T
+                M2 = np.array([t1[adj_f[T[idx_t, 1] - 1 ]], t2[adj_f[T[idx_t, 1] - 1 ]]]).T
+                M3 = np.array([t1[adj_f[T[idx_t, 2] - 1 ]], t2[adj_f[T[idx_t, 2] - 1 ]]]).T
+
+                # Orient cross fields
+                M1, M2, M3 = orient_crossfield(M1, M2, M3)
+
+                # Get corresponding barycentric coordinates
+                w1, w2, w3 = iglbar[i]
+
+                # Interpoalte
+                M_int = w1*M1 + w2*M2 + w3*M3
+
+                t1_new.append(M_int[:, 0])
+                t2_new.append(M_int[:, 1])
+        else: 
+            adj_f = f_f_adj[i]
+            
+            # create local triangle mesh for interpolation
+            B = np.vstack((vc[i], vc[adj_f]))
+
+            T = np.zeros((len(adj_f)-1, 3), dtype=int)
+
+            for j in range(len(adj_f)-1):
+                T[j] = [0, j+1, j+2]
+
+                        
+            # Get the closest points on the remeshed mesh
+            _, id_T, cpts = igl.point_mesh_squared_distance(local_vc, B, T)
+
+            # Get vertices of the nearest triangles
+            tv0, tv1, tv2 = B[T[id_T, 0]], B[T[id_T, 1]], B[T[id_T, 2]]
+
+            # Compute the barycentric coordinates of each point projected on the mesh
+            iglbar = igl.barycentric_coordinates_tri(local_vc, tv0, tv1, tv2)
+
+            # Interpolate per point at corresponding triangle
+            for i, idx_t in enumerate(id_T):
+                M1 = np.array([t1[i], t2[i]]).T
+                M2 = np.array([t1[adj_f[T[idx_t, 1] - 1 ]], t2[adj_f[T[idx_t, 1] -1 ]]]).T
+                M3 = np.array([t1[adj_f[T[idx_t, 2] - 1  ]], t2[adj_f[T[idx_t, 2] - 1]]]).T
+
+                # Orient cross fields
+                M1, M2, M3 = orient_crossfield(M1, M2, M3)
+
+                # Get corresponding barycentric coordinates
+                w1, w2, w3 = iglbar[i]
+
+                # Interpoalte
+                M_int = w1*M1 + w2*M2 + w3*M3
+
+                M_int /= np.linalg.norm(M_int, axis=1)[:, None]
+
+                t1_new.append(M_int[:, 0])
+                t2_new.append(M_int[:, 1])
+
+    return np.array(t1_new), np.array(t2_new), np.array(vc_new)
+            
+
+                
+
+

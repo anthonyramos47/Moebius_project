@@ -859,7 +859,7 @@ def interpolate_lc(foot_points, V, TF, l):
         l: Line congruence of the remeshed mesh
     """
 
-
+    print("Len  V insiede", len(V))
     # Get the closest points on the remeshed mesh
     _, f_idx, cpts = igl.point_mesh_squared_distance(foot_points, V, TF)
 
