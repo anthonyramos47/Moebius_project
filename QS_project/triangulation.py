@@ -137,7 +137,8 @@ ot2 = ot2.reshape(-1, 3)
 #     C_uv[i], l_uv[i]  = sph_ln_cong_at_pt(BSurf, rsurf, ui_vj[i][0], ui_vj[i][1])
 ot1 /= np.linalg.norm(ot1, axis=1)[:, None]
 ot2 /= np.linalg.norm(ot2, axis=1)[:, None]
-#int1, int2, nbc =interpolate_torsal_Q_tri(ot1, ot2, V, F)
+
+int1, int2, nbc =interpolate_torsal_Q_tri(ot1, ot2, V, F)
 tF, tV = triangulate_quads(F, V)
 
 tF = np.array(tF)
@@ -173,11 +174,11 @@ valid = np.zeros(len(tF))
 valid[idx] = 1
 
 # # # If you want to save the remeshed mesh to a file
-# ps.init()
+ps.init()
 
-# ps.remove_all_structures()
+ps.remove_all_structures()
 
-# tri = ps.register_surface_mesh("tri_mesh", tV, tF)
+tri = ps.register_surface_mesh("tri_mesh", tV, tF)
 # tri.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
 # or_mesh = ps.register_surface_mesh("mesh", V, F)
 
@@ -186,14 +187,14 @@ valid[idx] = 1
 
 # ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
 
-# torsal_dir_show(bc, t1, t2, size=0.02, rad=0.0005,  color=(1,1,1), name="Tri")
-# torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
+torsal_dir_show(nbc, int1, int2, size=0.02, rad=0.0005,  color=(1,1,1), name="Tri")
+torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
 
 # ps.register_surface_mesh("Proj", V_R, TF)
 # ps.register_surface_mesh("C_uv", C_uv, TF)
-# ps.show()
+ps.show()
 
 #save_torsal(vc, ot1, ot2, path=save_dir)
-save_torsal(bc, t1, t2, path=save_dir)
+#save_torsal(bc, t1, t2, path=save_dir)
 
 
