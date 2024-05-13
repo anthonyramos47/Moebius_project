@@ -183,7 +183,7 @@ l2 = np.array(l2)
 
 # print(v1[l1[0,0]], v1[l1[0,1]] )
 # Reorient the lines
-#reorient(d1, d2, v1, v2, l1, l2)
+reorient(d1, d2, v1, v2, l1, l2)
 # print(v1[l1[0,0]], v1[l1[0,1]] )
 # Save the two vector fields
 save_fields(save_path, v1, l1, v2, l2)
