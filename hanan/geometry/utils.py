@@ -1428,6 +1428,10 @@ def interpolate_torsal_Q_tri(t1, t2, V, F):
 
         # Local vertices
         local_V = np.vstack((v0[i], v1[i], v2[i], v3[i], vc[i]))
+
+        lv0, lv1, lv2 = local_V[local_F[:, 0]], local_V[local_F[:, 1]], local_V[local_F[:, 2]]
+
+        n_f = unit(np.cross(lv1 - lv0, lv2 - lv0))
         
 
         # Compute barycenters of new triangles
@@ -1476,9 +1480,19 @@ def interpolate_torsal_Q_tri(t1, t2, V, F):
 
                 # Interpoalte
                 M_int = w1*M1 + w2*M2 + w3*M3
+                M_int /= np.linalg.norm(M_int, axis=1)[:, None]
 
-                t1_new.append(M_int[:, 0])
-                t2_new.append(M_int[:, 1])
+                nt1 = M_int[:, 0]
+                nt2 = M_int[:, 1]
+
+                # Project onto corresponding triangle
+                nt1 = nt1 - (nt1@n_f[j])*n_f[j]
+                nt2 = nt2 - (nt2@n_f[j])*n_f[j]
+
+
+
+                t1_new.append(nt1)
+                t2_new.append(nt2)
         else: 
             adj_f = f_f_adj[i]
             
@@ -1503,8 +1517,6 @@ def interpolate_torsal_Q_tri(t1, t2, V, F):
             # Interpolate per point at corresponding triangle
             for j, idx_t in enumerate(id_T):
                 M1 = np.array([t1[i], t2[i]]).T
-            
-
                 M2 = np.array([t1[adj_f[T[idx_t, 1] - 1 ]], t2[adj_f[T[idx_t, 1] -1 ]]]).T
                 M3 = np.array([t1[adj_f[T[idx_t, 2] - 1  ]], t2[adj_f[T[idx_t, 2] - 1]]]).T
 
@@ -1519,8 +1531,17 @@ def interpolate_torsal_Q_tri(t1, t2, V, F):
 
                 M_int /= np.linalg.norm(M_int, axis=1)[:, None]
 
-                t1_new.append(M_int[:, 0])
-                t2_new.append(M_int[:, 1])
+                
+                nt1 = M_int[:, 0]
+                nt2 = M_int[:, 1]
+
+                # Project onto corresponding triangle
+                nt1 = nt1 - (nt1@n_f[j])*n_f[j]
+                nt2 = nt2 - (nt2@n_f[j])*n_f[j]
+
+                
+                t1_new.append(nt1)
+                t2_new.append(nt2)
 
     return np.array(t1_new), np.array(t2_new), np.array(vc_new)
             
