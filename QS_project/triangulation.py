@@ -193,6 +193,7 @@ valid[idx] = 1
 # ps.register_surface_mesh("C_uv", C_uv, TF)
 # ps.show()
 
-save_torsal(vc, ot1, ot2, path=save_dir)
+#save_torsal(vc, ot1, ot2, path=save_dir)
+save_torsal(bc, t1, t2, path=save_dir)
 
 
