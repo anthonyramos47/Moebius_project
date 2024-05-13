@@ -3,7 +3,7 @@ import numpy as np
 import polyscope as ps
 import argparse
 import time
-from pickle import load
+from pickle import load, dump
 
 
 # Import the necessary libraries
@@ -165,6 +165,17 @@ t1, t2, bc, idx = get_torsal_Mesh(tV, tF, ext_l)
 
 # #ot1, ot2, bc = get_torsal_Mesh(V, F, or_l)
 
+# Update the data dictionary
+data["int_t2"] = int2
+data["int_t1"] = int1
+data["nbc"] = nbc
+data["TV"] = tV
+data["TF"] = tF
+
+
+# Step 4: Dump the updated data back into the pickle file
+with open(os.path.join(exp_dir, file_name), 'wb') as file:
+    dump(data, file)
 
 # # V_R = 
 # # C_uv = np.zeros((len(ui_vj), 3))

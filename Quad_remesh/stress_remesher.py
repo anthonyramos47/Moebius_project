@@ -92,22 +92,18 @@ if __name__ == '__main__':
     with open(args.pkl_name+'.pickle', 'rb') as file:
         data  = pickle.load(file)
 
-    V = data["V"]
-    aux_F = data["F"]
+    V = data["TV"]
+    F = data["TF"]
 
+    QV = data["V"] 
+    QF = data["F"]
     
 
-    F = np.array(triangulate_quads(aux_F))
+    #F = np.array(triangulate_quads(aux_F))
 
+    t2 = data["int_t2"] 
+    t1 = data["int_t1"] 
 
-
-    t1 = data["t1"]
-    t2 = data["t2"]
-
-
-
-    t1 = t1.repeat(2, axis=0)
-    t2 = t2.repeat(2, axis=0)
 
     # print("args.w_fairness: ", args)
     # print("args.w_closeness: ", args.w_closeness)
@@ -166,7 +162,7 @@ if __name__ == '__main__':
     if save:
         opt.save_mesh('{}_deformed'.format(file_path), field_scale=1, save_all=True)
         geo.save_mesh_obj(V, F, '{}_start'.format(file_path), overwrite=True)
-        geo.save_mesh_obj(V, aux_F, '{}_Qstart'.format(file_path), overwrite=True)
+        geo.save_mesh_obj(QV, QF, '{}_Qstart'.format(file_path), overwrite=True)
 
     ov1, ov2 = opt.vectors()
 
