@@ -74,9 +74,14 @@ V = data['V']
 
 
 print("Topology cleaning")
+new_ffF = []
 for f in ffF:
     if len(f) != 4:
         print(f)
+    else:
+        new_ffF.append(f)
+
+ffF = np.array(new_ffF)
 
 
 
