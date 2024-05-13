@@ -186,8 +186,8 @@ class QM_Fairness(Constraint):
 
         self.cont+=1
 
-        if self.cont %8 == 0:
-            self.w *= 0.8
+        if self.cont %20 == 0:
+            self.w *= 0.5
         #if self.cont %25 == 0:
         #    self.w = 0
             #print(f"Weight decrease to {self.w}")

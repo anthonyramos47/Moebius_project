@@ -137,12 +137,6 @@ mesh_edges = e_v_v
 
 tuples_edges = np.vstack((mesh_edges[0], mesh_edges[1])).T
 
-
-
-
-
-
-
 # clean up edges have only innver vertices
 # # Sample size of the B-spline
 # sample = (len(u_pts), len(v_pts))   
@@ -337,20 +331,17 @@ tuples_edges = np.vstack((mesh_edges[0], mesh_edges[1])).T
 # #     exp_file.close()
 
 w_proximity = 0.5
-w_proximity_c = 1e-7
-w_fairness = 1
-w_sphericity = 1
+w_proximity_c = 0.1
+w_fairness = 0.2
+w_sphericity = 10
 w_supp = 1
 iter_per_opt = 1
 w_lap = 0.1
 state = 0
 state2 = 0
 counter = 0
-counter2 = 0
 init_opt = False
-w_tor = 0.1
-w_reg = 0.1
-init_opt_2 = False
+w_tor = 0.5
 idx_sph = 0
 step = 0.5
 name_saved = "Post_optimization"
@@ -373,88 +364,26 @@ def optimization():
     psim.Separator()
 
         # State handler
-    if counter%iter_per_opt == 0 or counter2%iter_per_opt == 0:
+    if counter%iter_per_opt == 0 :
         state = 0
-        state2 = 0
+
        
     # Inputs Opt 1
     if psim.CollapsingHeader("Optimization 1:"):
-        changed, w_sphericity = psim.InputFloat("Sphericity W", w_sphericity)
-        changed, w_supp       = psim.InputFloat("Support W", w_supp)
-        changed, w_proximity_c  = psim.InputFloat("Proximity C", w_proximity_c)
-        #changed, w_lap        = psim.InputFloat("Laplacian W", w_lap)
-
-  
-
-        if psim.Button("Init First opt"):
-
-            # Set init to True
-            init_opt = True
-
-            opt = Optimizer()
-
-            # Add variables to the optimizer
-            opt.add_variable("A" , len(vc)  ) # Centers of spheres
-            opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
-            opt.add_variable("C" , len(vc)  ) # Centers of spheres
-            
-            
-            
-
-            # Initialize Optimizer ("Method", step, verbosity)
-            opt.initialize_optimizer("LM", 0.65, 1)
-
-            # Initialize variables
-            opt.init_variable("A"  , A) 
-            opt.init_variable("B"  , B.flatten())
-            opt.init_variable("C"  , C)
-            
-
-    
-            # Sphericity
-            Sph_E = Sphere_Fix()
-            opt.add_constraint(Sph_E, args=(ffF, f_pts), w=w_sphericity)
-            Sph_U = Sph_Unit()
-            opt.add_constraint(Sph_U, args=(), w=10)
-
-            
-            Supp_E = Supp_F()
-            opt.add_constraint(Supp_E, args=(dual_top, l_f), w=w_supp)
-
-
-            # Proximity
-            Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.001), w=w_proximity_c)
-
-            #opt.unitize_variable("nd", 3, 10)
-            #opt.control_var("v", 0.01)
-            # opt.control_var("c", 0.001)
-
-            ps.info("Finished Initialization of Optimization 1")
-
-        if psim.Button("Optimize 1"):
-            if init_opt:
-                state = 1
-            else:
-                ps.warning("First Optimization not initialized")
-                state = 0
-
-
-    if psim.CollapsingHeader("Optimization 2:"):
-
+                
         changed, w_proximity  = psim.InputFloat("Proximity M", w_proximity)
         changed, w_proximity_c  = psim.InputFloat("Proximity C", w_proximity_c)
         changed, w_fairness   = psim.InputFloat("Fairness W", w_fairness)
         changed, w_sphericity = psim.InputFloat("Sphericity W", w_sphericity)
         changed, w_supp       = psim.InputFloat("Support W", w_supp)
         changed, w_tor        = psim.InputFloat("Tor Planarity W", w_tor)
-        changed, w_reg        = psim.InputFloat("Reg W", w_reg)
+        #changed, w_reg        = psim.InputFloat("Reg W", w_reg)
 
-        if psim.Button("Init Second opt"):
 
-            init_opt_2 = True
+        if psim.Button("Init First opt"):
 
-            A, B, C =opt.uncurry_X("A", "B", "C")
+            # Set init to True
+            init_opt = True
 
             opt = Optimizer()
 
@@ -473,7 +402,7 @@ def optimization():
 
             # Initialize variables
             opt.init_variable("A"  , A) 
-            opt.init_variable("B"  , B)
+            opt.init_variable("B"  , B.flatten())
             opt.init_variable("C"  , C)
             opt.init_variable("v"  , f_pts.flatten())
             opt.init_variable("nd" , l_f.flatten())
@@ -506,85 +435,28 @@ def optimization():
             Prox_C = Proximity_C()
             opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=w_proximity_c)
             
-            # Reg 
-            reg = Reg_E()
-            opt.add_constraint(reg, args=(e_f_f, e_v_v), w=w_reg)
+            # # Reg 
+            # reg = Reg_E()
+            # opt.add_constraint(reg, args=(e_f_f, e_v_v), w=w_reg)
 
             # # Define unit variables
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v" , 0.2)
+            opt.control_var("v" , 1)
             opt.control_var("nd", 1)
             #opt.control_var("c", 0.0001)
 
-            ps.info("Finished Initialization of Optimization 2")
+    if psim.Button("Optimize 1"):
+        if init_opt:
+            state = 1
+        else:
+            ps.warning("First Optimization not initialized")
+            state = 0
 
-        if psim.Button("Optimize 2"):
-            if init_opt_2:
-                state2 = 1
-            else:
-                ps.warning("First Optimization not initialized")
-                state2 = 0
-
-            
     if state:    
         counter += 1
-        # Optimize
-        opt.get_gradients() # Compute J and residuals
-        opt.optimize() # Solve linear system and update variables
         
-        # Get Variables
-        oA, oB, oC = opt.uncurry_X("A", "B", "C")
-        
-        vk = f_pts
-        oB = oB.reshape(-1,3)
-        
-
-        sph_c, rf = Implicit_to_CR(oA,oB,oC)
-
-        v0, v1, v2, v3 = vk[ffF[:, 0]], vk[ffF[:, 1]], vk[ffF[:, 2]], vk[ffF[:, 3]]
-
-        dif0 = np.linalg.norm(v0 - sph_c, axis=1)**2 - rf**2
-        dif1 = np.linalg.norm(v1 - sph_c, axis=1)**2 - rf**2
-        dif2 = np.linalg.norm(v2 - sph_c, axis=1)**2 - rf**2
-        dif3 = np.linalg.norm(v3 - sph_c, axis=1)**2 - rf**2
-
-
-        planarity1 = np.zeros(len(dual_top))
-        planarity  = np.zeros(len(dual_top))
-        for i in range(len(dual_top)):
-            if len(dual_top[i]) == 4:
-                c0, c1, c2, c3 = sph_c[dual_top[i]]
-                planarity1[i] =  compute_volume_of_tetrahedron(c0, c1, c2, c3)
-                planarity[i]  =  compute_planarity(c0, c1, c2, c3)
-
-
-        sphericity =  dif0**2 + dif1**2 + dif2**2 + dif3**2
-
-        idx_max = np.argmax(sphericity)
-        #max_sph = ps.register_point_cloud("Max_Sphericity", np.array([sph_c[idx_max]]), enabled=True, transparency=0.2, color=(0.1, 0.1, 0.1))
-        #max_sph.set_radius(rf[idx_max], relative=False)
-
-        # for _ in range(10):
-        #     i = np.random.randint(0, len(ffF))
-        #     sph = ps.register_point_cloud(f"s_"+str(i), np.array([sph_c[i]]), enabled=True, transparency=0.2, color=(0.1, 0.1, 0.1))
-        #     sph.set_radius(rf[i], relative=False)
-    
-        mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
-        mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
-        mesh.add_vector_quantity("lc", l_f, enabled=True, length=0.12)
-        mesh.add_scalar_quantity("Sphericity", np.array(sphericity), defined_on="faces", enabled=True )
-        c_surf = ps.register_surface_mesh("Opt_C", sph_c, dual_top)
-        c_surf.add_scalar_quantity("Planarity", planarity, defined_on='faces', enabled=True)
-        c_surf.add_scalar_quantity("Face_Vol" , planarity1, defined_on='faces', enabled=True)
-        #c_surf.add_vector_quantity("Normals", nd[inn_v], defined_on='faces', enabled=True)
-        ps.register_curve_network("Edges", sph_c, dual_edges, radius=0.001)
-        ps.register_point_cloud("cc", sph_c, radius=0.002)
-
-    if state2:    
-        counter2 += 1
-        # Optimize
         opt.get_gradients() # Compute J and residuals
         opt.optimize() # Solve linear system and update variables
         
@@ -619,16 +491,6 @@ def optimization():
 
         sphericity =  dif0**2 + dif1**2 + dif2**2 + dif3**2
 
-        #idx_max = np.argmax(sphericity)
-
-        
-        #max_sph = ps.register_point_cloud("Max_Sphericity", np.array([sph_c[idx_max]]), enabled=True, transparency=0.2, color=(0.1, 0.1, 0.1))
-        #max_sph.set_radius(rf[idx_max], relative=False)
-
-        # for _ in range(10):
-        #     i = np.random.randint(0, len(ffF))
-        #     sph = ps.register_point_cloud(f"s_"+str(i), np.array([sph_c[i]]), enabled=True, transparency=0.2, color=(0.1, 0.1, 0.1))
-        #     sph.set_radius(rf[i], relative=False)
     
         mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
         mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
@@ -644,9 +506,6 @@ def optimization():
         centers = ps.register_point_cloud("cc", sph_c[465:468])
 
         centers.add_vector_quantity("Dir", 1.2*(vc[465:468] - sph_c[465:468]), enabled=True, vectortype="ambient")
-
-        # pc = ps.register_point_cloud("V_LC", vk[inn_v], radius=0.002)
-        # pc.add_vector_quantity("LC", nd[inn_v], enabled=True)
 
 
     psim.Separator()
@@ -727,6 +586,10 @@ def optimization():
 
         supp_obj.close()
         
+
+       
+
+
         # mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
         # mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
         # ps.register_surface_mesh("Opt_C", sph_c, dual_top)
@@ -738,11 +601,12 @@ def optimization():
         # Get results
                   
         # Get Variables
-        vk, oA, oB, oC, nl = opt.uncurry_X("v", "A", "B", "C", "n_l")
+        vk, oA, oB, oC, nl, nd = opt.uncurry_X("v", "A", "B", "C", "n_l", "nd")
         
         vk = vk.reshape(-1,3)
         oB = oB.reshape(-1,3)
         nl = nl.reshape(-1,3)
+        nd = nd.reshape(-1,3)
 
         sph_c, rf = Implicit_to_CR(oA,oB,oC)
 
@@ -802,6 +666,22 @@ def optimization():
 
         exp_file2.close()
         exp_file.close()
+
+
+         
+        # Save Optimized line congruence
+        Node_path = os.path.join(remeshing_dir, name+'_opt_NodesAxis.obj')
+
+        # Compute line congruence
+        v_lc = np.vstack((vk, vk + nd))
+
+        f_lc = np.array([[i, i+len(vk)] for i in range(len(vk))])
+        # Write info
+        with open(Node_path, 'w') as f:
+            for v in v_lc:
+                f.write('v {} {} {}\n'.format(v[0], v[1], v[2]))
+            for l in f_lc:
+                f.write('l {} {}\n'.format(l[0]+1, l[1]+1))
 
 
 #print("Mesh", ffV[:10])

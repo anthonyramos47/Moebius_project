@@ -273,7 +273,7 @@ class Optimizer():
  
     def optimize(self):
         
-        if self.prevdx is None or (self.prevdx > 1e-8 and self.energy[-1] > 1e-9 and self.e_diff > 1e-9) :
+        if self.prevdx is None or (self.prevdx > 1e-8) :
             if self.method == 'LM': # Levenberg-Marquardt
                 self.LM()
             elif self.method == 'PG': # Projected Gauss-Newton

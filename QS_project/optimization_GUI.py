@@ -251,7 +251,7 @@ def optimization():
             opt.initialize_optimizer("LM", step_2, 1)
 
             # Init variables 
-            opt.init_variable("theta" , 20)
+            opt.init_variable("theta" , 0.1)
             opt.init_variable("l"     , f_l.flatten())  
             opt.init_variable("rij"   , f_cp)
             opt.init_variable("mu"    , f_mu)

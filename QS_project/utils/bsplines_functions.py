@@ -763,11 +763,14 @@ def visualization_LC_Torsal(surf, opt, r_uv, u_pts, v_pts, n, V, F):
     # ANGLES WITH NORMAL SCALAR FIELD
     surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", enabled=True)
 
+    
+
     surf.add_scalar_quantity("Torsal_Angles", torsal_angles, defined_on="faces", enabled=True)
 
     surf.add_scalar_quantity("Planarity", planarity_opt, defined_on="faces", enabled=False)
 
     torsal_dir_show(barycenters, t1, t2, size=size_torsal, rad=0.0014)
+    torsal_dir_show(barycenters, nt1, nt2, size=size_torsal, rad=0.0014)
 
     V_R = V + r_uv_surf.flatten()[:,None]*n.reshape(-1,3)
 
