@@ -1461,16 +1461,18 @@ def interpolate_torsal_Q_tri(t1, t2, V, F):
             iglbar = igl.barycentric_coordinates_tri(cpts, tv0, tv1, tv2)
 
             # Interpolate per point at corresponding triangle
-            for i, idx_t in enumerate(id_T):
+            for j, idx_t in enumerate(id_T):
+                
+
                 M1 = np.array([t1[i], t2[i]]).T
                 M2 = np.array([t1[adj_f[T[idx_t, 1] - 1 ]], t2[adj_f[T[idx_t, 1] - 1 ]]]).T
                 M3 = np.array([t1[adj_f[T[idx_t, 2] - 1 ]], t2[adj_f[T[idx_t, 2] - 1 ]]]).T
 
                 # Orient cross fields
-                M1, M2, M3 = orient_crossfield(M1, M2, M3)
+                #M1, M2, M3 = orient_crossfield(M1, M2, M3)
 
                 # Get corresponding barycentric coordinates
-                w1, w2, w3 = iglbar[i]
+                w1, w2, w3 = iglbar[j]
 
                 # Interpoalte
                 M_int = w1*M1 + w2*M2 + w3*M3
@@ -1499,16 +1501,18 @@ def interpolate_torsal_Q_tri(t1, t2, V, F):
             iglbar = igl.barycentric_coordinates_tri(local_vc, tv0, tv1, tv2)
 
             # Interpolate per point at corresponding triangle
-            for i, idx_t in enumerate(id_T):
+            for j, idx_t in enumerate(id_T):
                 M1 = np.array([t1[i], t2[i]]).T
+            
+
                 M2 = np.array([t1[adj_f[T[idx_t, 1] - 1 ]], t2[adj_f[T[idx_t, 1] -1 ]]]).T
                 M3 = np.array([t1[adj_f[T[idx_t, 2] - 1  ]], t2[adj_f[T[idx_t, 2] - 1]]]).T
 
                 # Orient cross fields
-                M1, M2, M3 = orient_crossfield(M1, M2, M3)
+                #M1, M2, M3 = orient_crossfield(M1, M2, M3)
 
                 # Get corresponding barycentric coordinates
-                w1, w2, w3 = iglbar[i]
+                w1, w2, w3 = iglbar[j]
 
                 # Interpoalte
                 M_int = w1*M1 + w2*M2 + w3*M3

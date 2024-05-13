@@ -187,7 +187,7 @@ tri = ps.register_surface_mesh("tri_mesh", tV, tF)
 
 # ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
 
-torsal_dir_show(nbc, int1, int2, size=0.02, rad=0.0005,  color=(1,1,1), name="Tri")
+torsal_dir_show(nbc, int1, int2, size=0.02, rad=0.0005,  color=(1,0,0), name="Tri")
 torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
 
 # ps.register_surface_mesh("Proj", V_R, TF)
@@ -195,6 +195,6 @@ torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
 ps.show()
 
 #save_torsal(vc, ot1, ot2, path=save_dir)
-#save_torsal(bc, t1, t2, path=save_dir)
+save_torsal(nbc, int1, int2, path=save_dir)
 
 
