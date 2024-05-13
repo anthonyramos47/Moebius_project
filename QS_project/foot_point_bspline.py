@@ -227,8 +227,8 @@ cc = (c0 + c1 + c2 + c3)/4
 vc = np.sum(f_pts[ffF], axis=1)/4
 
 # Compute radius of spheres
-rads = np.linalg.norm(vc - cc, axis=1)
-#rads =  np.sum(r_pts[ffF ], axis=1)/4
+#rads = np.linalg.norm(vc - cc, axis=1)
+rads =  np.sum(r_pts[ffF ], axis=1)/4
 
 # # Normals of dual faces
 nd = np.zeros((len(dual_top), 3))

@@ -391,6 +391,53 @@ def optimization():
             opt.add_variable("A" , len(vc)  ) # Centers of spheres
             opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
             opt.add_variable("C" , len(vc)  ) # Centers of spheres
+
+            # Initialize Optimizer ("Method", step, verbosity)
+            opt.initialize_optimizer("LM", step, 1)
+
+            # Initialize variables
+            opt.init_variable("A"  , A) 
+            opt.init_variable("B"  , B.flatten())
+            opt.init_variable("C"  , C)
+
+            # # Line congruence l.cu, l.cv = 0
+            Supp_E = Supp_F()
+            opt.add_constraint(Supp_E, args=(dual_top, l_f), w=0.0)
+
+            # Sphericity
+            Sph_E = Sphere_Fix()
+            opt.add_constraint(Sph_E, args=(ffF, f_pts), w=10)
+
+            Sph_U = Sph_Unit()
+            opt.add_constraint(Sph_U, args=(), w=10)
+
+            Prox_C = Proximity_C()
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=0.1)
+
+            for _ in range(50):
+                # Get gradients
+                opt.get_gradients()
+                opt.optimize()
+
+            opt.get_energy_per_constraint()
+
+            A, B, C = opt.uncurry_X("A", "B", "C")
+        
+            opt = Optimizer()
+
+            # Add variables to the optimizer
+            opt.add_variable("A" , len(vc)  ) # Centers of spheres
+            opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
+            opt.add_variable("C" , len(vc)  ) # Centers of spheres
+
+            # Initialize Optimizer ("Method", step, verbosity)
+            opt.initialize_optimizer("LM", step, 0)
+
+            # Initialize variables
+            opt.init_variable("A"  , A) 
+            opt.init_variable("B"  , B.flatten())
+            opt.init_variable("C"  , C)
+
             opt.add_variable("nd", len(l_f)*3   ) # Normals of dual faces
             opt.add_variable("v" , len(f_pts)*3) # Vertices of mid mesh
             opt.add_variable("n_l" , len(mesh_edges[0])*3   ) # Radii of spheres
@@ -402,7 +449,7 @@ def optimization():
 
             # Initialize variables
             opt.init_variable("A"  , A) 
-            opt.init_variable("B"  , B.flatten())
+            opt.init_variable("B"  , B)
             opt.init_variable("C"  , C)
             opt.init_variable("v"  , f_pts.flatten())
             opt.init_variable("nd" , l_f.flatten())
@@ -443,8 +490,8 @@ def optimization():
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v" , 1)
-            opt.control_var("nd", 1)
+            opt.control_var("v" , 0.1)
+            opt.control_var("nd", 0.1)
             #opt.control_var("c", 0.0001)
 
     if psim.Button("Optimize 1"):

@@ -100,7 +100,7 @@ bspline_surf_name = parser.parse_args().file_name
 dir =  1
 
 # Sample size
-sample = (15, 15)
+sample = (20, 20)
 choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
