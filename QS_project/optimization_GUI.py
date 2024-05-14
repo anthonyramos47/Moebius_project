@@ -321,10 +321,14 @@ def optimization():
     
     if psim.Button("Optimize 2"):
         if init_opt_2:
-            for _ in range(iter_per_opt):
+            for it in range(iter_per_opt):
                 # Optimize
                 opt.get_gradients() # Compute J and residuals
                 opt.optimize() # Solve linear system and update variables
+
+                if it%10 == 0 and weights["Torsal_Angle"]!= 0:
+                    opt.constraints[2].recompute(opt.X, opt.var_idx)
+
 
             # Flip line congruence if needed
             l = opt.uncurry_X("l")

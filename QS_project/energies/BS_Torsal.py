@@ -37,6 +37,55 @@ class BS_Torsal(Constraint):
         self.u_sample = None 
         self.v_sample = None
         self.counter = 0
+    
+
+    def recompute(self, X, var_idx):
+
+        print("recomputed")
+
+        # Initialize the torsal directions
+        l = self.uncurry_X(X, var_idx, "l")
+        l = l.reshape(self.u_sample, self.v_sample, 3)
+
+        # Compute the line congruence at the baricenter and the line congruence directions
+        lc, lu, lv = lc_info_at_grid_points(l)
+
+        # Reshape line congruence and normals
+        lc = lc.reshape(-1, 3)
+        lu = lu.reshape(-1, 3)
+        lv = lv.reshape(-1, 3)
+
+        # Normalize the line congruence
+        lc /= np.linalg.norm(lc, axis=1)[:, None]
+
+        # Compute the torsal directions 
+        t1, t2, ut1, vt1, ut2, vt2, _ = torsal_directions(lc, lu, lv, self.du, self.dv)
+
+        #lt1 = unit(ut1[:, None]*lu + vt1[:, None]*lv)
+        #lt2 = unit(ut2[:, None]*lu + vt2[:, None]*lv)
+
+        # Compute the torsal plane normal
+        nt1 = unit(np.cross(lc, t1))
+        nt2 = unit(np.cross(lc, t2))
+    
+        # Init the torsal directions
+        X[var_idx["u1"]] = ut1 
+        X[var_idx["v1"]] = vt1 
+        X[var_idx["u2"]] = ut2 
+        X[var_idx["v2"]] = vt2 
+
+        # Init the torsal plane normals
+        X[var_idx["nt1"]] = nt1.flatten()
+        X[var_idx["nt2"]] = nt2.flatten()
+
+        # Copute lines in torsal directions
+        lt1 = ut1[:, None]*lu + vt1[:, None]*lv
+        lt2 = ut2[:, None]*lu + vt2[:, None]*lv
+    
+        # Store the norm of the line congruence 
+        self.lc_norm  = np.linalg.norm(lc, axis=1)
+        self.lt1_norm = np.linalg.norm(lt1, axis=1)
+        self.lt2_norm = np.linalg.norm(lt2, axis=1)
 
         
       

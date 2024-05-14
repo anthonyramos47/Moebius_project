@@ -1296,13 +1296,14 @@ def search_edge(edges, e):
     return matching_indices[0][0] if len(matching_indices[0]) > 0 else None
 
 
-def init_torsal_opt(n, l, du, dv ):
+def torsal_recompute(opt, du, dv):
     """ 
     Function to initialize the torsal directions optimization
     Input:
         n: Normals (u,v,3)
         l: Line congruence (u, v, 3)
-
+        du: Surface derivative u (u,v,3)
+        dv: Surface derivative v (u,v,3)
     """
 
     # Reorient l 

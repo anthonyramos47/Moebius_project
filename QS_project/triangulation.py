@@ -193,25 +193,25 @@ valid = np.zeros(len(tF))
 valid[idx] = 1
 
 # # # # If you want to save the remeshed mesh to a file
-ps.init()
+# ps.init()
 
-ps.remove_all_structures()
+# ps.remove_all_structures()
 
-tri = ps.register_surface_mesh("tri_mesh", tV, tF)
-# # tri.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
-# # or_mesh = ps.register_surface_mesh("mesh", V, F)
+# tri = ps.register_surface_mesh("tri_mesh", tV, tF)
+# # # tri.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
+# # # or_mesh = ps.register_surface_mesh("mesh", V, F)
 
-# # or_mesh.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
-# # or_mesh.add_vector_quantity("l", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.0, 1.0, 0.0))
+# # # or_mesh.add_scalar_quantity("valid", valid, defined_on="faces", enabled=True, cmap="blues")
+# # # or_mesh.add_vector_quantity("l", or_l, defined_on="vertices", vectortype='ambient',  enabled=True, color=(0.0, 1.0, 0.0))
 
-# # ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
+# # # ps.register_point_cloud("vc", vc, color=(1, 0, 0), radius=0.001)
 
-torsal_dir_show(nbc, int1, int2, size=0.02, rad=0.0005,  color=(1,0,0), name="Tri")
-torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
+# torsal_dir_show(nbc, int1, int2, size=0.02, rad=0.0005,  color=(1,0,0), name="Tri")
+# torsal_dir_show(vc, ot1, ot2, size=0.02, rad=0.0005,  color=(1,1,1), name="")
 
-# # ps.register_surface_mesh("Proj", V_R, TF)
-# # ps.register_surface_mesh("C_uv", C_uv, TF)
-ps.show()
+# # # ps.register_surface_mesh("Proj", V_R, TF)
+# # # ps.register_surface_mesh("C_uv", C_uv, TF)
+# ps.show()
 
 #save_torsal(vc, ot1, ot2, path=save_dir)
 save_torsal(nbc, int1, int2, path=save_dir)
