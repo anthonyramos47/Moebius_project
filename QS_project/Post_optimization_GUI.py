@@ -490,8 +490,8 @@ def optimization():
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v" , 0.1)
-            opt.control_var("nd", 0.1)
+            opt.control_var("v" , 1)
+            opt.control_var("nd", 0.5)
             #opt.control_var("c", 0.0001)
 
     if psim.Button("Optimize 1"):
