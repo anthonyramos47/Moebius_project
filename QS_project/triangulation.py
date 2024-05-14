@@ -143,6 +143,12 @@ tF= triangulate_quads_diag(F)
 
 tV = V
 
+# even tf
+eve_T = tF[::2]
+
+# Get baricenter of each face
+ev_c = np.mean(tV[eve_T], axis=1)
+
 tF = np.array(tF)
 
 ext_l = np.vstack((or_l, lc))
@@ -209,5 +215,6 @@ ps.show()
 
 #save_torsal(vc, ot1, ot2, path=save_dir)
 save_torsal(nbc, int1, int2, path=save_dir)
+save_torsal(ev_c, ot1,  ot2, path=save_dir, type=3)
 
 

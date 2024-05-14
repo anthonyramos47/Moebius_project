@@ -938,7 +938,6 @@ def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path="", type=1):
     t2_dir_f = baricenter.reshape(-1,3) + size*t2
 
     
-    
     t2_nodes = np.concatenate((t2_dir_i, t2_dir_f), axis=0)
     t1_nodes = np.concatenate((t1_dir_i, t1_dir_f), axis=0)
 
@@ -953,9 +952,12 @@ def save_torsal(baricenter, t1, t2, size=0.005, rad=0.0005, path="", type=1):
         # Create two files for each vector field
         file1 = os.path.join(path, name+'_TD1.obj')
         file2 = os.path.join(path, name+'_TD2.obj')
-    else: 
+    elif type==2:
         file1 = os.path.join(path, name+'_QD1.obj')
         file2 = os.path.join(path, name+'_QD2.obj')
+    else: 
+        file1 = os.path.join(path, name+'_MD1.obj')
+        file2 = os.path.join(path, name+'_MD2.obj')
 
 
     # Write the first vector field
