@@ -312,42 +312,42 @@ tuples_edges = np.vstack((mesh_edges[0], mesh_edges[1])).T
 
 # #     # Save spheres ======================================================================
 # #     # Open file
-# #     exp_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
+# #     sph_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
 
 # #     # Write inn_f in the first line
 # #     for i in inn_f:
-# #         exp_file.write(f"{i} ")
-# #     exp_file.write("\n")
+# #         sph_file.write(f"{i} ")
+# #     sph_file.write("\n")
 
 # #     for i in range(len(ffF)):
 
-# #         exp_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
+# #         sph_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
 
 # #         for j in f_f_adj[i]:
-# #             exp_file.write(f"{j} ")
+# #             sph_file.write(f"{j} ")
 
-# #         exp_file.write("\n")
+# #         sph_file.write("\n")
 
-# #     exp_file.close()
+# #     sph_file.close()
 
-w_proximity = 0.5
+w_proximity = 0.2
 w_proximity_c = 0.1
 w_fairness = 0.2
-w_sphericity = 10
-w_supp = 1
-iter_per_opt = 1
+w_sphericity = 1
+w_supp = 0.5
 w_lap = 0.1
+iter_per_opt = 1
 state = 0
 state2 = 0
 counter = 0
 init_opt = False
-w_tor = 0.5
+w_tor = 0.01
 idx_sph = 0
 step = 0.5
 name_saved = "Post_optimization"
 def optimization():
 
-    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved,e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, w_reg, step, l_f, counter2
+    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved, e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, step, l_f, counter2
 
     # Title
     psim.TextUnformatted("Post Optimization GUI")
@@ -377,7 +377,7 @@ def optimization():
         changed, w_sphericity = psim.InputFloat("Sphericity W", w_sphericity)
         changed, w_supp       = psim.InputFloat("Support W", w_supp)
         changed, w_tor        = psim.InputFloat("Tor Planarity W", w_tor)
-        #changed, w_reg        = psim.InputFloat("Reg W", w_reg)
+        
 
 
         if psim.Button("Init First opt"):
@@ -402,7 +402,7 @@ def optimization():
 
             # # Line congruence l.cu, l.cv = 0
             Supp_E = Supp_F()
-            opt.add_constraint(Supp_E, args=(dual_top, l_f), w=0.0)
+            opt.add_constraint(Supp_E, args=(dual_top, l_f), w=0.001)
 
             # Sphericity
             Sph_E = Sphere_Fix()
@@ -414,7 +414,7 @@ def optimization():
             Prox_C = Proximity_C()
             opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=0.1)
 
-            for _ in range(50):
+            for _ in range(30):
                 # Get gradients
                 opt.get_gradients()
                 opt.optimize()
@@ -440,7 +440,7 @@ def optimization():
 
             opt.add_variable("nd", len(l_f)*3   ) # Normals of dual faces
             opt.add_variable("v" , len(f_pts)*3) # Vertices of mid mesh
-            opt.add_variable("n_l" , len(mesh_edges[0])*3   ) # Radii of spheres
+            opt.add_variable("n_l" , len(mesh_edges[0])*3   ) # Normal or the supp planes
             #opt.add_variable("r" , len(rads)   ) # Radii of spheres
             #opt.add_variable("mu", len(dual_edges))
 
@@ -477,20 +477,20 @@ def optimization():
 
             # # Proximity
             Prox_M = Proximity()
-            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=w_proximity)
+            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.0001), w=w_proximity)
 
             Prox_C = Proximity_C()
             opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=w_proximity_c)
             
             # # Reg 
-            # reg = Reg_E()
-            # opt.add_constraint(reg, args=(e_f_f, e_v_v), w=w_reg)
+            #reg = Reg_E()
+            #opt.add_constraint(reg, args=(e_f_f, e_v_v), w=w_reg)
 
             # # Define unit variables
             opt.unitize_variable("nd", 3, 10)
             opt.unitize_variable("n_l", 3, 10)
 
-            opt.control_var("v" , 1)
+            opt.control_var("v" , 0.4)
             opt.control_var("nd", 0.5)
             #opt.control_var("c", 0.0001)
 
@@ -649,11 +649,24 @@ def optimization():
                   
         # Get Variables
         vk, oA, oB, oC, nl, nd = opt.uncurry_X("v", "A", "B", "C", "n_l", "nd")
-        
+
+
         vk = vk.reshape(-1,3)
         oB = oB.reshape(-1,3)
         nl = nl.reshape(-1,3)
         nd = nd.reshape(-1,3)
+
+        # Save opt into pickle
+        data['vk'] = vk
+        data['oA'] = oA
+        data['oB'] = oB
+        data['oC'] = oC
+        data['nl'] = nl
+        data['nd'] = nd
+        with open(os.path.join(exp_dir, pickle_name), 'wb') as f:
+            pickle.dump(data, f)
+
+        # Draw the spheres
 
         sph_c, rf = Implicit_to_CR(oA,oB,oC)
 
@@ -664,21 +677,41 @@ def optimization():
 
         # Save spheres ======================================================================
         # Open file
-        exp_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
-
-        exp_file2 = open(os.path.join(remeshing_dir, name+'_sphs_p_cut.dat'), 'w')
+        sph_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
+        sph_cut_file = open(os.path.join(remeshing_dir, name+'_sphs_p_cut.dat'), 'w')
+        annuli_file = open(os.path.join(remeshing_dir, name+'_annuli.dat'), 'w')
 
         # Write inn_f in the first line
         for i in inn_f:
-            exp_file.write(f"{i} ")
-        exp_file.write("\n")
+            sph_file.write(f"{i} ")
+        sph_file.write("\n")
+
+        # Get list of faces of each edge
+        edges_faces = np.c_[e_f_f].flatten()
+        for i in edges_faces:
+            annuli_file.write(f"{i} ")
+        annuli_file.write("\n")
+    
+        for i in range(len(e_f_f[0])):
+
+            # Get the normal of the edge
+            n = nl[i]
+
+            # Get the vertices of the edge
+            vi, vj = vk[e_v_v[0][i]], vk[e_v_v[1][i]]
+
+            # Compute the mid point of the edge
+            mid = (vi + vj)/2
+            annuli_file.write(f"{mid[0]} {mid[1]} {mid[2]} {n[0]} {n[1]} {n[2]} {vi[0]} {vi[1]} {vi[2]} {vj[0]} {vj[1]} {vj[2]}\n")
 
 
         for i in range(len(ffF)):
             
-            exp_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
+            sph_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
 
             string_data_sph_panel = f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} "
+
+            annuli_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]}\n")
 
             for j in range(len(ffF[i])):
 
@@ -701,18 +734,18 @@ def optimization():
 
                 
 
-            exp_file2.write(string_data_sph_panel + "\n")
+            sph_cut_file.write(string_data_sph_panel + "\n")
             
 
             for j in f_f_adj[i]:
-                exp_file.write(f"{j} ")
+                sph_file.write(f"{j} ")
 
-            exp_file.write("\n")
+            sph_file.write("\n")
 
             
-
-        exp_file2.close()
-        exp_file.close()
+        annuli_file.close()
+        sph_cut_file.close()
+        sph_file.close()
 
 
          
