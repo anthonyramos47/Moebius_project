@@ -326,7 +326,7 @@ def optimization():
                 opt.get_gradients() # Compute J and residuals
                 opt.optimize() # Solve linear system and update variables
 
-                if it%10 == 0 and weights["Torsal_Angle"]!= 0:
+                if it%25 == 0 and weights["Torsal_Angle"]!= 0:
                     opt.constraints[2].recompute(opt.X, opt.var_idx)
 
 
