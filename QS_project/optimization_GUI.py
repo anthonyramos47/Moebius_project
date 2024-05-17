@@ -24,6 +24,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import splipy as sp
 import json
+import time 
 import pickle
 
 
@@ -65,6 +66,7 @@ experiment_dir = os.path.join(dir_path, "experiments")
 
 # Create the parser
 parser = argparse.ArgumentParser(description="Optimization")
+
 # Add an argument
 parser.add_argument('file_name', type=str, help='File name to load')
 
@@ -73,19 +75,12 @@ parser.add_argument('deltaumax', type=float, help='delta value')
 parser.add_argument('deltavmin', type=float, help='delta value')
 parser.add_argument('deltavmax', type=float, help='delta value')
 
+parser.add_argument('type', type=int, help='Read 1 pickle or 2 json file')
+
 bspline_surf_name = parser.parse_args().file_name
 dir =  1
 
 
-# Load picke information
-def load_data():
-    """ Function to load the data from a pickle file
-    """
-    with open(os.path.join(experiment_dir, bspline_surf_name+'_init.pickle'), 'rb') as f:
-        data = pickle.load(f)
-    return data
-
-data = load_data()
 
 
 # Sample size
@@ -114,13 +109,14 @@ name_saved = "Results"
 iter_per_opt = 20
 step_1 = 0.5
 step_2 = 0.5
-
+time_1 = []
+time_2 = []
 
 
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v, time_1, time_2
 
     # Title
     psim.TextUnformatted("Sphere and Lince Congruence Optimization")
@@ -288,11 +284,13 @@ def optimization():
                 counter += 1
                 # Optimize
                 
-
+                i_t  = time.time()
                 # Get gradients
                 opt.get_gradients() # Compute J and residuals
                 opt.optimize() # Solve linear system and update variables
+                f_t  = time.time()
 
+                time_1.append(f_t - i_t)
                 # l = opt.uncurry_X("l")
                 # l = l.reshape(len(u_pts), len(v_pts), 3)
                 # l = flip(l, n)
@@ -313,11 +311,14 @@ def optimization():
         if init_opt_2:
             for it in range(iter_per_opt):
                 # Optimize
+                i_t = time.time()
                 opt.get_gradients() # Compute J and residuals
                 opt.optimize() # Solve linear system and update variables
-
+                f_t = time.time()
                 if it%25 == 0 and weights["Torsal_Angle"]!= 0:
                     opt.constraints[2].recompute(opt.X, opt.var_idx)
+
+                time_2.append(f_t - i_t)
 
 
             # Flip line congruence if needed
@@ -366,7 +367,16 @@ def optimization():
 
     psim.TextUnformatted("Save Results")
 
-    changed, name_saved = psim.InputText("Save File Name", name_saved)    
+    changed, name_saved = psim.InputText("Save File Name", name_saved)  
+
+
+    if psim.Button("Time"):  
+
+        print("Time 1: ", np.array(time_1).mean())
+        print("Time 2: ", np.array(time_2).mean())
+
+        time_1 = []
+        time_2 = []
 
     if psim.Button("Save"):
 
@@ -449,9 +459,25 @@ def optimization():
         ps.warning("Results saved in: " + save_file_path)
 
 
+if parser.parse_args().type == 1:
+
+
+    # Load picke information
+    def load_data():
+        """ Function to load the data from a pickle file
+        """
+        with open(os.path.join(experiment_dir, bspline_surf_name+'_init.pickle'), 'rb') as f:
+            data = pickle.load(f)
+        return data
+
+    data = load_data()
+
+    bsp1 = data["surf"]
+elif parser.parse_args().type == 2:
+    bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
 #bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
         
-bsp1 = data["surf"]
+#bsp1 = data["surf"]
 
 # Get Grid Information
 u_pts, v_pts = sample_grid(sample[0], sample[1], deltaum=parser.parse_args().deltaumin, deltauM=parser.parse_args().deltaumax, deltavm = parser.parse_args().deltavmin, deltavM = parser.parse_args().deltavmax)

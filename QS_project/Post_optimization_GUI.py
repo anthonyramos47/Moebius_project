@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 import argparse
+import time
 from pickle import load
 import subprocess
 
@@ -343,11 +344,12 @@ counter = 0
 init_opt = False
 w_tor = 0.01
 idx_sph = 0
+times = []
 step = 0.5
 name_saved = "Post_optimization"
 def optimization():
 
-    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved, e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, step, l_f, counter2
+    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved, e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, step, l_f, counter2, time
 
     # Title
     psim.TextUnformatted("Post Optimization GUI")
@@ -503,9 +505,12 @@ def optimization():
 
     if state:    
         counter += 1
-        
+        i_t = time.time()
         opt.get_gradients() # Compute J and residuals
         opt.optimize() # Solve linear system and update variables
+
+        f_t = time.time()
+        times.append(f_t - i_t)
         
         # Get Variables
         vk, oA, oB, oC, nd = opt.uncurry_X("v", "A", "B", "C", "nd")
@@ -555,7 +560,14 @@ def optimization():
         centers.add_vector_quantity("Dir", 1.2*(vc[465:468] - sph_c[465:468]), enabled=True, vectortype="ambient")
 
 
+    if psim.Button("Time"):
+
+        print("Time: ", np.mean(times))
+
+
     psim.Separator()
+
+
 
 
     if psim.Button("Report"):

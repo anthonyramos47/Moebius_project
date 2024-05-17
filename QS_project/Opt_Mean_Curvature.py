@@ -95,23 +95,25 @@ cp_flat = control_points.flatten()
 
 original_cp_flat = cp_flat.copy()
 
-size = cp_flat.shape[0]
 
+dummy = 0.2*np.ones_like(H)
 
-
+x0 = np.hstack((cp_flat, dummy))
 
 if num_pos > num_neg:
 
     def objective_function(cp_flat, original_cp_flat, weight):
+        size = len(original_cp_flat)
          # Objective function to minimize
         # For example, weighted distance from the original control points
-        return weight * np.sum((cp_flat - original_cp_flat) ** 2)
+        return weight * np.sum((cp_flat[:size] - original_cp_flat) ** 2)
 
     
     def constraint_function(cp_flat):
+        size = len(original_cp_flat)
 
         # Reconstruct the control points from the flattened array
-        control_points_reshaped = cp_flat.reshape(control_points.shape)
+        control_points_reshaped = cp_flat[:size].reshape(control_points.shape)
 
         # Recreate the B-spline surface with the new control points
         bsp1_new = sp.Surface(basis_u, basis_v, control_points_reshaped)
@@ -120,34 +122,38 @@ if num_pos > num_neg:
         _, H, _ = curvatures_par(bsp1_new, u_vals, v_vals)
         
         # Ensure H is positive
-        return (H.flatten() - 0.08) # Subtract a small value to ensure positivity
+        return (H.flatten() - cp_flat[size:]**2 - 0.05) # Subtract a small value to ensure positivity
 
     # Define the constraint in the form expected by scipy.optimize.minimize
-    constraints = {'type': 'ineq', 'fun': constraint_function}
+    constraints = {'type': 'ineq', 
+                   'fun': constraint_function
+                   }
     # Run the optimization
 
-    result = minimize(objective_function, cp_flat, args=(original_cp_flat, 1e-7), constraints=constraints) 
+    result = minimize(objective_function, x0, args=( original_cp_flat, 1e-7), constraints=constraints) 
 
     # Check if the optimization was successful
     if result.success:
-        optimized_control_points = result.x.reshape(control_points.shape)
+        optimized_control_points = result.x[:len(original_cp_flat)].reshape(control_points.shape)
+        print(result)
         print("Optimization successful.")
         print("Optimized control points:", optimized_control_points)
     else:
         print("Optimization failed:", result.message)
 
 else:
-
     def objective_function(cp_flat, original_cp_flat, weight):
+        size = len(original_cp_flat)
          # Objective function to minimize
         # For example, weighted distance from the original control points
-        return weight * np.sum((cp_flat - original_cp_flat) ** 2)
+        return weight * np.sum((cp_flat[:size] - original_cp_flat) ** 2)
 
     
     def constraint_function(cp_flat):
+        size = len(original_cp_flat)
 
         # Reconstruct the control points from the flattened array
-        control_points_reshaped = cp_flat.reshape(control_points.shape)
+        control_points_reshaped = cp_flat[:size].reshape(control_points.shape)
 
         # Recreate the B-spline surface with the new control points
         bsp1_new = sp.Surface(basis_u, basis_v, control_points_reshaped)
@@ -156,17 +162,20 @@ else:
         _, H, _ = curvatures_par(bsp1_new, u_vals, v_vals)
         
         # Ensure H is positive
-        return (-H.flatten() - 0.08) # Subtract a small value to ensure positivity
+        return (-H.flatten() - cp_flat[size:]**2 -0.05) # Subtract a small value to ensure positivity
 
     # Define the constraint in the form expected by scipy.optimize.minimize
-    constraints = {'type': 'ineq', 'fun': constraint_function}
+    constraints = {'type': 'ineq', 
+                   'fun': constraint_function
+                   }
     # Run the optimization
 
-    result = minimize(objective_function, cp_flat, args=(original_cp_flat, 1e-7), constraints=constraints) 
+    result = minimize(objective_function, x0, args=( original_cp_flat, 1e-7), constraints=constraints) 
 
     # Check if the optimization was successful
     if result.success:
-        optimized_control_points = result.x.reshape(control_points.shape)
+        optimized_control_points = result.x[:len(original_cp_flat)].reshape(control_points.shape)
+        print(result)
         print("Optimization successful.")
         print("Optimized control points:", optimized_control_points)
     else:
@@ -174,7 +183,7 @@ else:
 
 
 
-optimized_control_points = result.x.reshape(control_points.shape)
+#optimized_control_points = result.x.reshape(control_points.shape)
 # Create the B-spline surface
 bsp1 = sp.Surface(basis_u, basis_v, optimized_control_points)
 
