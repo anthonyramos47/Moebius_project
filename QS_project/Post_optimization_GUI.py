@@ -769,7 +769,7 @@ def optimization():
 ps.init()
 
 mesh = ps.register_surface_mesh("mesh", f_pts, ffF)
-mesh.add_vector_quantity("lc", l_f, enabled=True)
+#mesh.add_vector_quantity("lc", l_f, enabled=True)
 #ps.register_surface_mesh("S_uv", ref_V, ref_F)
 #ps.register_surface_mesh("Remeshed", ffV, ffF)
 #ps.register_surface_mesh("Dual mesh", vc, dual_top)
@@ -779,7 +779,7 @@ mesh.add_vector_quantity("lc", l_f, enabled=True)
 
 
 #ps.register_point_cloud("Boundary", f_pts[bd_v], enabled=True, color=(0.1, 0.1, 0.1))
-ps.register_surface_mesh("C_uv", ref_C, ref_F, enabled=False)
+#ps.register_surface_mesh("C_uv", ref_C, ref_F, enabled=False)
 #ps.register_surface_mesh("Mid_mesh", VR, ffF)
 
 
