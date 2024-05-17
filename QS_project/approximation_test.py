@@ -37,7 +37,7 @@ print(dir_path)
 
 
 # Open and read the JSON file
-with open('/Users/cisneras/hanan/hananLab/QS_project/Surfjson.json', 'r') as file:
+with open('/Users/cisneras/hanan/hananLab/QS_project/data/Bsplines_Surfaces/Surfjson.json', 'r') as file:
     data = json.load(file)
 
 # degree_u = data["degreeU"] + 1
@@ -77,7 +77,7 @@ basis_v = sp.BSplineBasis(degree_v, knots_v) # 4 quadratic functions in the v-di
 
 control_points = np.array(control_points)
 
-control_points2 = 2*np.array(control_points) + np.random.rand(3)*10
+control_points2 = 2*np.array(control_points) 
 
 surface2 = sp.Surface(basis_u, basis_v, control_points2)
 

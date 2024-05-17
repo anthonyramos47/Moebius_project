@@ -73,34 +73,23 @@ parser.add_argument('deltaumax', type=float, help='delta value')
 parser.add_argument('deltavmin', type=float, help='delta value')
 parser.add_argument('deltavmax', type=float, help='delta value')
 
-# Name surface file
-
-# Rhino Test  1
-#bspline_surf_name, dir = "Complex_test_S", -1
-
-# Rhino Test 2
-#bspline_surf_name, dir = "Complex_test_S2", 1
-#bspline_surf_name, dir = "Sph_inv1", 1
-#bspline_surf_name, dir = "Sph_inv_2", 1
-
-# Rhino Bad test 
-#bspline_surf_name, dir = "Surfjson", -1
-
-# Florian Non change mean Curvature
-#bspline_surf_name, dir = "Florian", 1
-
-# Dat name
-#bspline_surf_name, dir = "inv_1", 1
-#bspline_surf_name, dir = "data_hyp", 1 # delta = 0.3
-#bspline_surf_name, dir = "Sample_C", 1
-#bspline_surf_name, dir = "Neg_Surf", 1
-#bspline_surf_name, dir = "Tunel", -1
-
 bspline_surf_name = parser.parse_args().file_name
 dir =  1
 
+
+# Load picke information
+def load_data():
+    """ Function to load the data from a pickle file
+    """
+    with open(os.path.join(experiment_dir, bspline_surf_name+'_init.pickle'), 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+data = load_data()
+
+
 # Sample size
-sample = (30, 30)
+sample = (20, 20)
 choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
@@ -299,6 +288,7 @@ def optimization():
                 counter += 1
                 # Optimize
                 
+
                 # Get gradients
                 opt.get_gradients() # Compute J and residuals
                 opt.optimize() # Solve linear system and update variables
@@ -459,7 +449,9 @@ def optimization():
         ps.warning("Results saved in: " + save_file_path)
 
 
-bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
+#bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
+        
+bsp1 = data["surf"]
 
 # Get Grid Information
 u_pts, v_pts = sample_grid(sample[0], sample[1], deltaum=parser.parse_args().deltaumin, deltauM=parser.parse_args().deltaumax, deltavm = parser.parse_args().deltavmin, deltavM = parser.parse_args().deltavmax)
