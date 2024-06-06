@@ -58,11 +58,10 @@ print(dir_path)
 # Define Bsplines Surface directory
 surface_dir = os.path.join(dir_path, "data", "Bsplines_Surfaces")
 print("surface dir:", surface_dir)
-
 experiment_dir = os.path.join(dir_path, "experiments")
+reports_dir = os.path.join(dir_path, "data", "Reports")
 
 # Optimization options ======================================
-
 
 # Create the parser
 parser = argparse.ArgumentParser(description="Optimization")
@@ -84,7 +83,8 @@ dir =  1
 
 
 # Sample size
-sample = (20, 20)
+sample = (20, 20
+          )
 choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
 angle = 25 # Angle threshold with surface
@@ -106,17 +106,23 @@ counter = 0
 init_opt_1 = False
 init_opt_2 = False
 name_saved = "Results"
+name_report = ""
 iter_per_opt = 20
+per_cop_it = 25
 step_1 = 0.5
 step_2 = 0.5
 time_1 = []
 time_2 = []
+report_data = {}
+lc_rep = False
+tor_rep = False
+final_rep = False
 
 
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v, time_1, time_2
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v, time_1, time_2, name_report, report_data, lc_rep, tor_rep, final_rep, per_cop_it
 
     # Title
     psim.TextUnformatted("Sphere and Lince Congruence Optimization")
@@ -128,19 +134,19 @@ def optimization():
 
 
     psim.PushItemWidth(150)
-    changed, iter_per_opt = psim.InputInt("Num of Iterations per Run: ", iter_per_opt)
+    _, iter_per_opt = psim.InputInt("Num of Iterations per Run: ", iter_per_opt)
 
-    changed, angle  = psim.InputFloat("Angle: ", angle)
-    changed, tangle = psim.InputFloat("Torsal Angle: ", tangle)
+    _, angle  = psim.InputFloat("Angle: ", angle)
+    _, tangle = psim.InputFloat("Torsal Angle: ", tangle)
     psim.Separator()
 
        
     # Inputs Opt 1
     if psim.CollapsingHeader("Optimization 1:"):
 
-        changed, weights["LC"][0] = psim.InputFloat("Line Congruence", weights["LC"][0])
-        changed, weights["LC_Orth"][0] = psim.InputFloat("LC Surf Orth", weights["LC_Orth"][0])
-        changed, step_1 = psim.InputFloat("Optimization step size", step_1)
+        _, weights["LC"][0] = psim.InputFloat("Line Congruence", weights["LC"][0])
+        _, weights["LC_Orth"][0] = psim.InputFloat("LC Surf Orth", weights["LC_Orth"][0])
+        _, step_1 = psim.InputFloat("Optimization step size", step_1)
 
         # State handler
         if counter%iter_per_opt == 0:
@@ -175,11 +181,11 @@ def optimization():
 
             # Line congruence l.cu, l.cv = 0
             LC = BS_LC()
-            opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0])
+            opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0], ce=1)
 
             # Line cong orthgonality with surface s(u,v)
             LC_orth = BS_LC_Orth()
-            opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][0])
+            opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][0], ce=1)
 
             # Define unit variables
             opt.unitize_variable("l", 3, 10)
@@ -196,12 +202,12 @@ def optimization():
 
     if psim.CollapsingHeader("Optimization 2:"):
 
-        changed, weights["LC"][1] = psim.InputFloat("Line Congruence W", weights["LC"][1])
-        changed, weights["LC_Orth"][1] = psim.InputFloat("LC Surf Orth W", weights["LC_Orth"][1])
-        changed, weights["Torsal"] = psim.InputFloat("Torsal W", weights["Torsal"])
-        changed, weights["Torsal_Angle"] = psim.InputFloat("Torsal Angle W", weights["Torsal_Angle"])
-        changed, weights["Fairness"] = psim.InputFloat("Fairness W", weights["Fairness"])
-        changed, step_2 = psim.InputFloat("Optimization step size", step_2)
+        _, weights["LC"][1] = psim.InputFloat("Line Congruence W", weights["LC"][1])
+        _, weights["LC_Orth"][1] = psim.InputFloat("LC Surf Orth W", weights["LC_Orth"][1])
+        _, weights["Torsal"] = psim.InputFloat("Torsal W", weights["Torsal"])
+        _, weights["Torsal_Angle"] = psim.InputFloat("Torsal Angle W", weights["Torsal_Angle"])
+        _, weights["Fairness"] = psim.InputFloat("Fairness W", weights["Fairness"])
+        _, step_2 = psim.InputFloat("Optimization step size", step_2)
         
         if psim.Button("Init Second opt"):
 
@@ -245,19 +251,19 @@ def optimization():
 
             # Line congruence l.cu, l.cv = 0
             LC = BS_LC()
-            opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0])
+            opt.add_constraint(LC, args=(bsp1, r_uv, u_pts, v_pts), w=weights["LC"][0], ce=1)
 
             # Line cong orthgonality with surface s(u,v)
             LC_orth = BS_LC_Orth()
-            opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][1])
+            opt.add_constraint(LC_orth, args=(bsp1, r_uv, u_pts, v_pts, angle), w=weights["LC_Orth"][1], ce=1)
 
             # Torsal constraint 
             LC_torsal = BS_Torsal()
-            opt.add_constraint(LC_torsal, args=(bsp1, u_pts, v_pts, n, sample), w=weights["Torsal"])
+            opt.add_constraint(LC_torsal, args=(bsp1, u_pts, v_pts, n, sample), w=weights["Torsal"], ce=1)
 
             # Torsal angle constraint
             LC_torsal_ang = BS_Torsal_Angle()
-            opt.add_constraint(LC_torsal_ang, args=(tangle, 0), w=weights["Torsal_Angle"])
+            opt.add_constraint(LC_torsal_ang, args=(tangle, 0), w=weights["Torsal_Angle"], ce=1)
 
             # Fairness
             Fair_L = Lap_Fairness()
@@ -279,7 +285,7 @@ def optimization():
 
 
     if state:
-            if init_opt_1:
+            if init_opt_1 and not opt.stop:
 
                 counter += 1
                 # Optimize
@@ -287,7 +293,7 @@ def optimization():
                 i_t  = time.time()
                 # Get gradients
                 opt.get_gradients() # Compute J and residuals
-                opt.optimize() # Solve linear system and update variables
+                opt.optimize_step() # Solve linear system and update variables
                 f_t  = time.time()
 
                 time_1.append(f_t - i_t)
@@ -302,25 +308,32 @@ def optimization():
 
                 visualize_LC(surf, r_uv, l, n, u_pts, v_pts, V, F,  cp)
                 #visualize_LC(surf, bsp1, r_uv, l, np.linspace(0, 1, 200), np.linspace(0, 1, 200), cp)
-            else:
+                opt.stop_criteria()
+            elif not init_opt_1:
                 ps.warning("First Optimization not initialized")
+                state = 0
+            else:
+                ps.warning("Optimization 1 finished")
                 state = 0
     
     
     if psim.Button("Optimize 2"):
+        
         if init_opt_2:
-            for it in range(iter_per_opt):
+            print("stop", opt.stop)
+            it = 0
+            while it < iter_per_opt and not opt.stop:
                 # Optimize
                 i_t = time.time()
                 opt.get_gradients() # Compute J and residuals
-                opt.optimize() # Solve linear system and update variables
+                opt.optimize_step() # Solve linear system and update variables
                 f_t = time.time()
-                if it%25 == 0 and weights["Torsal_Angle"]!= 0:
+                if it%per_cop_it == 0 and weights["Torsal_Angle"]!= 0:
                     opt.constraints[2].recompute(opt.X, opt.var_idx)
 
                 time_2.append(f_t - i_t)
-
-
+                it += 1
+                opt.stop_criteria()
             # Flip line congruence if needed
             l = opt.uncurry_X("l")
             l = l.reshape(len(u_pts), len(v_pts), 3)
@@ -360,15 +373,8 @@ def optimization():
         # ANGLES WITH NORMAL SCALAR FIELD
         surf.add_scalar_quantity("Angles", ang_normal.flatten(), defined_on="vertices", enabled=True)
 
-    if psim.Button("Report"):
-        opt.get_energy_per_constraint()
-    
+
     psim.Separator()
-
-    psim.TextUnformatted("Save Results")
-
-    changed, name_saved = psim.InputText("Save File Name", name_saved)  
-
 
     if psim.Button("Time"):  
 
@@ -378,9 +384,15 @@ def optimization():
         time_1 = []
         time_2 = []
 
+    psim.Separator()
+
+    psim.TextUnformatted("Save Results")
+
+    _, name_saved = psim.InputText("Save File Name", name_saved)  
+
     if psim.Button("Save"):
 
-         # Get RESULTS
+        # Get RESULTS
         l, cp, tu1, tu2, tv1, tv2, nt1, nt2 = opt.uncurry_X("l", "rij", "u1", "u2", "v1", "v2", "nt1", "nt2")
 
         # Reshape Torsal normals
@@ -456,8 +468,116 @@ def optimization():
         with open(save_file_path, 'wb') as file:
             pickle.dump(save_data, file)
 
+        # Save report 
         ps.warning("Results saved in: " + save_file_path)
 
+    
+
+    if psim.Button("Get Report LC"):
+        # Show result per console
+        opt.get_norm_energy_per_constraint()
+
+        # Open file to write
+        file_path = os.path.join(reports_dir, name_saved + "_LC.json")
+
+        # Data to save
+        
+        report_data["Opt1 LC weights"] = weights["LC"][0]
+        report_data["Opt1 LC Orth weights"] = weights["LC_Orth"][0]
+        report_data["Opt1 it"] = opt.it
+        report_data["Opt1 Energy"] = sum(e_i for e_i in opt.norm_energy_dic.values()) 
+        report_data["Opt1 Time"] = np.array(time_1).mean()
+
+        lc_rep = True
+
+    
+    psim.SameLine() 
+
+    if psim.Button("Get Report Torsal"):
+        # Show result per console
+        opt.get_norm_energy_per_constraint()
+
+        # Data to save
+        report_data["Recomp steps"] = per_cop_it
+        report_data["Opt2 LC weights"] = weights["LC"][1]
+        report_data["Opt2 LC Orth weights"] = weights["LC_Orth"][1]
+        report_data["Opt2 Torsal weights"] = weights["Torsal"]
+        report_data["Opt2 Torsal Angle weights"] = weights["Torsal_Angle"]
+        report_data["Opt2 it"] = opt.it
+        report_data["Opt2 Energy"] = sum(e_i for e_i in opt.norm_energy_dic.values()) 
+        report_data["Opt2 Time"] = np.array(time_2).mean()
+
+        report_data["Angle"] = angle
+        report_data["Torsal Angle"] = tangle
+        report_data["Gird"] = sample
+    
+        tor_rep = True
+
+        # Get RESULTS
+        try:
+            nt1, nt2, th = opt.uncurry_X("nt1", "nt2", "theta")
+
+            nt1 = nt1.reshape(-1,3)
+            nt2 = nt2.reshape(-1,3)
+
+            cost1t2 = np.einsum("ij,ij->i", nt1, nt2)**2 
+
+            cos_a_2 = np.cos(tangle*np.pi/180)**2
+
+            idx = np.where(cost1t2 > np.cos(tangle*np.pi/180)**2)
+
+            t_energy = np.mean((cost1t2[idx] - cos_a_2 )**2 )
+
+            print("Torsal Angles: ", t_energy)
+        except:
+            pass
+    
+    psim.SameLine() 
+
+    if psim.Button("Get Report Torsal Final"):
+        # Show result per console
+        opt.get_norm_energy_per_constraint()
+
+        nt1, nt2 = opt.uncurry_X("nt1", "nt2")
+
+        nt1 = nt1.reshape(-1,3)
+        nt2 = nt2.reshape(-1,3)
+
+        cost1t2 = np.einsum("ij,ij->i", nt1, nt2)**2 
+
+        cos_a_2 = np.cos(tangle*np.pi/180)**2
+
+        idx = np.where(cost1t2 > np.cos(tangle*np.pi/180)**2)
+
+        if idx[0].shape[0] != 0:
+
+            t_energy = np.mean((cost1t2[idx] - cos_a_2 )**2 )
+        else:
+            t_energy = 0
+
+        print("Torsal Angles: ", t_energy)
+
+        # Data to save
+        report_data["Final LC weights"] = weights["LC"][1]
+        report_data["Final LC Orth weights"] = weights["LC_Orth"][1]
+        report_data["Final Torsal weights"] = weights["Torsal"]
+        report_data["Final Torsal Angle weights"] = weights["Torsal_Angle"]
+        report_data["Final it"] = opt.it
+        report_data["Final Energy"] = sum(e_i for e_i in opt.norm_energy_dic.values()) + t_energy
+        report_data["Final Time"] = np.array(time_2).mean()
+
+        final_rep = True
+
+
+    if psim.Button("Save Report"):
+        
+        # Open file to write
+        file_path = os.path.join(reports_dir, name_saved + "_Report.json")
+
+        # Save the variable to a json
+        with open(file_path, 'w') as file:
+            json.dump(report_data, file)
+        
 
 if parser.parse_args().type == 1:
 

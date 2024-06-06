@@ -41,10 +41,12 @@ class Optimizer():
         self.energy = [] # Energy vector
         self.e_diff = 1 # Energy difference
         self.energy_dic = {} # Energy dictionary
+        self.norm_energy_dic = {} # Energy normalized dictionary
         self.var_idx = {} # Variable indices
         self.var = 0 # Number of variables
         self.constraints = [] # List of constraints objects
         self.verbose = False # Verbose
+        self.stop = False # Stop criteria
 
     def clear_energy(self):
         """
@@ -111,6 +113,16 @@ class Optimizer():
         print(f"Final Energy: {self.energy[-1]}\n")
         print(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}\n\n")
 
+    def get_norm_energy_per_constraint(self):
+        print(f"Normalized ENERGY REPORT\n")
+        print("===========================================\n")
+        for name, energy in self.norm_energy_dic.items():
+            print(f"{name}: {energy}")
+        print("===========================================\n")
+        print("=============Final Energy ==================\n")
+        print(f"Final Iteration: {self.it} Energy: {sum(e_i for e_i in self.norm_energy_dic.values())}\n")
+        
+
     def add_variable(self, var_name, dim) -> None:
         """
             Method to add a variable to the optimizer
@@ -140,7 +152,7 @@ class Optimizer():
         self.X[self.var_idx[name]] = vals
         self.X0[self.var_idx[name]] = vals
 
-    def add_constraint(self, constraint, args, w=1) -> None:
+    def add_constraint(self, constraint, args, w=1, ce=0) -> None:
         """
             Method to add a constraint to the optimizer
             Input:
@@ -149,6 +161,7 @@ class Optimizer():
                 args: arguments of the constraint
         """
 
+        constraint.sum_energy = ce
         # Add constraint to the optimizer
         constraint._initialize_constraint(self.X, self.var_idx, *args)
         constraint.set_weigth(w)
@@ -254,8 +267,9 @@ class Optimizer():
                 #print(f"Time to stack and Hess {constraint.name}: {final_time - initial_time}\n\n")
 
                 # Add energy to the energy dictionary
-                if constraint.name is not None:
+                if constraint.name is not None and constraint.sum_energy:
                         self.energy_dic[constraint.name] = constraint.w * np.sum(constraint._r**2)
+                        self.norm_energy_dic[constraint.name] = constraint.w * np.mean(constraint._r**2)
         #print(f"\nTotal time to compute constraints: {total}")
         
         if len(stacked_H) == 1:
@@ -269,19 +283,28 @@ class Optimizer():
 
             #print(f"Time to sum Hessians: {final_time - initial_time}")
 
-
- 
-    def optimize(self):
-        
-        if self.prevdx is None or (self.prevdx > 1e-8) :
-            if self.method == 'LM': # Levenberg-Marquardt
-                self.LM()
-            elif self.method == 'PG': # Projected Gauss-Newton
-                self.PG()
-            else:
-                print("Error: Solver not implemented or not specified")
+    def optimize_step(self):
+        if self.method == 'LM': # Levenberg-Marquardt
+            self.LM()
+        elif self.method == 'PG': # Projected Gauss-Newton
+            self.PG()
         else:
-            pass
+            print("Error: Solver not implemented or not specified")
+    
+    def optimize(self, it=1):
+        while self.it < it and not self.stop:
+            self.get_gradients()
+            self.optimize_step()
+
+            self.stop_criteria()
+
+    def stop_criteria(self):
+        if (self.prevdx > 1e-8 or self.prevdx is None) and self.it < 5000:
+            self.stop = False
+        else:
+            self.stop = True
+        
+
 
     def LM(self):
         # Levenberg-Marquardt method for non-linear least squares
@@ -330,17 +353,16 @@ class Optimizer():
         
         #b = -J.T@self.r
         
- 
-
         # Store previous dx norm
         self.prevdx = np.linalg.norm(self.step*dx)
 
-        energy = sum(e_i for e_i in self.energy_dic.values())   
+        energy = sum(e_i for e_i in self.energy_dic.values())
+
+        energy_norm = sum(e_i for e_i in self.norm_energy_dic.values())   
 
         if len(self.energy) > 1:
             self.e_diff = abs(energy - self.energy[-1])
             
-
         # Append energy
         self.energy.append(energy)
 
@@ -361,7 +383,7 @@ class Optimizer():
         
         if self.verbose:
             # Print energy
-            print(f" E {self.it}: {energy}\t dx: {self.prevdx}")
+            print(f" E {self.it}: {energy}\t {energy_norm}\t dx: {self.prevdx}")
 
 
     def get_variables(self):

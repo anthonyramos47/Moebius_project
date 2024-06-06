@@ -79,6 +79,9 @@ exp_dir = os.path.join(working_path, 'experiments')
 # Remeshing data folder
 remeshing_dir = os.path.join(working_path, 'data', 'Remeshing', name)
 
+# Reports folder
+reports_dir = os.path.join(working_path, "data", "Reports")
+
 
 # Load picke information
 def load_data():
@@ -129,207 +132,10 @@ ref_C = data['ref_C']
 VR = data['VR']
 l_f = data['l_dir']
 
-
 A, B, C = get_Implicit_sphere(cc, rads)
-
 dual_edges = np.array(list(extract_edges(dual_top)))
-
 mesh_edges = e_v_v
-
 tuples_edges = np.vstack((mesh_edges[0], mesh_edges[1])).T
-
-# clean up edges have only innver vertices
-# # Sample size of the B-spline
-# sample = (len(u_pts), len(v_pts))   
-
-# # Evaluate the B-spline at the u and v points
-# V, F = Bspline_to_mesh(BSurf, u_pts, v_pts)
-
-# # Get the vertices and faces of the mesh
-# ref_u = np.linspace(0,   1, 300)
-# ref_v = np.linspace(0,   1, 300)
-
-# # Get the vertices and faces of the mesh
-# ref_V, ref_F = Bspline_to_mesh(BSurf, ref_u, ref_v)
-
-# ref_F = np.array(triangulate_quads(ref_F))
-
-
-# # Compute footpoints (u,v) coordinates of remeshed mesh onto the B-spline
-# foot_pts = foot_points(ffV, V, u_pts, v_pts, BSurf)
-# foot_pts = foot_pts.reshape(-1, 2)
-
-# # Evaluate the B-spline functions at the foot points bsurf(u, v), r(u, v) and n(u, v)
-# f_pts = np.zeros((len(foot_pts), 3))
-# r_pts = np.zeros((len(foot_pts)))
-# n_dir = np.zeros((len(foot_pts), 3))
-# for i in range(len(foot_pts)):
-#     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
-#     f_pts[i] =   BSurf(foot_pts[i, 0], foot_pts[i, 1])
-#     r_pts[i] = bisplev(foot_pts[i, 0], foot_pts[i, 1], rsurf)
-
-# # Compute the vertices of the mid mesh
-# VR = f_pts + r_pts[:,None]*n_dir
-# VR = VR.reshape(-1, 3)
-
-# # Get vertices of C(u, v) 
-# # Evaluate r(u,v) in ref_u ref_v
-# ref_r_uv = bisplev(ref_u, ref_v, rsurf)
-# # Compute the normals of the reference mesh
-# ref_n = BSurf.normal(ref_u, ref_v)
-# ref_rn = ref_r_uv[:, :, None]*ref_n
-
-# ref_v = BSurf(ref_u, ref_v)
-# ref_C = ref_v + ref_rn
-# ref_C = ref_C.reshape(-1, 3)
-
-
-
-# # Create mesh for Mid mesh (sphere centers)
-# mesh = Mesh()
-# mesh.make_mesh(VR, ffF)
-
-# # Get the face-face adjacency list 
-# f_f_adj = mesh.face_face_adjacency_list()
-# dual_top = mesh.dual_top()
-
-# # Faces of each edge
-# e_f_f = mesh.edge_faces()
-
-# # Vertices of each edge
-# e_v_v = mesh.edge_vertices()
-
-# # Get inner faces indices
-# inn_f = mesh.inner_faces()
-
-# # Get inner vertices
-# inn_v = mesh.inner_vertices()
-
-# bd_v = mesh.boundary_vertices()
-
-# #print(inn_v)
-
-# # Get adjacent vertices
-# adj_v = mesh.vertex_adjacency_list()
-
-# # Get adjacent faces
-# ffF = mesh.faces()
-
-# # Compute the nodes of the mid mesh
-# c0, c1, c2, c3 = VR[ffF[:, 0]], VR[ffF[:, 1]], VR[ffF[:, 2]], VR[ffF[:, 3]]
-
-# # Compute the baricenter of the mid mesh
-# cc = (c0 + c1 + c2 + c3)/4
-
-# # Compute the barycenter at the remeshed mesh
-# vc = np.sum(f_pts[ffF], axis=1)/4
-
-# # Compute radius of spheres
-# #rads = np.linalg.norm(vc - cc, axis=1)
-# rads =  np.sum(r_pts[ffF ], axis=1)/4
-
-# # # Normals of dual faces
-# nd = np.zeros((len(dual_top), 3))
-
-# for i, f_i in enumerate(dual_top):
-#     if len(f_i) >= 4:
-#         nd[i] = np.cross(cc[f_i[2]] - cc[f_i[0]], cc[f_i[1]] - cc[f_i[3]])
-#         nd[i] /= np.linalg.norm(nd[i])
-#     elif len(f_i) == 3:
-#         nd[i] = np.cross(cc[f_i[1]] - cc[f_i[0]], cc[f_i[2]] - cc[f_i[1]])
-#         nd[i] /= np.linalg.norm(nd[i])
-
-
-
-# # Find zero nd
-# #print(nd[np.where(np.linalg.norm(nd, axis=1) == 0)[0]])
-
-
-# # idx_dual_top = np.unique(fla_dual_top)
-
-# # # Network to visualzie nd
-# # nodes = np.hstack((vc[idx_dual_top], vc[idx_dual_top] + nd))
-# # nodes = nodes.reshape(-1, 3)
-
-# # edges = []
-# # for i in range(len(vc)):
-# #     edges.append([i, i+len(vc)])
-        
-
-# # opt = Optimizer()
-
-# # # Add variables to the optimizer
-# # opt.add_variable("c" , len(vc)*3   ) # Centers of spheres
-# # opt.add_variable("nd", len(nd)*3   ) # Normals of dual faces
-# # opt.add_variable("v" , len(f_pts)*3) # Vertices of mid mesh
-# # opt.add_variable("r" , len(rads)   ) # Radii of spheres
-
-# # # Initialize Optimizer ("Method", step, verbosity)
-# # opt.initialize_optimizer("LM", 0.6, 1)
-
-# # # Initialize variables
-# # opt.init_variable("c"  , cc.flatten()) 
-# # opt.init_variable("nd" , nd.flatten())
-# # opt.init_variable("v"  , f_pts.flatten())
-# # opt.init_variable("r"  , rads)
-
-
-
-# # # Constraints ==========================================
-# # # Line congruence l.cu, l.cv = 0
-# # Supp_E = Supp()
-# # opt.add_constraint(Supp_E, args=(dual_top, 2), w=1)
-
-# # # Sphericity
-# # Sph_E = Sphericity()
-# # opt.add_constraint(Sph_E, args=(ffF, 2), w=1)
-
-# # # Fairness
-# # Fair_M = QM_Fairness()
-# # opt.add_constraint(Fair_M, args=(inn_v, adj_v, "v", 3), w=1)
-
-# # # Proximity
-# # Prox_M = Proximity()
-# # opt.add_constraint(Prox_M, args=(ref_V, ref_F, 0.001), w=0.5)
-
-# # # Fair_C = QM_Fairness()
-# # # opt.add_constraint(Fair_C, args=(in_v_c, ad_v_c, "c", 3), w=0.002)
-
-# # # Define unit variables
-# # opt.unitize_variable("nd", 3, 10)
-
-# # for _ in range(100):
-# #     # Get gradients
-# #     opt.get_gradients() # Compute J and residuals
-# #     opt.optimize() # Solve linear system and update variables
-
-
-# # opt.get_energy_per_constraint()
-
-
-# # if save:
-# #     # save mesh
-# #     write_obj(os.path.join(remeshing_dir, name+'_mesh_opt.obj'), vk, ffF)
-
-# #     # Save spheres ======================================================================
-# #     # Open file
-# #     sph_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
-
-# #     # Write inn_f in the first line
-# #     for i in inn_f:
-# #         sph_file.write(f"{i} ")
-# #     sph_file.write("\n")
-
-# #     for i in range(len(ffF)):
-
-# #         sph_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
-
-# #         for j in f_f_adj[i]:
-# #             sph_file.write(f"{j} ")
-
-# #         sph_file.write("\n")
-
-# #     sph_file.close()
 
 w_proximity = 0.2
 w_proximity_c = 0.1
@@ -349,7 +155,7 @@ step = 0.5
 name_saved = "Post_optimization"
 def optimization():
 
-    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved, e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, step, l_f, counter2, time
+    global w_proximity, w_fairness, w_sphericity, w_supp, iter_per_opt, init_opt, state, counter, vc, nd, f_pts, rads, dual_top, ffF, ref_V, ref_F, ref_u, ref_v, cc, vc, opt, inn_v, bd_v, adj_v, name_saved, e_f_f, e_v_v, w_lap, state2, init_opt_2, A, B, C, w_proximity_c, idx_sph, w_tor, step, l_f, counter2, time, opt
 
     # Title
     psim.TextUnformatted("Post Optimization GUI")
@@ -384,37 +190,8 @@ def optimization():
 
         if psim.Button("Init First opt"):
 
-            # Set init to True
+            # Initialize Optimizer
             init_opt = True
-
-            opt = Optimizer()
-
-            # Add variables to the optimizer
-            opt.add_variable("A" , len(vc)  ) # Centers of spheres
-            opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
-            opt.add_variable("C" , len(vc)  ) # Centers of spheres
-
-            # Initialize Optimizer ("Method", step, verbosity)
-            opt.initialize_optimizer("LM", step, 1)
-
-            # Initialize variables
-            opt.init_variable("A"  , A) 
-            opt.init_variable("B"  , B.flatten())
-            opt.init_variable("C"  , C)
-
-            # # Line congruence l.cu, l.cv = 0
-            Supp_E = Supp_F()
-            opt.add_constraint(Supp_E, args=(dual_top, l_f), w=0.001)
-
-            # Sphericity
-            Sph_E = Sphere_Fix()
-            opt.add_constraint(Sph_E, args=(ffF, f_pts), w=10)
-
-            Sph_U = Sph_Unit()
-            opt.add_constraint(Sph_U, args=(), w=10)
-
-            Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=0.1)
 
             for _ in range(30):
                 # Get gradients
@@ -460,11 +237,11 @@ def optimization():
             # Constraints ==========================================
             # # Line congruence l.cu, l.cv = 0
             Supp_E = Supp()
-            opt.add_constraint(Supp_E, args=(dual_top, inn_v), w=w_supp)
+            opt.add_constraint(Supp_E, args=(dual_top, inn_v), w=w_supp, ce=1)
 
             # Sphericity
             Sph_E = Sphere()
-            opt.add_constraint(Sph_E, args=(ffF, 2), w=w_sphericity)
+            opt.add_constraint(Sph_E, args=(ffF, 2), w=w_sphericity, ce=1)
 
             Sph_U = Sph_Unit()
             opt.add_constraint(Sph_U, args=(), w=10)
@@ -475,18 +252,14 @@ def optimization():
 
             # Torosal Planarity
             Tor_P = Tor_Planarity()
-            opt.add_constraint(Tor_P, args=(mesh_edges, inn_v), w=w_tor)
+            opt.add_constraint(Tor_P, args=(mesh_edges, inn_v), w=w_tor, ce=1)
 
             # # Proximity
             Prox_M = Proximity()
-            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.0001), w=w_proximity)
+            opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.0001), w=w_proximity, ce =1)
 
             Prox_C = Proximity_C()
-            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=w_proximity_c)
-            
-            # # Reg 
-            #reg = Reg_E()
-            #opt.add_constraint(reg, args=(e_f_f, e_v_v), w=w_reg)
+            opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=w_proximity_c, ce =1)
 
             # # Define unit variables
             opt.unitize_variable("nd", 3, 10)
@@ -503,14 +276,15 @@ def optimization():
             ps.warning("First Optimization not initialized")
             state = 0
 
-    if state:    
+    if state and not opt.stop:    
         counter += 1
         i_t = time.time()
         opt.get_gradients() # Compute J and residuals
-        opt.optimize() # Solve linear system and update variables
-
+        opt.optimize_step() # Solve linear system and update variables
         f_t = time.time()
         times.append(f_t - i_t)
+
+        opt.stop_criteria()
         
         # Get Variables
         vk, oA, oB, oC, nd = opt.uncurry_X("v", "A", "B", "C", "nd")
@@ -558,20 +332,45 @@ def optimization():
         centers = ps.register_point_cloud("cc", sph_c[465:468])
 
         centers.add_vector_quantity("Dir", 1.2*(vc[465:468] - sph_c[465:468]), enabled=True, vectortype="ambient")
+    
+    elif opt.stop:
+        ps.warning("Optimization 1 has stopped")
+        state = 0
+
 
 
     if psim.Button("Time"):
-
         print("Time: ", np.mean(times))
-
-
     psim.Separator()
 
-
-
-
     if psim.Button("Report"):
-        opt.get_energy_per_constraint()
+        #opt.get_energy_per_constraint()
+        opt.get_norm_energy_per_constraint()
+
+    psim.SameLine()    
+    
+    if psim.Button("Save Report"):
+
+        report_data = {
+            "Vertices": len(ffV),
+            "Faces": len(ffF),
+            "W_proximity": w_proximity,
+            "W_proximity_c": w_proximity_c,
+            "W_fairness": w_fairness,
+            "W_sphere": w_sphericity,
+            "W_supp": w_supp,
+            "W_tor": w_tor,
+            "Iterations": opt.it,
+            "Time": np.mean(times),
+            "Energy": sum(e_i for e_i in opt.norm_energy_dic.values())
+        }
+        
+        # Open file to write
+        file_path = os.path.join(reports_dir, name + "_Final_Report.json")
+
+        # Save the variable to a json
+        with open(file_path, 'w') as file:
+            json.dump(report_data, file)
 
     psim.Separator()
 
@@ -601,8 +400,7 @@ def optimization():
         n_l = n_l.reshape(-1,3)
         vk  = vk.reshape(-1,3)
 
-        
-        
+
         # # Get vertices per edge
         vi, vj = vk[mesh_edges[0]], vk[mesh_edges[1]]
 
@@ -617,8 +415,6 @@ def optimization():
 
         # Compute orthogonal vector
         b2 = np.cross(n_l, b1)
-
-       
 
         supp_obj = open(os.path.join(remeshing_dir, name+'_supp_opt.obj'), 'w')
 
@@ -645,15 +441,11 @@ def optimization():
 
         supp_obj.close()
         
-
-       
-
-
         # mesh = ps.register_surface_mesh("Opt_Vertices", vk, ffF)
         # mesh.add_scalar_quantity("Radii", rf, defined_on='faces', enabled=True)
         # ps.register_surface_mesh("Opt_C", sph_c, dual_top)
-
     psim.Separator()
+
     psim.TextUnformatted("Save Results")
     if psim.Button("Save"):
 
@@ -743,9 +535,6 @@ def optimization():
                 mid = (vi + vj)/2
                 string_data_sph_panel += f"{vi[0]} {vi[1]} {vi[2]} {mid[0]} {mid[1]} {mid[2]} {n[0]} {n[1]} {n[2]} "
         
-
-                
-
             sph_cut_file.write(string_data_sph_panel + "\n")
             
 
@@ -765,7 +554,7 @@ def optimization():
         Node_path = os.path.join(remeshing_dir, name+'_opt_NodesAxis.obj')
 
         # Compute line congruence
-        v_lc = np.vstack((vk, vk + nd))
+        v_lc = np.vstack((vk - 0.3*nd, vk + 0.3*nd))
 
         f_lc = np.array([[i, i+len(vk)] for i in range(len(vk))])
         # Write info
@@ -777,6 +566,34 @@ def optimization():
 
 
 #print("Mesh", ffV[:10])
+opt = Optimizer()
+
+# Add variables to the optimizer
+opt.add_variable("A" , len(vc)  ) # Centers of spheres
+opt.add_variable("B" , len(vc)*3  ) # Centers of spheres
+opt.add_variable("C" , len(vc)  ) # Centers of spheres
+
+# Initialize Optimizer ("Method", step, verbosity)
+opt.initialize_optimizer("LM", step, 1)
+
+# Initialize variables
+opt.init_variable("A"  , A) 
+opt.init_variable("B"  , B.flatten())
+opt.init_variable("C"  , C)
+
+# # Line congruence l.cu, l.cv = 0
+Supp_E = Supp_F()
+opt.add_constraint(Supp_E, args=(dual_top, l_f), w=0.001, ce=1)
+
+# Sphericity
+Sph_E = Sphere_Fix()
+opt.add_constraint(Sph_E, args=(ffF, f_pts), w=10, ce=1)
+
+Sph_U = Sph_Unit()
+opt.add_constraint(Sph_U, args=(), w=10, ce=1)
+
+Prox_C = Proximity_C()
+opt.add_constraint(Prox_C, args=(ref_C, ref_F, 0.0001), w=0.1)
          
 ps.init()
 

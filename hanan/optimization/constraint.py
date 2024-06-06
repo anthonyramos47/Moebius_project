@@ -20,6 +20,7 @@ class Constraint():
         self.const = 0 # Num Constraints
         self.var = None # Num Variables
         self.sparse = True # Sparse matrix
+        self.sum_energy = False # Define if we are going to sum the contribution of the energy 
         self.const_idx = {} # Dic to store the index of the constraints
 
     def initialize_constraint(self, X, var_indices, *args) -> None:

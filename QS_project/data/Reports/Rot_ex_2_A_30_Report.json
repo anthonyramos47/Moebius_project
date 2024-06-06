@@ -1,0 +1,13 @@
+{"Opt1 LC weights": 1.0, 
+"Opt1 LC Orth weights": 2.0, 
+"Opt1 it": 199, 
+"Opt1 Energy": 5.7867234015089395e-12, 
+"Opt1 Time": 0.10124428667614807, 
+"Recomp steps": 25, 
+"Opt2 LC weights": 1.0, 
+"Opt2 LC Orth weights": 0.009999999776482582, 
+"Opt2 Torsal weights": 1.0, 
+"Opt2 Torsal Angle weights": 2.0, 
+"Opt2 it": 200, 
+"Opt2 Energy": 2.0900866770898392e-05, 
+"Opt2 Time": 0.7451788008213043, "Angle": 30.0, "Torsal Angle": 45.0, "Gird": [20, 20]}

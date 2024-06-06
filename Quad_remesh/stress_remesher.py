@@ -160,7 +160,7 @@ if __name__ == '__main__':
     opt.optimize()
 
     if save:
-        opt.save_mesh('{}_deformed'.format(file_path), field_scale=1, save_all=True)
+        #opt.save_mesh('{}_deformed'.format(file_path), field_scale=1, save_all=True)
         geo.save_mesh_obj(V, F, '{}_start'.format(file_path), overwrite=True)
         geo.save_mesh_obj(QV, QF, '{}_Qstart'.format(file_path), overwrite=True)
 
@@ -183,8 +183,8 @@ if __name__ == '__main__':
     B1 = geo.faces_centroid(V, H)
     
 
-    plotter.plot_faces(V, H, color='b')
-    plotter.plot_edges(V, H, color='white', width=4)
-    plotter.plot_vectors(ov1, anchor=B1, position='center', scale_factor=scale)
-    plotter.plot_vectors(ov2, anchor=B1, position='center', scale_factor=scale)
-    plotter.show()
+    # plotter.plot_faces(V, H, color='b')
+    # plotter.plot_edges(V, H, color='white', width=4)
+    # plotter.plot_vectors(ov1, anchor=B1, position='center', scale_factor=scale)
+    # plotter.plot_vectors(ov2, anchor=B1, position='center', scale_factor=scale)
+    # plotter.show()
