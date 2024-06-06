@@ -83,7 +83,7 @@ dir =  1
 
 
 # Sample size
-sample = (20, 20
+sample = (25, 25
           )
 choice_data = 0 # 0: Json , 1: data_hyp.dat
 mid_init = 0  # 0: central_sphere, 1: offset_surface
