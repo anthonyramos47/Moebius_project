@@ -47,6 +47,8 @@ class Optimizer():
         self.constraints = [] # List of constraints objects
         self.verbose = False # Verbose
         self.stop = False # Stop criteria
+        self.fixed_values = False 
+        self.fixed_idx = []
 
     def clear_energy(self):
         """
@@ -208,18 +210,24 @@ class Optimizer():
         # Add constraint
         #self.get_gradients(unit)
 
-    def fix_vertices(self, fix_vertices) -> None:
+    def fix_variable(self, var, idx) -> None:
         """
             **-- Warning: Method not ready yet --**
             Method to fix vertices of the mesh. Not used in the current implementation
         """
+        self.fixed_values = True 
+        self.fixed_idx.append(self.var_idx[var][idx])
 
-        # The structure of our Jacobian is J = [ V | aux variables]
-        # If we want to fix a vertex, we need to set the corresponding column of the Jacobian to zero
-        # self.J[:, fix_vertices*3    ] = 0
-        # self.J[:, fix_vertices*3 + 1] = 0
-        # self.J[:, fix_vertices*3 + 2] = 0
-        pass
+
+    def fix_values_H(self):
+        """
+            Method to fix the values of the variables in the Hessian matrix
+        """
+        if self.fixed_values:
+            for idxs  in self.fixed_idx:
+                self.H[idxs, :] = 0
+                self.H[:, idxs] = 0
+                #self.H[idxs, idxs] = 1
 
 
     def initialize_optimizer(self, method= "LM", step = 0.8, print=0) -> None:
@@ -326,7 +334,7 @@ class Optimizer():
 
         # # Add the diagonal_matrix to H
         # self.H = self.H + diagonal_matrix
-
+        #self.fix_values_H()
 
         #mu = 1e-3 # Regularization parameter
         mu = self.H.max() * 1e-8

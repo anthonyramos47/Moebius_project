@@ -223,6 +223,8 @@ def optimization():
             #opt.add_variable("r" , len(rads)   ) # Radii of spheres
             #opt.add_variable("mu", len(dual_edges))
 
+            opt.fix_variable("v", bd_v)
+
             # Initialize Optimizer ("Method", step, verbosity)
             opt.initialize_optimizer("LM", step, 1)
 

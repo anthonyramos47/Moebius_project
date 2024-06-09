@@ -135,11 +135,11 @@ opt.init_variable("v"  , ffV.flatten())
 
 # # Fairness
 Fair_M = QM_Fairness()
-opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.001)
+opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=3, ce=1)
 
 # # Proximity
 Prox_M = Proximity()
-opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=5)
+opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=5, ce=1)
 
 opt.control_var("v", 1)
 
