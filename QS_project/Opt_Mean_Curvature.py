@@ -122,7 +122,7 @@ if num_pos > num_neg:
         _, H, _ = curvatures_par(bsp1_new, u_vals, v_vals)
         
         # Ensure H is positive
-        return (H.flatten() - cp_flat[size:]**2 - 0.05) # Subtract a small value to ensure positivity
+        return (H.flatten() - cp_flat[size:]**2 - 0.2) # Subtract a small value to ensure positivity
 
     # Define the constraint in the form expected by scipy.optimize.minimize
     constraints = {'type': 'ineq', 
@@ -162,7 +162,7 @@ else:
         _, H, _ = curvatures_par(bsp1_new, u_vals, v_vals)
         
         # Ensure H is positive
-        return (-H.flatten() - cp_flat[size:]**2 -0.05) # Subtract a small value to ensure positivity
+        return (-H.flatten() - cp_flat[size:]**2 - 0.2) # Subtract a small value to ensure positivity
 
     # Define the constraint in the form expected by scipy.optimize.minimize
     constraints = {'type': 'ineq', 

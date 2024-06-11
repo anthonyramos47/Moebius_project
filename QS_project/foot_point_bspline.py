@@ -141,7 +141,7 @@ opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=3, ce=1)
 Prox_M = Proximity()
 opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=5, ce=1)
 
-opt.control_var("v", 1)
+opt.control_var("v", 0.2)
 
 for i in range(50):
 
@@ -149,6 +149,9 @@ for i in range(50):
     opt.optimize() # Solve linear system and update variables
 
 opt.get_energy_per_constraint()
+
+
+orffV = ffV.reshape(-1, 3)
 
 ffV = opt.uncurry_X("v")
 
@@ -356,6 +359,7 @@ if parser.parse_args().vis == 1:
     start_m = ps.register_surface_mesh("S_uv", V, F, enabled=False)
     start_m.add_vector_quantity("l", opt_l, enabled=True)
     or_mesh = ps.register_surface_mesh("foot_pts", f_pts, ffF)
+    ps.register_surface_mesh("Or Remeshed", orffV, ffF)
     or_mesh.add_vector_quantity("l", l_dir, enabled=True)
     ps.register_surface_mesh("C_uv", VR, ffF, enabled=False)
     ps.register_surface_mesh("ref_mesh", ref_V, ref_F, enabled=False)
