@@ -8,12 +8,13 @@ Exp_dir="/Users/cisneras/hanan/hananLab/QS_project/experiments/"
 #Exp_name="Nice_result.pickle"
 #Exp_name=$1
 #!/bin/bash
+conda activate hananJ
 
-for  Exp_name in Last_ex_2 Last_ex_3_inv_1 Last_ex_3_inv Last_ex_4_inv_1 Last_ex_4_inv Last_ex_5_inv_1 Last_ex_5_inv Last_ex_5
+
+for Exp_name in Last_ex_2 Last_ex_3_inv_1 Last_ex_3_inv Last_ex_4_inv_1 Last_ex_4_inv Last_ex_5_inv_1 Last_ex_5_inv Last_ex_5
 do
     Pickle_name=$Exp_name".pickle"
 
-    conda activate hananJ
 
     python QS_project/triangulation.py $1
 
