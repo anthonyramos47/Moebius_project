@@ -11,8 +11,6 @@ Exp_dir="/Users/cisneras/hanan/hananLab/QS_project/experiments/"
 
 for  Exp_name in Last_ex_2 Last_ex_3_inv_1 Last_ex_3_inv Last_ex_4_inv_1 Last_ex_4_inv Last_ex_5_inv_1 Last_ex_5_inv Last_ex_5
 do
-  
-
     Pickle_name=$Exp_name".pickle"
 
     conda activate hananJ
@@ -33,8 +31,10 @@ do
 
     python QS_project/cross_field_sep.py $Exp_name
 
-    git add *
-    git commit -m "$Exp_name Upload for remeshing"
-    git push origin LastC
 
 done
+
+
+git add *
+git commit -m "$Exp_name Upload for remeshing"
+git push origin LastC
