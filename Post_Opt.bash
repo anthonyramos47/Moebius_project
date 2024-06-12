@@ -10,6 +10,6 @@ conda activate hananJ
 
 cd QS_project
 
-python foot_point_bspline.py $Exp_name 1
+python foot_point_bspline.py $Exp_name 0
 
-python Post_optimization_GUI.py $Exp_name
+python Post_optimization.py $Exp_name
