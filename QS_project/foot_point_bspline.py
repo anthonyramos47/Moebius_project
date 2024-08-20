@@ -350,13 +350,8 @@ if parser.parse_args().vis == 1:
 
     ps.remove_all_structures()
 
-    # for idx in [62,64,65,132,128]:
-    #     #idx = np.random.randint(0, len(ffF))
-    #     sph = ps.register_point_cloud(f"s_"+str(idx), np.array([cc[idx]]), transparency=0.4, color=(0.1, 0.1, 0.1))
-    #     r = np.linalg.norm(vc[idx] - cc[idx])
-    #     sph.set_radius(r, relative=False)
-
     start_m = ps.register_surface_mesh("S_uv", V, F, enabled=False)
+    
     start_m.add_vector_quantity("l", opt_l, enabled=True)
     or_mesh = ps.register_surface_mesh("foot_pts", f_pts, ffF)
     ps.register_surface_mesh("Or Remeshed", orffV, ffF)

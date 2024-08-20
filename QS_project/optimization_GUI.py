@@ -593,6 +593,8 @@ if parser.parse_args().type == 1:
     data = load_data()
 
     bsp1 = data["surf"]
+    # o_v_pts = data["o_v_pts"]
+    # o_u_pts = data["o_u_pts"]
 elif parser.parse_args().type == 2:
     bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
 #bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
@@ -625,6 +627,29 @@ cp = r_uv[2].copy()
 
 V, F = Bspline_to_mesh(bsp1, u_pts, v_pts)
 
+#OV, OF = Bspline_to_mesh(bsp1, o_u_pts, o_v_pts)
+
+# Compute the curvature
+K, H, _ = curvatures_par(bsp1, u_pts, v_pts)
+
+#OK, OH, _ = curvatures_par(bsp1, o_u_pts, o_v_pts)
+
+H = H.flatten()
+K = K.flatten()
+
+# OH = OH.flatten()
+# OK = OK.flatten()
+
+
+valid = np.zeros_like(H)
+# o_valid = np.zeros_like(OH)
+
+idx = np.where(H < 0)[0]
+# o_idx = np.where(OH < 0)[0]
+
+valid[idx] = 1
+#o_valid[o_idx] = 1
+
 
 # GET TOPOLOGY INFO
 
@@ -638,6 +663,13 @@ adj_v = mesh.vertex_adjacency_list()
 ps.init()
 # Surface
 surf = ps.register_surface_mesh("S_uv", V, F)
+
+
+surf.add_scalar_quantity("Mean Curvature", H, enabled=True)
+surf.add_scalar_quantity("Gaussian Curvature", K, enabled=False)
+surf.add_scalar_quantity("Near Vanishing Curv", valid, enabled=True)
+
+
 # INITIAL LC
 surf.add_vector_quantity("init_l", init_l.reshape(-1, 3), vectortype='ambient', enabled=False, color=(0.0, 0.0, 0.1))
 ps.set_user_callback(optimization)

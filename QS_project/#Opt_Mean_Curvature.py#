@@ -114,7 +114,6 @@ if num_pos > num_neg:
         cp_pts = cp_flat[:len(original_cp_flat)]
         # Objective function to minimize
         
-
         # For example, weighted distance from the original control points
         return weight * np.sum((cp_pts - original_cp_flat) ** 2)
 

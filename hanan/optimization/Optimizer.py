@@ -35,6 +35,7 @@ class Optimizer():
         self.bestit = None # Best iteration
         self.prevdx = None # Previous dx
         self.H = None # Hessian matrix
+        self.H_ordering = None # Ordering of the Hessian
         self.it = None # Iteration 
         self.step = None # Step size
         self.method = None # Method used to solve the problem
@@ -262,17 +263,18 @@ class Optimizer():
                 # Compute J, r for the constraint
                 constraint._compute(self.X, self.var_idx)
                 #final_time = tm.time()
-                # total += final_time - initial_time
-                #print(f"Time to compute {constraint.name}: {final_time - initial_time}")
+                # # total += final_time - initial_time
+                # print(f"Time to compute {constraint.name}: {final_time - initial_time}")
 
                 #initial_time = tm.time()
                 # Add J, r to the optimizer                
-                #stacked_J.append(np.sqrt(constraint.w) * constraint._J)
-                stacked_H.append( constraint.w * constraint._J.T.dot(constraint._J))
-                stacked_b.append( constraint.w * constraint._J.T.dot(constraint._r))    
-                final_time = tm.time()
-                # # total += final_time - initial_time
-                #print(f"Time to stack and Hess {constraint.name}: {final_time - initial_time}\n\n")
+                # stacked_H.append( constraint. * constraint._J.T.dot(constraint._J))
+                # stacked_b.append( constraint.w * constraint._J.T.dot(constraint._r))    
+                stacked_H.append( constraint.H)
+                stacked_b.append( constraint.b)   
+                #final_time = tm.time()
+                #total += final_time - initial_time
+                # print(f"Time to stack and Hess {constraint.name}: {final_time - initial_time}\n\n")
 
                 # Add energy to the energy dictionary
                 if constraint.name is not None and constraint.sum_energy:
@@ -309,6 +311,8 @@ class Optimizer():
     def stop_criteria(self):
         if (self.prevdx > 1e-8 or self.prevdx is None) and self.it < 5000:
             self.stop = False
+        elif self.energy[-1] < 1e-12:
+            self.stop = True
         else:
             self.stop = True
         
@@ -319,55 +323,27 @@ class Optimizer():
         # https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm
         # Solve for (J^TJ + lambda*I) dx = -J^Tr, lambda = max(diag(J^TJ))*1e-8
 
-        # Get J 
-        #J = self.J
-
-        # Compute pseudo Hessian
-        #H = (J.T * J).tocsc()
-        
-        # # Calculate the value to add to the diagonal
-        # add_value = self.H.max() * 1e-8
-
-        # # Create a diagonal matrix with the values to add
-        # diagonal_values = np.array([add_value] * self.H.shape[0])
-        # diagonal_matrix = diags(diagonal_values, 0, format='csc')
-
-        # # Add the diagonal_matrix to H
-        # self.H = self.H + diagonal_matrix
-        #self.fix_values_H()
-
         #mu = 1e-3 # Regularization parameter
         mu = self.H.max() * 1e-8
         
-
         #initial_time = tm.time()
         # Extract the diagonal elements from the matrix H_csr
         diagonal = self.H.diagonal()
-
-        # Create a diagonal matrix where each diagonal entry is the reciprocal of the original matrix's diagonal
-        #M = diags(1.0 / diagonal)
         
+        # Set the diagonal elements of the matrix H_csr to the sum of the diagonal elements and mu
         self.H.setdiag(diagonal + mu)
-
         dx = spsolve(self.H, -self.b)
 
-        # # Solve the linear system
-        # dx, exitCode = gmres(self.H, -self.b, M=M)
-        # if exitCode != 0:
-        #     print(f"Solver did not converge at iteration, exit code: {exitCode}")
-    
-        #final_time = tm.time()
-        #print(f"Time to solve linear system: {final_time - initial_time}")
-        
-        #b = -J.T@self.r
-        
         # Store previous dx norm
         self.prevdx = np.linalg.norm(self.step*dx)
 
+        # Compute energy
         energy = sum(e_i for e_i in self.energy_dic.values())
 
+        # Compute normalized energy 
         energy_norm = sum(e_i for e_i in self.norm_energy_dic.values())   
 
+        # Update energy difference
         if len(self.energy) > 1:
             self.e_diff = abs(energy - self.energy[-1])
             

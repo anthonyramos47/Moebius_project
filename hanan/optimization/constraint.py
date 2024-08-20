@@ -12,7 +12,9 @@ class Constraint():
         self.name = None # Name of the constraint
         self.w = 1 # Weight
         self._J = None # Jacobian matrix
+        self.J_constant = None # Constant Jacobian
         self._J0 = None # Constant Jacobian
+        self.J0_done = False # Jacobian computed
         self._i = [] # Row index
         self._j = [] # Column index
         self._values = [] # Values
@@ -65,18 +67,35 @@ class Constraint():
 
         self.compute(X, var_idx)
 
-
-        # print("shape i:", len(self._i)) 
-        # print("shape j:", len(self._j))
-        # print("shape values:", len(self._values))
-
-        in_t = time()
-        if self.sparse:
+        # If J is constant, we compute it only once
+        if self.J_constant and not self.J0_done:
             self._J = csr_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
-        else:
-            self._J = csr_matrix(self._J)
+
+            self.H = self.w * self._J.T.dot(self._J)
+
+            self.b = self.w * self._J.T.dot(self._r)
+
+            self._J0 = self._J.copy()
+            self.J0_done = True
+
+        # We only compute the residual and the Jacobian if J is not constant
+        elif self.J0_done:
+            self.b = self.w * self._J0.T.dot(self._r)
+    
+        # If J is not constant, we compute it every time
+        if not self.J_constant:
+            self._J = csr_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+
+            self.H = self.w * self._J.T.dot(self._J)
+
+            self.b = self.w * self._J.T.dot(self._r)
+
+        # if self.sparse:
+        #     self._J = csr_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+        # else:
+        #     self._J = csr_matrix(self._J)
         
-        #print("Jacobian", self.J.toarray())
+        
 
     def compute(self, X) -> None:
         """ Function to compute the residual and the Jacobian of the constraint

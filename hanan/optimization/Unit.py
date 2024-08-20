@@ -13,8 +13,10 @@ class Unit(Constraint):
             Initializes a new instance of the Unit class.
             """
             self.dim = None # Dimension of the variable
+            self.J_constant = True # Constant Jacobian
             self.v_name = None # Variable name
             super().__init__()
+            
         
         
 
