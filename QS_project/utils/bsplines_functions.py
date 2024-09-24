@@ -634,7 +634,8 @@ def Bspline_to_mesh(bsp1, u_pts, v_pts):
     # Get Grid as quad mesh V and F
     V = S_flat
     # Faces F_i = [i, i+1, sample[1]*i + i, sample[1]*i + i]
-    F = np.array([  (sample[1]*j) +np.array([ i, i+1, sample[1] + i + 1, sample[1] + i])   for j in range(sample[1] - 1)for i in range(sample[0] - 1)] )
+    #F = np.array([  (sample[1]*j) +np.array([ i, i+1, sample[1] + i + 1, sample[1] + i])   for j in range(sample[1] - 1)for i in range(sample[0] - 1)] )
+    F = np.array([  np.array([ sample[1]*i+j, sample[1]*i+j+1, sample[1]*(i+1)+(j+1), sample[1]*(i+1)+j])   for j in range(sample[1] - 1)for i in range(sample[0] - 1)] )
 
     return V, F
 

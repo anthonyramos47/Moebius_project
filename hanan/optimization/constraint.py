@@ -3,7 +3,7 @@
 # The main idea is to pass a mesh and return a residual and a Jacobian
 import numpy as np
 import geometry as geo
-from scipy.sparse import csr_matrix
+from scipy.sparse import coo_matrix
 from time import time
 
 
@@ -15,6 +15,7 @@ class Constraint():
         self.J_constant = None # Constant Jacobian
         self._J0 = None # Constant Jacobian
         self.J0_done = False # Jacobian computed
+        self.idx_done = False # Indices computed
         self._i = [] # Row index
         self._j = [] # Column index
         self._values = [] # Values
@@ -24,6 +25,7 @@ class Constraint():
         self.sparse = True # Sparse matrix
         self.sum_energy = False # Define if we are going to sum the contribution of the energy 
         self.const_idx = {} # Dic to store the index of the constraints
+        self.first_compt = False # First computation
 
     def initialize_constraint(self, X, var_indices, *args) -> None:
         """ Method to initialize the constraint
@@ -63,13 +65,18 @@ class Constraint():
         Method to compute the residual and the Jacobian
         """
         self.reset()    
-
-
         self.compute(X, var_idx)
+        
+        # Fix values after the first computation
+        if not self.first_compt:
+            self.first_compt = True
+            self.idx_done = True
 
         # If J is constant, we compute it only once
         if self.J_constant and not self.J0_done:
-            self._J = csr_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+            self._J = coo_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+
+            self._J.tocsr()
 
             self.H = self.w * self._J.T.dot(self._J)
 
@@ -84,10 +91,9 @@ class Constraint():
     
         # If J is not constant, we compute it every time
         if not self.J_constant:
-            self._J = csr_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
-
+            self._J = coo_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
+            self._J.tocsr()
             self.H = self.w * self._J.T.dot(self._J)
-
             self.b = self.w * self._J.T.dot(self._r)
 
         # if self.sparse:
@@ -121,6 +127,7 @@ class Constraint():
                 c_idx: Constraint indices
                 v_idx: Variable indices
         """
+
         if c_idx is None or v_idx is None:
             self._values = values
         else:
@@ -135,10 +142,12 @@ class Constraint():
                 c_idx: Constraint indices
                 v_idx: Variable indices
         """
-        # Fill row
-        self._i.extend(c_idx)
-        self._j.extend(v_idx)
-        self._values.extend(values)
+        if self.idx_done:
+            self._values.extend(values)
+        else:
+            self._i.extend(c_idx)
+            self._j.extend(v_idx)
+            self._values.extend(values)
 
     def set_r(self, c_idx,  values):
         """ Function to set the residual
@@ -178,14 +187,9 @@ class Constraint():
     def reset(self):
         """ Function to clear the Jacobian
         """
-        self._i = []
-        self._j = []
         self._values = [] 
         self._J = None
         self._r = np.zeros(self.const, dtype=np.float64)
-
-
-
 
     def print_per_const_energy(self):
 

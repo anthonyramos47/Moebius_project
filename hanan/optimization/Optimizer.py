@@ -45,7 +45,7 @@ class Optimizer():
         self.norm_energy_dic = {} # Energy normalized dictionary
         self.var_idx = {} # Variable indices
         self.var = 0 # Number of variables
-        self.constraints = [] # List of constraints objects
+        self.constraints = {} # Dictionary of constraints objects
         self.verbose = False # Verbose
         self.stop = False # Stop criteria
         self.fixed_values = False 
@@ -93,8 +93,6 @@ class Optimizer():
             file.write(f"Final Energy: {self.energy[-1]}\n")
             file.write(f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}")
 
-
-
         print(f"Final Energy: {self.energy[-1]}")
         plot = plt.plot(self.energy)
         plt.xlabel('Iteration')
@@ -105,6 +103,18 @@ class Optimizer():
         # Put point markers on the plot
         plt.scatter(range(len(self.energy)), self.energy, color='r')
         plt.savefig(name)
+
+    def final_enery_log_report(self):
+        string = "ENERGY REPORT\n"
+        string+="===========================================\n"
+        for name, energy in self.energy_dic.items():
+            string+=f"{name}: {energy}\n"
+        string+="===========================================\n"
+        string+="=============Final Energy ==================\n"
+        string+=f"Final Energy: {self.energy[-1]}\n"
+        string+=f"Best iteration: {self.bestit + 1}\nBest energy: {self.energy[self.bestit]}\n\n"
+        
+        return string
     
     def get_energy_per_constraint(self):
         print(f"ENERGY REPORT\n")
@@ -169,7 +179,7 @@ class Optimizer():
         constraint._initialize_constraint(self.X, self.var_idx, *args)
         constraint.set_weigth(w)
 
-        self.constraints.append(constraint)
+        self.constraints[constraint.name] = constraint
 
     def control_var(self, var_name, w) -> None:
         """
@@ -186,7 +196,7 @@ class Optimizer():
         SC.w = w
         SC.name = var_name + "_step_control"
         #self.energy_vector = np.zeros(len(self.X))
-        self.constraints.append(SC)
+        self.constraints[SC.name] = SC
         # Add constraint
         #self.get_gradients(unit)
 
@@ -202,14 +212,31 @@ class Optimizer():
         """
         # Initialize constraint
         unit = Unit()
-        #unit.initialize_constraint(self.X, self.var_idx, var_name, dim)
         unit._initialize_constraint(self.X, self.var_idx, var_name, dim)
         unit.w = w
         unit.name = var_name + "_unit"
-        #self.energy_vector = np.zeros(len(self.X))
-        self.constraints.append(unit)
-        # Add constraint
-        #self.get_gradients(unit)
+        self.constraints[unit.name] = unit
+
+    def set_constraints_weights_dic(self, dic_e_w) -> None:
+        """
+            Method to set the weight of the constraints
+            Input:
+                dic_e_w: Dictionary with the energy and the weight of the constraints
+        """
+        for name, w in dic_e_w.items():
+            if name in self.constraints:
+                self.constraints[name].set_weigth(w)
+
+    def set_constraints_weights_array(self, ls_w) -> None:
+        """
+            Method to set the weight of the constraints
+            Input:
+                ls_w: List with the weights of the constraints
+        """
+        assert len(ls_w) == len(self.constraints), "Error: The number of weights is different from the number of constraints"
+
+        for i, v in self.constraints.values():
+            v.set_weigth(ls_w[i])
 
     def fix_variable(self, var, idx) -> None:
         """
@@ -254,7 +281,7 @@ class Optimizer():
         stacked_b = []
 
         #total = 0
-        for constraint in self.constraints:
+        for constraint in self.constraints.values():
             
             # Add J, r to the optimizer
             if constraint.w != 0:
@@ -305,7 +332,6 @@ class Optimizer():
         while self.it < it and not self.stop:
             self.get_gradients()
             self.optimize_step()
-
             self.stop_criteria()
 
     def stop_criteria(self):

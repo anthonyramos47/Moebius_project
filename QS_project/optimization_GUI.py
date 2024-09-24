@@ -66,20 +66,20 @@ reports_dir = os.path.join(dir_path, "data", "Reports")
 # Create the parser
 parser = argparse.ArgumentParser(description="Optimization")
 
-# Add an argument
+# Argument for file name
 parser.add_argument('file_name', type=str, help='File name to load')
 
+# U and V grid size
 parser.add_argument('deltaumin', type=float, help='delta value')
 parser.add_argument('deltaumax', type=float, help='delta value')
 parser.add_argument('deltavmin', type=float, help='delta value')
 parser.add_argument('deltavmax', type=float, help='delta value')
 
+# Type of file : 1 pickle, 2 json
 parser.add_argument('type', type=int, help='Read 1 pickle or 2 json file')
 
 bspline_surf_name = parser.parse_args().file_name
 dir =  1
-
-
 
 
 # Sample size
@@ -122,10 +122,10 @@ final_rep = False
 # Optimization functions ====================================
 def optimization():
 
-    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v, time_1, time_2, name_report, report_data, lc_rep, tor_rep, final_rep, per_cop_it
+    global state, state2, counter, opt, cp, l, init_opt_2, init_opt_1, angle, tangle, name_saved,iter_per_opt, step_1, step_2, bsp1, adj_v, time_1, time_2, name_report, report_data, lc_rep, tor_rep, final_rep, per_cop_it, LC, LC_orth, LC_torsal, LC_torsal_ang, Fair_L
 
     # Title
-    psim.TextUnformatted("Sphere and Lince Congruence Optimization")
+    psim.TextUnformatted("Sphere and Line Congruence Optimization")
 
 
     if psim.Button("Stop"):
@@ -175,8 +175,6 @@ def optimization():
             opt.init_variable("rij" ,         cp )
             opt.init_variable("mu"  ,         50  )
             opt.init_variable("l"   , l.flatten())
-
-
             # Constraints ==========================================
 
             # Line congruence l.cu, l.cv = 0
@@ -194,10 +192,12 @@ def optimization():
 
 
         if psim.Button("Optimize 1"):
+            
+            opt.set_constraints_weights({LC.name: weights["LC"][0], LC_orth.name: weights["LC_Orth"][0]})
+            
             state = 1
             counter = 1
 
-    
     psim.Separator()
 
     if psim.CollapsingHeader("Optimization 2:"):
@@ -320,6 +320,9 @@ def optimization():
     if psim.Button("Optimize 2"):
         
         if init_opt_2:
+
+            opt.set_constraints_weights({LC.name: weights["LC"][1], LC_orth.name: weights["LC_Orth"][1], LC_torsal.name: weights["Torsal"], LC_torsal_ang.name: weights["Torsal_Angle"], Fair_L.name: weights["Fairness"]})
+
             print("stop", opt.stop)
             it = 0
             while it < iter_per_opt and not opt.stop:
@@ -593,18 +596,18 @@ if parser.parse_args().type == 1:
     data = load_data()
 
     bsp1 = data["surf"]
-    # o_v_pts = data["o_v_pts"]
-    # o_u_pts = data["o_u_pts"]
+
 elif parser.parse_args().type == 2:
     bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
-#bsp1 = get_spline_data(choice_data, surface_dir, bspline_surf_name)
-        
-#bsp1 = data["surf"]
 
-# Get Grid Information
+
+# Get Grid points
 u_pts, v_pts = sample_grid(sample[0], sample[1], deltaum=parser.parse_args().deltaumin, deltauM=parser.parse_args().deltaumax, deltavm = parser.parse_args().deltavmin, deltavM = parser.parse_args().deltavmax)
+
+# Get the number of quads
 n_squares = (len(u_pts)-1)*(len(v_pts)-1)
 
+# Initialize the central spheres radius and normals
 r_H, n = init_sphere_congruence(mid_init, bsp1, u_pts, v_pts, sample)
 
 # Fit r_H to a B-spline surface r(u,v)
@@ -617,38 +620,23 @@ l = flip(l, n)
 # Store initial line congruence for visualization
 init_l = l.copy()
 
-
-
 # Get the number of control points
 cp = r_uv[2].copy()
 
-
-# End of constraints ===================================
-
+# Transform the b-spline surface to a mesh
 V, F = Bspline_to_mesh(bsp1, u_pts, v_pts)
-
-#OV, OF = Bspline_to_mesh(bsp1, o_u_pts, o_v_pts)
 
 # Compute the curvature
 K, H, _ = curvatures_par(bsp1, u_pts, v_pts)
 
-#OK, OH, _ = curvatures_par(bsp1, o_u_pts, o_v_pts)
-
+# Flatten values
 H = H.flatten()
 K = K.flatten()
 
-# OH = OH.flatten()
-# OK = OK.flatten()
-
-
+# Define number of positive and negative values 
 valid = np.zeros_like(H)
-# o_valid = np.zeros_like(OH)
-
 idx = np.where(H < 0)[0]
-# o_idx = np.where(OH < 0)[0]
-
 valid[idx] = 1
-#o_valid[o_idx] = 1
 
 
 # GET TOPOLOGY INFO
@@ -660,18 +648,26 @@ mesh.make_mesh(V, F)
 # Get the vertex vertex adj list
 adj_v = mesh.vertex_adjacency_list()
 
+
+
+# Visualization
+
 ps.init()
+
 # Surface
 surf = ps.register_surface_mesh("S_uv", V, F)
 
-
+# Curvature
 surf.add_scalar_quantity("Mean Curvature", H, enabled=True)
 surf.add_scalar_quantity("Gaussian Curvature", K, enabled=False)
 surf.add_scalar_quantity("Near Vanishing Curv", valid, enabled=True)
 
-
 # INITIAL LC
 surf.add_vector_quantity("init_l", init_l.reshape(-1, 3), vectortype='ambient', enabled=False, color=(0.0, 0.0, 0.1))
+
+# Callbakcs
 ps.set_user_callback(optimization)
+
+# Show
 ps.show()
 
