@@ -333,6 +333,9 @@ sph_file = open(os.path.join(remeshing_dir, name+'_sphs_opt.dat'), 'w')
 sph_cut_file = open(os.path.join(remeshing_dir, name+'_sphs_p_cut.dat'), 'w')
 annuli_file = open(os.path.join(remeshing_dir, name+'_annuli.dat'), 'w')
 
+# Vedo data 
+sph_panels = []
+
 # Write inn_f in the first line
 for i in inn_f:
     sph_file.write(f"{i} ")
@@ -356,14 +359,25 @@ for i in range(len(e_f_f[0])):
     mid = (vi + vj)/2
     annuli_file.write(f"{mid[0]} {mid[1]} {mid[2]} {n[0]} {n[1]} {n[2]} {vi[0]} {vi[1]} {vi[2]} {vj[0]} {vj[1]} {vj[2]}\n")
 
-
+# ffF are the faces of the mesh
 for i in range(len(ffF)):
     
+    # Write the sphere data
     sph_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} {vc[i][0]} {vc[i][1]} {vc[i][2]} ")
 
+    # Sphere 
     string_data_sph_panel = f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]} "
 
+    # Annuli data 
     annuli_file.write(f"{sph_c[i][0]} {sph_c[i][1]} {sph_c[i][2]} {rf[i]}\n")
+
+    # sphere Data 
+    sphere_data = [] 
+
+    sphere_data.append(sph_c[i])
+    sphere_data.append(rf[i])
+
+    planes_sphere = []
 
     for j in range(len(ffF[i])):
 
@@ -383,6 +397,10 @@ for i in range(len(ffF)):
         mid = (vi + vj)/2
         string_data_sph_panel += f"{vi[0]} {vi[1]} {vi[2]} {mid[0]} {mid[1]} {mid[2]} {n[0]} {n[1]} {n[2]} "
 
+        planes_sphere.append([vi, n])
+    
+    sph_panels.append([sphere_data, planes_sphere])
+
     sph_cut_file.write(string_data_sph_panel + "\n")
     
 
@@ -395,6 +413,16 @@ for i in range(len(ffF)):
 annuli_file.close()
 sph_cut_file.close()
 sph_file.close()
+
+
+# Export picke with sphe_pnales
+newdata = {}
+newdata['sph_panels'] = sph_panels
+
+with open(os.path.join(exp_dir, name+'_sph_panels_opt.pickle'), 'wb') as f:
+    pickle.dump(newdata, f)
+
+
 
 
 # Save Optimized line congruence
