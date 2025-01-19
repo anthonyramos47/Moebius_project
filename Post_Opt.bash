@@ -1,6 +1,6 @@
 #Windows source /home/anthony/anaconda3/etc/profile.d/conda.sh
 # Mac
-source /Users/cisneras/opt/anaconda3/etc/profile.d/conda.sh
+source /opt/anaconda3/etc/profile.d/conda.sh
 
 #git pull origin LastC
 
