@@ -1,7 +1,7 @@
 #Windows source /home/anthony/anaconda3/etc/profile.d/conda.sh
 # Mac
 conda init
-source /Users/cisneras/opt/anaconda3/etc/profile.d/conda.sh
+source /opt/anaconda3/etc/profile.d/conda.sh
 
 #Exp_dir="/home/anthony/Hanan Lab/hananLab/QS_project/experiments/"
 Exp_dir="/Users/cisneras/hanan/hananLab/QS_project/experiments/"
