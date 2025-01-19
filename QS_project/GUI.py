@@ -44,6 +44,7 @@ from optimization.Optimizer import Optimizer
 dir_path = os.getcwd()
 print(dir_path)
 
+
 # Define Bsplines Surface directory
 surface_dir = os.path.join(dir_path, "data", "Bsplines_Surfaces")
 print("surface dir:", surface_dir)
@@ -152,6 +153,8 @@ class GUI:
 
         lt1 = unit(tu1[:,None]*lu + tv1[:,None]*lv)
         lt2 = unit(tu2[:,None]*lu + tv2[:,None]*lv)
+
+
 
 
         V_R = V + r_uv_surf.flatten()[:,None]*self.vars["n"].reshape(-1,3)

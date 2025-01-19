@@ -1,1 +1,1 @@
-{"Vertices": 424, "Faces": 369, "W_proximity": 0.01, "W_proximity_c": 0.01, "W_fairness": 0.2, "W_sphere": 2, "W_supp": 0.1, "W_tor": 0.01, "Iterations": 150, "Time": 0.5031921656926474, "Energy": 7.391736594625145e-07}
+{"Vertices": 424, "Faces": 369, "W_proximity": 0.01, "W_proximity_c": 0.01, "W_fairness": 0.2, "W_sphere": 2, "W_supp": 0.1, "W_tor": 0.01, "Iterations": 200, "Time": 0.5457732975482941, "Energy": 8.097066926077633e-07}

@@ -63,9 +63,15 @@ def load_data():
 
 data = load_data()
 
+bd_v = data['bd_v']
+
+print("Boundary", len(bd_v))
+
 # Get u and v points 
 u_pts = data['u_pts']
 v_pts = data['v_pts']
+
+
 
 init_l = data['init_l'].reshape(-1, 3)
 opt_l  = data['l'].reshape(-1, 3)
@@ -90,12 +96,23 @@ ffF = np.array(new_ffF)
 BSurf = data['surf']
 rsurf = data['r_uv']
 
+r_uv_surf = data['r_uv_surf']
 
 # Sample size of the B-spline
 sample = (len(u_pts), len(v_pts))   
 
 # Evaluate the B-spline at the u and v points
 V, F = Bspline_to_mesh(BSurf, u_pts, v_pts)
+
+n_m = BSurf.normal(u_pts, v_pts)
+
+VC = V + r_uv_surf.flatten()[:,None]*n_m.reshape(-1, 3)
+
+# Save c surface 
+mesh_c_mesh = os.path.join(remeshing_dir, name+'_Mesh_C.obj')
+write_obj(mesh_c_mesh, VC, F)
+
+
 
 range_u = (0, 1)
 range_v = (0, 1)
@@ -135,13 +152,14 @@ opt.init_variable("v"  , ffV.flatten())
 
 # # Fairness
 Fair_M = QM_Fairness()
-opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=3, ce=1)
+opt.add_constraint(Fair_M, args=(adj_v, "v", 3), w=0.01, ce=1)
 
 # # Proximity
 Prox_M = Proximity()
 opt.add_constraint(Prox_M, args=("v", ref_V, ref_F, 0.01), w=5, ce=1)
 
 opt.control_var("v", 0.2)
+
 
 for i in range(50):
 
@@ -173,7 +191,7 @@ n_dir = np.zeros((len(foot_pts), 3))
 for i in range(len(foot_pts)):
     #l_dir[i] = sph_ln_cong_at_pt(BSurf, rsurf, foot_pts[i, 0], foot_pts[i, 1])[1]
     n_dir[i] = BSurf.normal(foot_pts[i, 0], foot_pts[i, 1])
-    f_pts[i] =   BSurf(foot_pts[i, 0], foot_pts[i, 1])
+    f_pts[i] = BSurf(foot_pts[i, 0], foot_pts[i, 1])
     r_pts[i] = bisplev(foot_pts[i, 0], foot_pts[i, 1], rsurf)
 
 # Compute the vertices of the mid mesh C(u,v)
@@ -342,6 +360,8 @@ data["l_dir"] = l_dir
 # Step 4: Dump the updated data back into the pickle file
 with open(os.path.join(exp_dir, pickle_name), 'wb') as file:
     dump(data, file)
+
+
 
 
 if parser.parse_args().vis == 1:

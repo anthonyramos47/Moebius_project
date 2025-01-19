@@ -349,6 +349,8 @@ class Optimizer():
         # https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm
         # Solve for (J^TJ + lambda*I) dx = -J^Tr, lambda = max(diag(J^TJ))*1e-8
 
+        #self.fix_values_H()
+
         #mu = 1e-3 # Regularization parameter
         mu = self.H.max() * 1e-8
         

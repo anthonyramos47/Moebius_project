@@ -215,7 +215,6 @@ opt.add_variable("n_l" , len(mesh_edges[0])*3   ) # Normal or the supp planes
 #opt.add_variable("r" , len(rads)   ) # Radii of spheres
 #opt.add_variable("mu", len(dual_edges))
 
-opt.fix_variable("v", bd_v)
 
 # Initialize Optimizer ("Method", step, verbosity)
 opt.initialize_optimizer("LM", step, 1)
@@ -263,7 +262,8 @@ opt.control_var("v" , 0.4)
 opt.control_var("nd", 0.5)
 
 
-for _ in range(150):
+
+for _ in range(200):
     # Get gradients
     i_t = time.time()
     opt.get_gradients()
@@ -413,14 +413,6 @@ for i in range(len(ffF)):
 annuli_file.close()
 sph_cut_file.close()
 sph_file.close()
-
-
-# Export picke with sphe_pnales
-newdata = {}
-newdata['sph_panels'] = sph_panels
-
-with open(os.path.join(exp_dir, name+'_sph_panels_opt.pickle'), 'wb') as f:
-    pickle.dump(newdata, f)
 
 
 
