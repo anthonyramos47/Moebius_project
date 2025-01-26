@@ -37,7 +37,6 @@ class Sph_Unit(Constraint):
         """ Compute the constraint
         """
         # Get the variables
-        
         A = X[var_idx["A"]]
         B = X[var_idx["B"]]
         C = X[var_idx["C"]]
