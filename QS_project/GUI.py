@@ -353,8 +353,6 @@ class GUI:
         
         _, self.name_saved = psim.InputText("Name", self.name_saved)
 
-
-
         if psim.Button("Save Report"):
             self.print_log()
             self.save_report()
@@ -366,7 +364,6 @@ class GUI:
             self.export_data()
             
     def start(self):
-
 
         # Load the B-spline surface
         if parser.parse_args().type == 1:

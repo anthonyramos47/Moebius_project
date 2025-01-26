@@ -27,10 +27,10 @@ class Step_Control(Constraint):
             var_name: Name of the variable that we want to constraint
             dim: Dimension of the variable
         """
-
-        
+        # Variable name
         self.v_name = var_name
 
+        # X0
         self.prev = X[var_indices[var_name]]
 
         # Setup constraints
@@ -46,7 +46,6 @@ class Step_Control(Constraint):
         Input:
             X: Variables
         """
-        
         # Get variable
         xv = self.uncurry_X(X, var_idx, self.v_name) # flattened variable
     

@@ -13,13 +13,16 @@ class Constraint():
         self.w = 1 # Weight
         self._J = None # Jacobian matrix
         self.J_constant = None # Constant Jacobian
+        
         self._J0 = None # Constant Jacobian
         self.J0_done = False # Jacobian computed
         self.idx_done = False # Indices computed
+
         self._i = [] # Row index
         self._j = [] # Column index
         self._values = [] # Values
         self._r = None # Residual vector
+
         self.const = 0 # Num Constraints
         self.var = None # Num Variables
         self.sparse = True # Sparse matrix
@@ -49,12 +52,10 @@ class Constraint():
         """
         Method to initialize the all initial data for the constraint
         """
-
         # Initialization function
         self.initialize_constraint(X, var_indices, *args)
 
         # Compute the indices for rows and columns of the Jacobian, since those remain constant
-    
         # Get the number of variables
         self.var = len(X)
         
@@ -74,14 +75,20 @@ class Constraint():
 
         # If J is constant, we compute it only once
         if self.J_constant and not self.J0_done:
+
+            # Fill Sparse J matrix
             self._J = coo_matrix((np.array(self._values), (self._i, self._j)), shape=(self.const, self.var))
 
+            # Transform it to csr
             self._J.tocsr()
 
+            # Compute H 
             self.H = self.w * self._J.T.dot(self._J)
 
+            # Compute b 
             self.b = self.w * self._J.T.dot(self._r)
 
+            # Define J0 since J is constant
             self._J0 = self._J.copy()
             self.J0_done = True
 
@@ -101,8 +108,6 @@ class Constraint():
         # else:
         #     self._J = csr_matrix(self._J)
         
-        
-
     def compute(self, X) -> None:
         """ Function to compute the residual and the Jacobian of the constraint
             Input:
