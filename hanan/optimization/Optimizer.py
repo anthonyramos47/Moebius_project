@@ -26,8 +26,6 @@ class Optimizer():
             The optimizer is then solved using the optimize(name_solv) method. The name_solv parameter is a string that can be
             either "LM" for Levenberg-Marquardt or "PG" for Projected Gauss-Newton.
         """
-        #self.J = None # Jacobian matrix
-        #self.r = None # Residual vector
         self.b = None # Vector of residuals J.T@r
         self.X = None # Variable
         self.X0 = None # Initial variable 
@@ -200,7 +198,27 @@ class Optimizer():
         # Add constraint
         #self.get_gradients(unit)
 
+    def set_fairness(self, var_name, adj_list, dec_fac, dec_sep, dim, w)-> None:
+        """
+        Method to add Fairness Soft energy to the computation on a given variable
+        Input: 
+            var_name .- name of variable where the fairness energy is going to be computed
+            adj_list .- list of adjacent vertices indices
+            dec_fac  .- decrease factor
+            dec_step .- steps to decrease weight
+            dim      .- dimension of the variable
+            w        .- weight of the constraint
+        """
 
+        fairness = Fairness()
+        # Initialize constraint
+        fairness._initialize_constraint(self.X, self.var_idx, var_name, adj_list, dim)
+        # Set parameters
+        fairness.w = w
+        fairness.dec_fac = dec_fac
+        fairness.dec_step = dec_step
+        fairness.name = var_name + "_Fairness"
+        self.constraints[fairness.name] = fairness
 
     def unitize_variable(self, var_name, dim, w) -> None:
         """

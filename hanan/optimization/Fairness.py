@@ -1,10 +1,9 @@
 # Call parent class
 from optimization.constraint import Constraint
-import splipy as sp
 import numpy as np
 
 
-class QM_Fairness(Constraint):
+class Fairness(Constraint):
 
     def __init__(self) -> None:
         """ Template constraint
@@ -12,39 +11,41 @@ class QM_Fairness(Constraint):
         E_{supp} = \sum_{f\in Mesh Dual} \sum_{vi in f} || (vi - cf)^2 - rf^2 ||^2
         """
         super().__init__()
-        self.name = "QM_Fairness" # Name of the constraint
+        self.name = None # Name of the constraint
         self.du_i = None # Direction  u
         self.du_j = None # Direction  u
         self.dv_i = None # Direction v
         self.dv_j = None # Direction v
 
-        self.vk = None # Valence n!=4 vertices
+        self.vk   = None # Valence n!=4 vertices
         self.vk_n = None # Neighbors of valence n!=4 vertices
         
         self.row_du = None # Row indices du
         self.row_dv = None # Row indices dv
+
+        self.dec_fac  = 0.5 # Decrease factor
+        self.dec_step = 5  # Steps to decrease weight
 
         # Cont for weight decrease
         self.cont = 0
 
 
       
-    def initialize_constraint(self, X, var_idx, adj_v, var_name, dim) -> None:
+    def initialize_constraint(self, X, var_idx, var_name, adj_v, dim) -> None:
         """ 
         We assume knots are normalized
         Input:
             X : Variables
             var_idx     : dictionary of indices of variables
-            inn_v       : list of inner vertices indices
+            var_name    : name of variable
             adj_v       : list of adjacent vertices indices
-
+            dim         : dimension of the variable
         """
 
-        self.name = "QM_Fairness_"+var_name
+        self.name = "Fairness_"+var_name
 
         num_rows_Q = 0 # Rows for quadrilateral vertices
         num_rows_L = 0 # Rows for Laplacian
-        
 
         # Valence != 4 vertices  Laplacian
         vk = []
@@ -53,10 +54,10 @@ class QM_Fairness(Constraint):
         # Quadrilateral vertices indices
         du_i = []
         du_j = []
-
         dv_i = []
         dv_j = []
-
+        
+        # Non-quad vertices indices
         dv_k = []
 
         for i, _ in enumerate(adj_v):
@@ -77,7 +78,6 @@ class QM_Fairness(Constraint):
                 vk_n.append(adj_v[i])
                 vk.extend([i])
                 
-        
         # Tansform to numpy arrays
         # Quadrilateral vertices
         du_i = np.array(du_i)
@@ -86,7 +86,6 @@ class QM_Fairness(Constraint):
         dv_j = np.array(dv_j)
         dv_k = np.array(dv_k)
 
-    
 
         if dim > 1:
             self.du_j = var_idx[var_name][3 * np.repeat(du_j, dim) + np.tile(range(dim), len(du_j))]
@@ -109,21 +108,17 @@ class QM_Fairness(Constraint):
             self.dv_i = var_idx[var_name][dv_i]
             self.dv_k = var_idx[var_name][dv_k]
 
-           
-
+        # Quad fairness
         self.add_constraint("Du_Fair", 3*num_rows_Q)
         self.add_constraint("Dv_Fair", 3*num_rows_Q)
         
+        # Laplacian fairness
         self.add_constraint("Lap_Fair", 3*num_rows_L)
-        
 
         # Row indices
         self.row_du_Q =  self.const_idx["Du_Fair"]
         self.row_dv_Q =  self.const_idx["Dv_Fair"]
 
-
-
-        
         
     def compute(self, X, var_idx):
         
@@ -145,11 +140,9 @@ class QM_Fairness(Constraint):
         self.add_derivatives(self.row_dv_Q, self.dv_j, d_v)
         self.add_derivatives(self.row_dv_Q, self.dv_k, d_vk)
 
-
         # Compute residuals
         self.set_r(self.const_idx["Du_Fair"], du)
         self.set_r(self.const_idx["Dv_Fair"], dv)
-
 
         # Laplacian
         vk = X[self.vk].reshape(-1, 3)
@@ -183,8 +176,8 @@ class QM_Fairness(Constraint):
 
         self.cont+=1
 
-        if self.cont %20 == 0:
-            self.w *= 0.5
+        if self.cont % self.dec_setp == 0:
+            self.w *= self.dec_fac
         #if self.cont %25 == 0:
         #    self.w = 0
             #print(f"Weight decrease to {self.w}")

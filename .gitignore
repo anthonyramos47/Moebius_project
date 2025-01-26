@@ -5,3 +5,9 @@
 **/__approximation__/
 *.ini
 *.idea
+*/.ipynb_checkpoints/
+*/.vscode/
+*/.pytest_cache/
+
+
+

@@ -18,8 +18,6 @@ class Unit(Constraint):
             super().__init__()
             
         
-        
-
     def initialize_constraint(self, X, var_indices, var_name, dim) -> None:
         """
         Initializes the constraint.
@@ -27,9 +25,7 @@ class Unit(Constraint):
             var_indices: Dictionary with the indices of the variables
             var_name: Name of the variable that we want to constraint
             dim: Dimension of the variable
-        """
-
-        
+        """   
         self.v_name = var_name
         self.dim = dim
 
