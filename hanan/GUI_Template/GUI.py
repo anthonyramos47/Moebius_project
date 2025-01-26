@@ -47,22 +47,46 @@ print(dir_path)
 class GUI:
 
     def __init__(self):
-        self.run_opt     = False
-        self._iterations = 10
+        # GUI Variables
+        self.run_opt     = False 
+        self._iterations = 10 
         self.opt         = Optimizer()
         self._it         = 0 
-        self.log         = []    
+        self.log         = []
+        self.time_opt    = 0.0
+
+
+        # Here can be be added 
+        # Optimization and Vis parameters
+        
+        # Dictionary of weights used
+        self.weights     = {}  
+
+    def export_data(self)->None:
+        """
+        Function to export data after or during optimization
+        """
+        pass
 
     def dump_to_log(self)->None:
         """ 
         Dump the log to a file information about the optimization
         """
+
+        # Sample of log
+        #   local_log = {
+        #     "iterations": self.opt.it,
+        #     "weights": self.weights,
+        #     "time": self.time_opt,
+        #     "Energies_Report": self.opt.final_enery_log_report()
+        # }
         pass 
 
     def print_log(self)->None:
         """ 
         Print the log
         """
+        # print(self.log)
         pass
 
     def loop(self):
