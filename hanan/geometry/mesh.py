@@ -412,7 +412,7 @@ class Mesh():
 
     
     # Topological properties of the Mesh ----------------------------------------------------------
-
+    @property
     def faces(self):
         """ Returns the faces list of the mesh """
 
