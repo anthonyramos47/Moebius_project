@@ -47,6 +47,7 @@ from moebius.utils.bsplines import (
 from moebius.utils.mesh_utils import lc_info_at_grid_points, torsal_directions, unit
 
 from moebius.energies import (
+    MeanCurvatureBspline,
     LineCong, LineCongOrth, Torsal, TorsalAngle,
     SphereFit, SupportPlanarity, RegFaces,
 )
@@ -168,6 +169,61 @@ def compute_init(state: MoebiusState) -> None:
 
     print(f"Init  r range  [{r_H.min():.4f}, {r_H.max():.4f}]")
     print(f"Init  l·n mean  {np.einsum('ijk,ijk->ij',l,n).mean():.4f}")
+
+
+# ── Stage 1b: B-spline mean-curvature optimisation ───────────────────────────
+
+def setup_bspline_optimizer(state: MoebiusState,
+                             H_thresh: float = 0.05,
+                             w_H: float = 1.0,
+                             w_step: float = 0.1) -> Optimizer:
+    """Optimise the surface B-spline control points to ensure H ≠ 0.
+
+    Builds a grid adjacency over the control points and uses:
+      - MeanCurvatureBspline  — push |H| above H_thresh
+      - step_control          — limit CP displacement per iteration
+      - set_lap_smooth        — keep the deformation smooth
+    """
+    bsp = state.bspline
+    u, v = state.u_pts, state.v_pts
+    cp0  = bsp.controlpoints.copy().ravel()
+    nu_cp, nv_cp = bsp.controlpoints.shape[:2]
+
+    opt = Optimizer()
+    opt.add_variable("cp_surf", cp0)
+
+    H_term = MeanCurvatureBspline()
+    opt.add_objective_term(H_term, (bsp, u, v, H_thresh), w=w_H, ce=True)
+
+    opt.control_variable("cp_surf", w_step)
+    opt.set_lap_smooth("cp_surf", np.arange(nu_cp * nv_cp),
+                       _cp_adjacency(nu_cp, nv_cp), dim=3, w=1e-2)
+
+    opt.initialize_optimizer(verbose=True)
+    state.bspline_opt = opt
+    return opt
+
+
+def run_bspline_optimizer(state: MoebiusState, max_iter: int = 30) -> None:
+    """Run the B-spline optimiser and apply the result to state.bspline."""
+    state.bspline_opt.optimize(max_iter=max_iter)
+    cp_opt = state.bspline_opt.unpack("cp_surf")
+    state.bspline.controlpoints = cp_opt.reshape(state.bspline.controlpoints.shape)
+    print(state.bspline_opt.get_report())
+
+
+def _cp_adjacency(nu: int, nv: int) -> list:
+    """4-connected grid adjacency list for a nu×nv control-point grid."""
+    adj = []
+    for i in range(nu):
+        for j in range(nv):
+            nb = []
+            if i > 0:      nb.append((i - 1) * nv + j)
+            if i < nu - 1: nb.append((i + 1) * nv + j)
+            if j > 0:      nb.append(i * nv + j - 1)
+            if j < nv - 1: nb.append(i * nv + j + 1)
+            adj.append(nb)
+    return adj
 
 
 # ── Stage 2: LC optimisation ──────────────────────────────────────────────────

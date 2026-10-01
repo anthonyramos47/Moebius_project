@@ -1,3 +1,4 @@
+from .mean_curvature_bspline import MeanCurvatureBspline
 from .line_congruence import LineCong
 from .line_congruence_orth import LineCongOrth
 from .torsal import Torsal
