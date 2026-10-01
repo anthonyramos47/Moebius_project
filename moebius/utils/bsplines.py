@@ -10,6 +10,7 @@ import os
 import igl
 import numpy as np
 import splipy as sp
+from hanan.geometry.construction import normalize_vertices
 from scipy.interpolate import bisplev, bisplrep
 from scipy.optimize import minimize
 from scipy.spatial import KDTree
