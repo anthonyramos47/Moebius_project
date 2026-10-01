@@ -30,7 +30,7 @@ import igl
 import splipy as sp
 
 from hanan.geometry.mesh import Mesh
-from hanan.geometry.io import write_obj
+from hanan.geometry.io import write_obj, read_obj, triangulate_quads
 from hanan.optimization import Optimizer
 
 from moebius.utils.bsplines import (
@@ -324,20 +324,18 @@ def run_remesher(state: MoebiusState, n_faces: int = 400) -> int:
 
 def load_remeshed_surface(state: MoebiusState) -> None:
     """Load remeshed OBJ and interpolate line-congruence to its vertices."""
-    from hanan.geometry.io import read_obj
     obj_path = os.path.join(state.save_path, "remeshed.obj")
-    V, F = read_obj(obj_path)
+    V, F_list = read_obj(obj_path)
     state.V_remesh = V
-    state.F_remesh = F
+    state.F_remesh = np.array(F_list, dtype=np.int32)
 
-    # Original sampling mesh for interpolation
-    V_orig, F_tri = sample_bspline_surface(state.bspline, state.u_pts, state.v_pts)
-    F_tri_np = np.array(igl.triangulate_quad(F_tri), dtype=np.int32) \
-               if hasattr(igl, 'triangulate_quad') else _tri_quads(F_tri)
+    # Build triangle mesh from sampling grid for IGL-based interpolation
+    V_orig, F_quad = sample_bspline_surface(state.bspline, state.u_pts, state.v_pts)
+    F_tri = np.array(triangulate_quads(F_quad.tolist()), dtype=np.int32)
 
     l_flat = state.torsal_opt.unpack("l").reshape(-1, 3)
-    state.l_remesh = interpolate_lc(V, V_orig, F_tri_np, l_flat)
-    print(f"Loaded remeshed mesh: {len(V)} vertices, {len(F)} faces")
+    state.l_remesh = interpolate_lc(V, V_orig, F_tri, l_flat)
+    print(f"Loaded remeshed mesh: {len(V)} vertices, {len(state.F_remesh)} faces")
 
 
 # ── Stage 5: post-optimisation ────────────────────────────────────────────────
@@ -352,10 +350,16 @@ def setup_postopt_optimizer(state: MoebiusState,
 
     mesh = Mesh()
     mesh.make_mesh(V, F)
-    vertex_sph   = F                               # vertex indices per sphere face
-    sph_sph_adj  = mesh.vertex_star_face_list()    # dual polygon per inner vertex
-    inner_v      = mesh.inner_vertices()
-    e_f_f, e_v_v = mesh.interior_edge_face_vertex_pairs()
+    vertex_sph  = F                         # vertex indices per sphere face (nf, 4)
+    sph_sph_adj = mesh.dual_top()           # ordered face rings around each inner vertex
+    inner_v     = mesh.inner_vertices()
+
+    # Interior edge → face and vertex pairs
+    ie       = mesh.inner_edges()           # shape (E_inner,)
+    ev1, ev2 = mesh.edge_vertices()         # (E_all,), (E_all,)
+    ef1, ef2 = mesh.edge_faces()            # (E_all,), (E_all,)  (-1 = boundary)
+    e_f_f    = (ef1[ie], ef2[ie])
+    e_v_v    = (ev1[ie], ev2[ie])
 
     # Sphere params from current geometry
     n_f  = len(F)
@@ -366,21 +370,20 @@ def setup_postopt_optimizer(state: MoebiusState,
         B0[fi] = pts.mean(axis=0)
     C0 = np.zeros(n_f)
 
+    # Declare ALL variables first (Jacobian shape is fixed at len(X) on first add_objective_term)
     opt = Optimizer()
-    opt.add_variable("v", V.ravel())
-    opt.add_variable("A", A0)
-    opt.add_variable("B", B0.ravel())
-    opt.add_variable("C", C0)
-
-    sph_term = SphereFit()
-    opt.add_objective_term(sph_term, (vertex_sph,), w=w_sphere, ce=True)
-
-    supp_term = SupportPlanarity()
+    opt.add_variable("v",  V.ravel())
+    opt.add_variable("A",  A0)
+    opt.add_variable("B",  B0.ravel())
+    opt.add_variable("C",  C0)
     opt.add_variable("nd", np.zeros(3 * len(inner_v)))
-    opt.add_objective_term(supp_term, (sph_sph_adj, inner_v), w=w_support, ce=True)
 
-    reg_term = RegFaces()
-    opt.add_objective_term(reg_term, (e_f_f, e_v_v), w=w_reg, ce=True)
+    sph_term  = SphereFit()
+    supp_term = SupportPlanarity()
+    reg_term  = RegFaces()
+    opt.add_objective_term(sph_term,  (vertex_sph,),      w=w_sphere,  ce=True)
+    opt.add_objective_term(supp_term, (sph_sph_adj,),     w=w_support, ce=True)
+    opt.add_objective_term(reg_term,  (e_f_f, e_v_v),     w=w_reg,     ce=True)
 
     opt.set_fairness("v", mesh.vertex_adjacency_list(), dim=3, w=1e-3)
     opt.initialize_optimizer(verbose=True)

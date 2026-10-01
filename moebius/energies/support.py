@@ -1,15 +1,15 @@
 """
 Support-structure planarity energy (post-optimisation).
 
-For each "dual face" (polygon formed by sphere centres around a mesh vertex),
-enforce that consecutive sphere centres c_i, c_{i+1} lie in a common plane:
+For each dual face (ordered ring of quad-mesh faces around an inner vertex),
+the sphere centres {c_f = B_f/(2*A_f)} should be coplanar:
 
-    E = Σ_face Σ_{edges(i,j)} ‖ (c_j - c_i)/‖c_j-c_i‖ × n_d ‖²
+    E = Σ_{inner v} Σ_{edge (fi,fj) in ring} ‖ (c_fj - c_fi)/‖·‖ × n_d ‖²
 
-where n_d is the auxiliary normal of the dual face.
+where n_d is the auxiliary dual-face normal variable.
 
-Uses JAX autodiff (analytical Jacobian is very complex for polygonal faces).
-Variables: nd (sphere-centre directions / dual normals), v (mesh vertices — not optimised here).
+Uses JAX autodiff.
+Variables: A (scalar/face), B (3-vector/face), nd (dual normals, one per inner vertex).
 """
 
 import numpy as np
@@ -20,46 +20,43 @@ class SupportPlanarity(ObjectiveTerm):
 
     def __init__(self):
         super().__init__()
-        self.name   = "SupportPlanarity"
+        self.name           = "SupportPlanarity"
         self.jacobianMethod = "jax"
 
-    def initialize_objective(self, X, var_idx, sph_sph_adj, inner_v):
+    def initialize_objective(self, X, var_idx, sph_sph_adj):
         """
         Parameters
         ----------
-        sph_sph_adj : list of lists — for each dual face, the sphere centre indices.
-        inner_v     : 1-D int array — global vertex indices of inner dual vertices.
+        sph_sph_adj : list of lists — ordered face rings from Mesh.dual_top().
+                      Entry i contains the face indices around the i-th inner vertex.
+                      One nd vector per entry.
         """
         self._var_nd = var_idx["nd"]
-        self._var_v  = var_idx["v"]
+        self._var_A  = var_idx["A"]
+        self._var_B  = var_idx["B"]
 
         self._sph_adj = [np.array(f, dtype=np.int32)
                          for f in sph_sph_adj if len(f) >= 3]
 
-        # Precompute edge pairs per dual face
-        self._edges = []
-        n_res = 0
-        for f in self._sph_adj:
-            k = len(f)
-            for i in range(k):
-                self._edges.append((f[i], f[(i + 1) % k]))
-            n_res += k
-
-        self._inner_v = inner_v
+        n_res = sum(len(f) for f in self._sph_adj)
         self.num_residuals = n_res
 
     def res(self, X) -> np.ndarray:
         nd = X[self._var_nd].reshape(-1, 3)
-        v  = X[self._var_v ].reshape(-1, 3)
-        r  = []
-        edge_idx = 0
+        A  = X[self._var_A]                      # (nf,)
+        B  = X[self._var_B].reshape(-1, 3)       # (nf, 3)
+        # Sphere centres: c_f = B_f / (2 * A_f)
+        c  = B / (2 * A[:, None] + 1e-12)
+
+        r = []
         for fi, f in enumerate(self._sph_adj):
-            n_d  = nd[self._inner_v[fi]]
-            for i in range(len(f)):
-                ci = v[f[i]]
-                cj = v[f[(i + 1) % len(f)]]
+            n_d = nd[fi]                          # dual normal for this ring
+            k   = len(f)
+            for i in range(k):
+                ci   = c[f[i]]
+                cj   = c[f[(i + 1) % k]]
                 diff = cj - ci
-                norm_diff = diff / (np.linalg.norm(diff) + 1e-12)
-                cross = np.cross(norm_diff, n_d)
+                diff_n = diff / (np.linalg.norm(diff) + 1e-12)
+                cross  = np.cross(diff_n, n_d)
                 r.append(np.dot(cross, cross))
         return np.array(r)

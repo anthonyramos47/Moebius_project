@@ -14,9 +14,6 @@ from scipy.interpolate import bisplev, bisplrep
 from scipy.optimize import minimize
 from scipy.spatial import KDTree
 
-from hanan.geometry.utils import normalize_vertices
-
-
 # ── I/O ──────────────────────────────────────────────────────────────────────
 
 def read_bspline_json(path: str) -> sp.Surface:
