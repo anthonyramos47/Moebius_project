@@ -199,7 +199,7 @@ def setup_bspline_optimizer(state: MoebiusState,
     opt.set_lap_smooth("cp_surf", np.arange(nu_cp * nv_cp),
                        _cp_adjacency(nu_cp, nv_cp), dim=3, w=1e-2)
 
-    opt.initialize_optimizer(verbose=True)
+    opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.bspline_opt = opt
     return opt
 
@@ -255,7 +255,7 @@ def setup_lc_optimizer(state: MoebiusState,
     opt.unitize_variable("l", 3, w=10.0)
     opt.set_fairness("l", _vertex_adj(state), dim=3, w=0.01)
 
-    opt.initialize_optimizer(verbose=True)
+    opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.lc_opt = opt
     return opt
 
@@ -322,7 +322,7 @@ def setup_torsal_optimizer(state: MoebiusState,
     opt.control_variable("nt2", 0.05)
     opt.set_fairness("l", _vertex_adj(state), dim=3, w=0.01)
 
-    opt.initialize_optimizer(verbose=True)
+    opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.torsal_opt = opt
     return opt
 
@@ -442,7 +442,7 @@ def setup_postopt_optimizer(state: MoebiusState,
     opt.add_objective_term(reg_term,  (e_f_f, e_v_v),     w=w_reg,     ce=True)
 
     opt.set_fairness("v", mesh.vertex_adjacency_list(), dim=3, w=1e-3)
-    opt.initialize_optimizer(verbose=True)
+    opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.postopt = opt
     return opt
 
