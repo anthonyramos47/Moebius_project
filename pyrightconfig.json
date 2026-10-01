@@ -1,0 +1,10 @@
+{
+  "pythonVersion": "3.10",
+  "venvPath": "~/miniconda3/envs",
+  "venv": "Mproj",
+  "include": ["moebius", "notebooks"],
+  "extraPaths": [
+    "../Laguerre_project/Chakana_Geo/hanan/src",
+    "../Laguerre_project/Chakana_Geo/kayviz/src"
+  ]
+}

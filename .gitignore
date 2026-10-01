@@ -1,4 +1,6 @@
 **/.DS_store
+notebooks/out/
+*.egg-info/
 **/__pycache__/
 **/__outputs__/
 **/__mathematica__/

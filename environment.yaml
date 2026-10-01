@@ -1,0 +1,23 @@
+name: Mproj
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - matplotlib
+  - pandas
+  - pip
+  - pip:
+    - splipy
+    - libigl
+    - jax[cpu]
+    - jaxlib
+    - geomdl
+    - ipykernel
+    - ipywidgets
+    - jupyterlab
+    # Chakana_Geo editable installs — run after creating the env:
+    #   pip install -e ../Laguerre_project/Chakana_Geo/hanan
+    #   pip install -e ../Laguerre_project/Chakana_Geo/kayviz
