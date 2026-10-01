@@ -18,6 +18,5 @@ dependencies:
     - ipykernel
     - ipywidgets
     - jupyterlab
-    # Chakana_Geo editable installs — run after creating the env:
-    #   pip install -e ../Laguerre_project/Chakana_Geo/hanan
-    #   pip install -e ../Laguerre_project/Chakana_Geo/kayviz
+    - -e ./Chakana_Geo/hanan
+    - -e ./Chakana_Geo/kayviz

@@ -4,7 +4,7 @@
   "venv": "Mproj",
   "include": ["moebius", "notebooks"],
   "extraPaths": [
-    "../Laguerre_project/Chakana_Geo/hanan/src",
-    "../Laguerre_project/Chakana_Geo/kayviz/src"
+    "Chakana_Geo/hanan/src",
+    "Chakana_Geo/kayviz/src"
   ]
 }
