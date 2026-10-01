@@ -17,8 +17,16 @@ from scipy.spatial import KDTree
 
 # ── I/O ──────────────────────────────────────────────────────────────────────
 
-def read_bspline_json(path: str) -> sp.Surface:
-    """Read a B-spline surface from a Rhino-exported JSON file."""
+def read_bspline_json(path: str, normalize: bool = True,
+                      normalize_factor: float = 2.0) -> sp.Surface:
+    """Read a B-spline surface from a Rhino-exported JSON file.
+
+    Parameters
+    ----------
+    normalize : centre and scale control points so the longest bounding-box
+                dimension equals normalize_factor (default True, factor 2 →
+                fits in [-2, 2]³, matching the old pipeline behaviour).
+    """
     with open(path) as f:
         data = json.load(f)
 
@@ -37,6 +45,10 @@ def read_bspline_json(path: str) -> sp.Surface:
     knots_v = np.concatenate([[knots_v[0]], knots_v, [knots_v[-1]]])
 
     ctrl = np.array(data["controlPoints"]).reshape(-1, 4)[:, :3]
+
+    if normalize:
+        shape = ctrl.shape
+        ctrl = normalize_vertices(ctrl.reshape(-1, 3), normalize_factor).reshape(shape)
 
     basis_u = sp.BSplineBasis(order_u, knots_u)
     basis_v = sp.BSplineBasis(order_v, knots_v)
