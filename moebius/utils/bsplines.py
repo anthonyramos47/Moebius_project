@@ -201,11 +201,23 @@ def flip_lc(l: np.ndarray, n: np.ndarray) -> np.ndarray:
 
 # ── remeshing helpers ─────────────────────────────────────────────────────────
 
+def _barycentric_tri(p, a, b, c):
+    """igl barycentric coordinates, across libigl versions.
+
+    libigl 2.6 renamed `barycentric_coordinates_tri` to
+    `barycentric_coordinates` (the `_tet` overload moved under the same name).
+    Prefer the current name and fall back for pre-2.6 installs.
+    """
+    fn = getattr(igl, "barycentric_coordinates", None) or \
+         getattr(igl, "barycentric_coordinates_tri")
+    return fn(p, a, b, c)
+
+
 def interpolate_lc(foot_pts: np.ndarray, V: np.ndarray, TF: np.ndarray,
                    l: np.ndarray) -> np.ndarray:
     """Barycentric interpolation of line congruence to new foot points."""
     _, f_idx, cpts = igl.point_mesh_squared_distance(foot_pts, V, TF)
     v0, v1, v2 = V[TF[f_idx, 0]], V[TF[f_idx, 1]], V[TF[f_idx, 2]]
-    bar = igl.barycentric_coordinates_tri(cpts, v0, v1, v2)
+    bar = _barycentric_tri(cpts, v0, v1, v2)
     l0, l1, l2 = l[TF[f_idx, 0]], l[TF[f_idx, 1]], l[TF[f_idx, 2]]
     return bar[:, 0:1] * l0 + bar[:, 1:2] * l1 + bar[:, 2:3] * l2

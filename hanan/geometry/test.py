@@ -1,4 +1,0 @@
-from geometry.testFolder import *
-
-
-

@@ -1,6 +1,6 @@
 {
-  "pythonVersion": "3.10",
-  "venvPath": "~/miniconda3/envs",
+  "pythonVersion": "3.11",
+  "venvPath": "~/anaconda3/envs",
   "venv": "Mproj",
   "include": ["moebius", "notebooks"],
   "extraPaths": [

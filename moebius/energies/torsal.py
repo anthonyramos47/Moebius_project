@@ -68,12 +68,18 @@ class Torsal(ObjectiveTerm):
         l = np.sign(np.einsum("ijk,ijk->ij", l, n_bsp))[..., None] * l
         self._init_torsal_vars(X, var_idx, l)
 
-        # Running norms updated each iteration
-        lt1 = (X[var_idx["u1"]][:, None] * self.du +
-               X[var_idx["v1"]][:, None] * self.dv)
-        lt2 = (X[var_idx["u2"]][:, None] * self.du +
-               X[var_idx["v2"]][:, None] * self.dv)
-        lc, _, _ = lc_info_at_grid_points(l)
+        # Frozen normalisers; refreshed in accept_step().
+        # lt_k lives in the LINE-CONGRUENCE basis (lu, lv) — not the surface
+        # tangents (du, dv), which give t_k. Using du/dv here made every
+        # normaliser come out as exactly ||t_k|| = 1 (t1_unit forces that), so
+        # the lt_nt1/lt_nt2 residuals were left unnormalised.
+        lc, lu, lv = lc_info_at_grid_points(l)
+        lu = lu.reshape(-1, 3)
+        lv = lv.reshape(-1, 3)
+        lt1 = (X[var_idx["u1"]][:, None] * lu +
+               X[var_idx["v1"]][:, None] * lv)
+        lt2 = (X[var_idx["u2"]][:, None] * lu +
+               X[var_idx["v2"]][:, None] * lv)
         self.lt1_norm = np.linalg.norm(lt1, axis=1) + 1e-12
         self.lt2_norm = np.linalg.norm(lt2, axis=1) + 1e-12
         self.lc_norm  = np.linalg.norm(lc.reshape(-1, 3), axis=1) + 1e-12
@@ -167,6 +173,20 @@ class Torsal(ObjectiveTerm):
         return (l, u1, v1, u2, v2, nt1, nt2,
                 lc.reshape(-1, 3), lu.reshape(-1, 3), lv.reshape(-1, 3))
 
+    def accept_step(self, X) -> None:
+        """Refresh the frozen ‖lt1‖, ‖lt2‖, ‖lc‖ normalisers at the new iterate.
+
+        The analytic Jacobian treats them as constants, so they stay fixed
+        while res/grad are evaluated at one X and move only once a step is
+        accepted.
+        """
+        _, u1, v1, u2, v2, _, _, lc, lu, lv = self._unpack(X)
+        lt1 = u1[:, None] * lu + v1[:, None] * lv
+        lt2 = u2[:, None] * lu + v2[:, None] * lv
+        self.lt1_norm = np.linalg.norm(lt1, axis=1) + 1e-12
+        self.lt2_norm = np.linalg.norm(lt2, axis=1) + 1e-12
+        self.lc_norm  = np.linalg.norm(lc,  axis=1) + 1e-12
+
     def res(self, X) -> np.ndarray:
         l, u1, v1, u2, v2, nt1, nt2, lc, lu, lv = self._unpack(X)
         F   = self._F
@@ -174,7 +194,11 @@ class Torsal(ObjectiveTerm):
         t2  = u2[:, None] * self.du + v2[:, None] * self.dv
         lt1 = u1[:, None] * lu + v1[:, None] * lv
         lt2 = u2[:, None] * lu + v2[:, None] * lv
-        lc_n = lc / (np.linalg.norm(lc, axis=1, keepdims=True) + 1e-12)
+        # Frozen normaliser (refreshed in accept_step), exactly as lt1/lt2 above.
+        # Normalising live here while grad() differentiates with a constant
+        # ||lc|| made the lc_nt1/lc_nt2 Jacobian blocks wrong (verified
+        # against finite differences).
+        lc_n = lc / self.lc_norm[:, None]
         lt1n = self.lt1_norm
         lt2n = self.lt2_norm
 
@@ -197,15 +221,13 @@ class Torsal(ObjectiveTerm):
         lt1 = u1[:, None] * lu + v1[:, None] * lv
         lt2 = u2[:, None] * lu + v2[:, None] * lv
 
-        lcn   = np.linalg.norm(lc, axis=1, keepdims=True) + 1e-12
-        lc_u  = lc / lcn
+        lc_u  = lc / self.lc_norm[:, None]
+        # Frozen normalisers, refreshed in accept_step(). They must not be
+        # updated here: the entries below mix `lt1n` with `self.lt1_norm`, so
+        # recomputing mid-Jacobian made one derivative use the new norm and
+        # another the old one.
         lt1n  = self.lt1_norm[:, None]
         lt2n  = self.lt2_norm[:, None]
-
-        # Update running norms
-        self.lt1_norm = np.linalg.norm(lt1, axis=1) + 1e-12
-        self.lt2_norm = np.linalg.norm(lt2, axis=1) + 1e-12
-        self.lc_norm  = np.linalg.norm(lc, axis=1)  + 1e-12
 
         # ── lt_nt1  [0,F) ──────────────────────────────────────────────────────
         # ∂/∂u1 = (lu·nt1)/‖lt1‖
