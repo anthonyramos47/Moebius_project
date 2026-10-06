@@ -52,7 +52,6 @@ from energies.Support_Fix import Supp_F
 from energies.Sphere_Fix_V import Sphere_Fix
 from energies.Sph_unit import Sph_Unit
 from energies.Tor_Planarity import Tor_Planarity
-from energies.Reg_E import Reg_E
 
 from optimization.Optimizer import Optimizer
 

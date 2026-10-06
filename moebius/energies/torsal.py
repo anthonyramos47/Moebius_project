@@ -95,7 +95,14 @@ class Torsal(ObjectiveTerm):
         lv = lv.reshape(-1, 3)
         lc_u = lc / (np.linalg.norm(lc, axis=1, keepdims=True) + 1e-12)
 
-        t1, t2, ut1, vt1, ut2, vt2, _ = torsal_directions(lc_u, lu, lv, self.du, self.dv)
+        t1, t2, ut1, vt1, ut2, vt2, neg_idx = torsal_directions(
+            lc_u, lu, lv, self.du, self.dv)
+        # Faces where the torsal quadratic had a negative discriminant: no REAL
+        # torsal directions exist there, so torsal_directions() fell back to a
+        # Nelder-Mead least-squares fit. Keep the set — those directions are not
+        # torsal and make poor remeshing constraints.
+        self.no_real_torsal = np.zeros(self._F, dtype=bool)
+        self.no_real_torsal[neg_idx] = True
         nt1 = unit(np.cross(lc_u, t1))
         nt2 = unit(np.cross(lc_u, t2))
 

@@ -51,7 +51,11 @@ from moebius.utils.mesh_utils import lc_info_at_grid_points, torsal_directions, 
 from moebius.energies import (
     MeanCurvatureBspline,
     LineCong, LineCongOrth, Torsal, TorsalAngle,
-    SphereFit, SupportPlanarity, RegFaces,
+    SphereFit, SphereUnit, SupportPlanarity,
+    TorsalPlane, init_edge_normals, ProximityCenters,
+)
+from moebius.utils.spheres import (
+    implicit_sphere_from_center_radius, center_radius_from_implicit,
 )
 
 HERE        = Path(__file__).resolve().parent
@@ -70,9 +74,9 @@ TORSAL_WEIGHTS = {
     "LineCong": 1.0, "LineCongOrth": 0.5,
     "Torsal": 1.0, "TorsalAngle": 0.5,
 }
-POSTOPT_WEIGHTS = {
-    "SphereFit": 1.0, "SupportPlanarity": 1e-1,
-    "RegFaces": 1e-2,
+POSTOPT_WEIGHTS = {   # paper Table 3
+    "SphereFit": 1.0, "SphereUnit": 10.0, "SupportPlanarity": 1e-1,
+    "TorsalPlane": 1e-2, "ProximityCenters": 1e-2,
 }
 
 
@@ -567,9 +571,134 @@ def torsal_field_per_quad(state: MoebiusState):
     return t1, t2
 
 
+def _frame_distance(t1a, t2a, t1b, t2b):
+    """Angle (deg) between two frames, blind to sign and to t1/t2 ordering."""
+    def ang(p, q):
+        return np.degrees(np.arccos(np.clip(np.abs(
+            np.einsum("ij,ij->i", p, q)), 0.0, 1.0)))
+    same = np.maximum(ang(t1a, t1b), ang(t2a, t2b))
+    swap = np.maximum(ang(t1a, t2b), ang(t2a, t1b))
+    return np.minimum(same, swap)
+
+
+def frame_field_outliers(state: MoebiusState, t1, t2,
+                         boundary_rings: int = 0,
+                         max_neighbour_deg: Optional[float] = 35.0,
+                         min_frame_angle_deg: Optional[float] = 5.0,
+                         max_torsal_residual: Optional[float] = None,
+                         max_rotation_deg: Optional[float] = None,
+                         drop_no_real_torsal: bool = True,
+                         rotation=None) -> dict:
+    """Flag quads whose frame should NOT be used as a remesher constraint.
+
+    The remesher interpolates the field over any element not listed in
+    `--indices`, so dropping a bad frame is strictly better than feeding it in:
+    a single rogue direction forces a singularity the solver then has to work
+    around. Criteria (each disabled by passing None):
+
+    max_neighbour_deg    the frame disagrees with its 4-neighbours on the
+                         sampling grid by more than this, measured blind to
+                         sign and to t1/t2 ordering. Uses the MEDIAN over
+                         neighbours, so a good quad sitting next to one outlier
+                         is kept while the outlier itself is dropped.
+    min_frame_angle_deg  t1 and t2 are nearly parallel - the frame is
+                         degenerate and carries no usable cross direction.
+    max_torsal_residual  |det[t, lt, lc]| above this: the optimisation did not
+                         actually make this quad torsal, so its direction is
+                         not meaningful.
+    max_rotation_deg     the in-plane projection rotated the direction by more
+                         than this (see export_frame_field).
+    drop_no_real_torsal  drop quads where the torsal quadratic had a negative
+                         discriminant, i.e. no REAL torsal directions exist and
+                         torsal_directions() returned a least-squares fit
+                         instead. These are the most principled drops: the
+                         direction there was never torsal to begin with.
+    boundary_rings       drop this many rings of quads along the grid border.
+                         The torsal direction at a quad depends on lu, lv —
+                         differences of l across the quad — and on the surface
+                         derivatives, both of which are least reliable at the
+                         patch edge, where r(u,v) is also least constrained.
+                         1 or 2 is usually enough.
+
+    Returns {'mask': bool array of quads to KEEP, 'reasons': {name: count}}.
+    """
+    nu, nv = state.u_sample_num, state.v_sample_num
+    nq = (nu - 1) * (nv - 1)
+    drop = np.zeros(nq, dtype=bool)
+    reasons = {}
+
+    if drop_no_real_torsal:
+        tors = state.torsal_opt.objective_terms.get("Torsal")
+        m = getattr(tors, "no_real_torsal", None)
+        if m is not None and len(m) == nq:
+            reasons["no real torsal directions (discriminant < 0)"] = int(m.sum())
+            drop |= m
+
+    if boundary_rings > 0:
+        gi = np.arange(nq).reshape(nu - 1, nv - 1)
+        m = np.zeros((nu - 1, nv - 1), dtype=bool)
+        k = int(boundary_rings)
+        m[:k, :] = m[-k:, :] = True
+        m[:, :k] = m[:, -k:] = True
+        m = m.ravel()
+        reasons[f"within {k} ring(s) of the boundary"] = int(m.sum())
+        drop |= m
+
+    if min_frame_angle_deg is not None:
+        ang = np.degrees(np.arccos(np.clip(np.abs(
+            np.einsum("ij,ij->i", t1, t2)), 0.0, 1.0)))
+        m = ang < min_frame_angle_deg
+        reasons["degenerate frame"] = int(m.sum()); drop |= m
+
+    if max_neighbour_deg is not None:
+        gi = np.arange(nq).reshape(nu - 1, nv - 1)
+        score = np.full(nq, np.nan)
+        for q in range(nq):
+            i, j = divmod(q, nv - 1)
+            nb = []
+            if i > 0:        nb.append(gi[i - 1, j])
+            if i < nu - 2:   nb.append(gi[i + 1, j])
+            if j > 0:        nb.append(gi[i, j - 1])
+            if j < nv - 2:   nb.append(gi[i, j + 1])
+            if not nb:
+                continue
+            nb = np.asarray(nb)
+            d = _frame_distance(np.repeat(t1[q][None], len(nb), 0),
+                                np.repeat(t2[q][None], len(nb), 0),
+                                t1[nb], t2[nb])
+            score[q] = np.median(d)
+        m = np.nan_to_num(score, nan=0.0) > max_neighbour_deg
+        reasons[f"not smooth (>{max_neighbour_deg:g} deg from neighbours)"] = int(m.sum())
+        drop |= m
+
+    if max_torsal_residual is not None:
+        V, F = sample_bspline_surface(state.bspline, state.u_pts, state.v_pts)
+        l = state.torsal_opt.unpack("l").reshape(nu, nv, 3)
+        lc, lu, lv = lc_info_at_grid_points(l)
+        lc = lc.reshape(-1, 3); lu = lu.reshape(-1, 3); lv = lv.reshape(-1, 3)
+        u1, v1, u2, v2 = state.torsal_opt.unpack("u1", "v1", "u2", "v2")
+        lt1 = u1[:, None] * lu + v1[:, None] * lv
+        lt2 = u2[:, None] * lu + v2[:, None] * lv
+        res = np.maximum(
+            np.abs(np.einsum("ij,ij->i", np.cross(unit(t1), unit(lt1)), unit(lc))),
+            np.abs(np.einsum("ij,ij->i", np.cross(unit(t2), unit(lt2)), unit(lc))))
+        m = res > max_torsal_residual
+        reasons[f"torsal residual >{max_torsal_residual:g}"] = int(m.sum())
+        drop |= m
+
+    if max_rotation_deg is not None and rotation is not None:
+        m = rotation > max_rotation_deg
+        reasons[f"in-plane rotation >{max_rotation_deg:g} deg"] = int(m.sum())
+        drop |= m
+
+    return {"mask": ~drop, "reasons": reasons}
+
+
 def export_frame_field(state: MoebiusState, basename: str = "remesh_input",
                        one_frame_per_quad: bool = True,
-                       project_to_faces: bool = True) -> dict:
+                       project_to_faces: bool = True,
+                       filter_outliers: bool = False,
+                       **outlier_kwargs) -> dict:
     """Write the triangulated surface + per-face frame field for quadRemesher.
 
     Produces, in state.save_path:
@@ -636,6 +765,24 @@ def export_frame_field(state: MoebiusState, basename: str = "remesh_input",
     if project_to_faces:
         t1_tri, t2_tri = p1, p2
 
+    # Drop frames that should not constrain the remesher; it interpolates
+    # across anything missing from --indices.
+    kept_info = None
+    if filter_outliers:
+        rot_per_quad = (rot if one_frame_per_quad
+                        else np.maximum(rot[0::2], rot[1::2]))
+        kept_info = frame_field_outliers(state, t1, t2, rotation=rot_per_quad,
+                                         **outlier_kwargs)
+        keep = kept_info["mask"]
+        if tri_idx is None:          # constraining both triangles of each quad
+            tri_idx = np.arange(len(F_tri), dtype=np.int32)
+            keep_tri = np.repeat(keep, 2)
+        else:
+            keep_tri = keep
+        tri_idx = tri_idx[keep_tri]
+        t1_tri, t2_tri = t1_tri[keep_tri], t2_tri[keep_tri]
+        rot = rot[keep_tri]
+
     obj_path = os.path.join(state.save_path, basename + ".obj")
     d1_path  = os.path.join(state.save_path, "D1.dat")
     d2_path  = os.path.join(state.save_path, "D2.dat")
@@ -653,6 +800,18 @@ def export_frame_field(state: MoebiusState, basename: str = "remesh_input",
         np.einsum("ij,ij->i", t1, t2)), -1, 1)))
 
     print(f"Exported {len(V)} vertices, {len(F_tri)} triangles -> {state.save_path}")
+    if kept_info is not None:
+        kept = int(kept_info["mask"].sum())
+        print(f"  outlier filter: kept {kept}/{n_quads} quads "
+              f"({100*kept/n_quads:.1f}%) as constraints; the remesher "
+              "interpolates the rest")
+        for why, cnt in kept_info["reasons"].items():
+            if cnt:
+                print(f"     dropped {cnt:5d}  {why}")
+        if kept < 0.25 * n_quads:
+            print(f"  WARNING: only {100*kept/n_quads:.0f}% of quads still "
+                  "constrain the field - loosen the thresholds, or the "
+                  "remesher will mostly be inventing its own field.")
     print(f"  {len(t1_tri)} frames on "
           + (f"1 of the 2 triangles of each of {n_quads} quads"
              if one_frame_per_quad else f"all {len(F_tri)} triangles"))
@@ -916,11 +1075,55 @@ def sweep_gradient(state: MoebiusState, gradients, **kwargs) -> list:
 
 # ── Stage 5: post-optimisation ────────────────────────────────────────────────
 
+def init_face_spheres(state: MoebiusState):
+    """Initial (centre, radius) per remeshed face from the sphere congruence.
+
+    Foot-points each remeshed vertex onto the sampling grid of the B-spline,
+    interpolates the surface point, normal and radius r(u,v) there, forms the
+    per-vertex centre c = f(u,v) + r*n, then averages over each face's four
+    vertices — the construction in paper Sec. 5.2 and in the original
+    QS_project/foot_point_bspline.py.
+    """
+    from scipy.interpolate import bisplev
+    from moebius.utils.bsplines import interpolate_lc
+
+    V_grid, F_quad = sample_bspline_surface(state.bspline, state.u_pts, state.v_pts)
+    F_tri = np.array(triangulate_quads(F_quad.tolist()), dtype=np.int32)
+
+    n_grid = state.bspline.normal(state.u_pts, state.v_pts).reshape(-1, 3)
+    r_grid = bisplev(state.u_pts, state.v_pts, state.r_uv).ravel()
+
+    Vq = state.V_remesh
+    # interpolate_lc transfers any per-grid-vertex 3-vector; reuse it for the
+    # normal, and carry the scalar radius as a 3-vector to share the machinery.
+    n_q = interpolate_lc(Vq, V_grid, F_tri, n_grid)
+    n_q /= np.linalg.norm(n_q, axis=1, keepdims=True) + 1e-12
+    r_q = interpolate_lc(Vq, V_grid, F_tri,
+                         np.repeat(r_grid[:, None], 3, axis=1))[:, 0]
+
+    c_q = Vq + r_q[:, None] * n_q                     # per-vertex centres
+    F = state.F_remesh_quads
+    return c_q[F].mean(axis=1), r_q[F].mean(axis=1)   # per-face averages
+
+
 def setup_postopt_optimizer(state: MoebiusState,
                              w_sphere: float = 1.0,
+                             w_unit: float = 10.0,
                              w_support: float = 1e-1,
-                             w_reg: float = 1e-2) -> Optimizer:
-    """Build the post-optimisation Optimizer (sphere fit + support + regularity)."""
+                             w_tplane: float = 1e-2,
+                             w_fair: float = 1e-3,
+                             w_reg_v: float = 0.0,
+                             w_reg_n: float = 0.0,
+                             w_unit_n: float = 10.0,
+                             warmup_iters: int = 10,
+                             w_prox: float = 1e-2,
+                             w_glide: float = 1.0,
+                             w_prox_c: float = 1e-2,
+                             prox_epsilon: float = 0.1) -> Optimizer:
+    """Build the post-optimisation Optimizer (paper Sec. 5.2, Eq. 10).
+
+    Defaults follow Table 3: w_torsal_plane = 0.01, w_unit = 10, w_reg = 0.05.
+    """
     V = state.V_remesh
     F = state.F_remesh_quads
     if F is None:
@@ -944,31 +1147,116 @@ def setup_postopt_optimizer(state: MoebiusState,
     e_f_f    = (ef1[ie], ef2[ie])
     e_v_v    = (ev1[ie], ev2[ie])
 
-    # Sphere params from current geometry
-    n_f  = len(F)
-    A0   = np.ones(n_f)
-    B0   = np.zeros((n_f, 3))
-    for fi, f in enumerate(F):
-        pts = V[f]
-        B0[fi] = pts.mean(axis=0)
-    C0 = np.zeros(n_f)
+    # Initial sphere congruence, as the original implementation built it:
+    # foot-point every remeshed vertex onto the B-spline, read n(u,v) and
+    # r(u,v) there, form c = f(u,v) + r*n per vertex, then AVERAGE the four
+    # vertex centres and radii of each face.
+    c_face, r_face = init_face_spheres(state)
+    A0, B0, C0 = implicit_sphere_from_center_radius(c_face, r_face)
+
+    # Dual-ring normals from the centre ring itself (cross of its diagonals),
+    # as the original did — a direct estimate of the ring's plane normal.
+    nd0 = np.zeros((len(sph_sph_adj), 3))
+    for i, f in enumerate(sph_sph_adj):
+        f = np.asarray(f, dtype=np.int32)
+        if len(f) >= 4:
+            nd0[i] = np.cross(c_face[f[2]] - c_face[f[0]],
+                              c_face[f[1]] - c_face[f[3]])
+        elif len(f) == 3:
+            nd0[i] = np.cross(c_face[f[1]] - c_face[f[0]],
+                              c_face[f[2]] - c_face[f[1]])
+    nn = np.linalg.norm(nd0, axis=1, keepdims=True)
+    nd0 = np.where(nn > 1e-12, nd0 / np.maximum(nn, 1e-12), np.array([0., 0., 1.]))
+
+    # Node axes at the remeshed vertices, and the per-edge torsal-plane normals
+    l0 = state.l_remesh / (np.linalg.norm(state.l_remesh, axis=1, keepdims=True) + 1e-12)
+    n_l0 = init_edge_normals(V, l0, e_v_v[0], e_v_v[1])
+
+    # Warm-up (paper Sec. 5.2, "Implementation details"): a few steps where the
+    # ONLY variables are the spheres, optimising sphericity plus a small amount
+    # of support, "to have a closer initial guess before starting to allow the
+    # movement of the vertices". The mesh vertices are a constant here.
+    if warmup_iters > 0:
+        wu = Optimizer()
+        wu.add_variable("A",  A0)
+        wu.add_variable("B",  B0.ravel())
+        wu.add_variable("C",  C0)
+        wu.add_variable("nd", nd0.ravel())
+        wu.add_objective_term(SphereFit(),  (vertex_sph, V), w=w_sphere, ce=True)
+        wu.add_objective_term(SphereUnit(), (),              w=w_unit,   ce=True)
+        wu.add_objective_term(SupportPlanarity(), (sph_sph_adj,),
+                              w=0.01 * w_support, ce=True)
+        wu.unitize_variable("nd", 3, w=w_unit_n)
+        wu.initialize_optimizer(verbose=False, adaptive_mu=False)
+        wu.optimize(max_iter=warmup_iters)
+        A0, B0, C0 = wu.unpack("A", "B", "C")
+        nd0 = wu.unpack("nd").reshape(-1, 3)
+        print(f"Warm-up: {wu.it} sphere-only steps, "
+              f"energy {wu.energy[0]:.4e} -> {wu.energy[-1]:.4e}")
 
     # Declare ALL variables first (Jacobian shape is fixed at len(X) on first add_objective_term)
     opt = Optimizer()
-    opt.add_variable("v",  V.ravel())
-    opt.add_variable("A",  A0)
-    opt.add_variable("B",  B0.ravel())
-    opt.add_variable("C",  C0)
-    opt.add_variable("nd", np.zeros(3 * len(inner_v)))
+    opt.add_variable("v",   V.ravel())
+    opt.add_variable("A",   A0)
+    opt.add_variable("B",   np.asarray(B0).ravel())
+    opt.add_variable("C",   C0)
+    opt.add_variable("nd",  nd0.ravel())
+    opt.add_variable("l",   l0.ravel())
+    opt.add_variable("n_l", n_l0.ravel())
 
-    sph_term  = SphereFit()
-    supp_term = SupportPlanarity()
-    reg_term  = RegFaces()
-    opt.add_objective_term(sph_term,  (vertex_sph,),      w=w_sphere,  ce=True)
-    opt.add_objective_term(supp_term, (sph_sph_adj,),     w=w_support, ce=True)
-    opt.add_objective_term(reg_term,  (e_f_f, e_v_v),     w=w_reg,     ce=True)
+    opt.add_objective_term(SphereFit(),        (vertex_sph,),  w=w_sphere,  ce=True)
+    # Without SphereUnit, (A, B, C) = 0 satisfies SphereFit exactly: the paper
+    # says it "prevents the coefficients from vanishing".
+    opt.add_objective_term(SphereUnit(),       (),             w=w_unit,    ce=True)
+    opt.add_objective_term(SupportPlanarity(), (sph_sph_adj,), w=w_support, ce=True)
+    opt.add_objective_term(TorsalPlane(),      (e_v_v,),       w=w_tplane,  ce=True)
 
-    opt.set_fairness("v", mesh.vertex_adjacency_list(), dim=3, w=1e-3)
+    # Proximity (paper E_prox_f / E_prox_C). Without these nothing holds the
+    # mesh to the reference surface or the centres to the congruence.
+    #   - the mesh vertices v -> the sampled reference surface, via Chakana's
+    #     proximity_reference, which adds BOTH the closest-point term
+    #     (ProximityReference, |v - v_f|^2) and the gliding/tangent-plane term
+    #     (GlideReference, <v - v_f, n_f>^2).
+    #   - the sphere centres -> the centre surface c = s + r n of the
+    #     congruence optimised in stages 2-3.
+    V_ref, F_ref_quad = sample_bspline_surface(state.bspline, state.u_pts, state.v_pts)
+    F_ref = np.array(triangulate_quads(F_ref_quad.tolist()), dtype=np.int32)
+    opt.proximity_reference("v", V_ref, F_ref, w_prox, w_glide)
+
+    from scipy.interpolate import bisplev
+    r_grid = bisplev(state.u_pts, state.v_pts, state.r_uv).ravel()
+    n_grid = state.bspline.normal(state.u_pts, state.v_pts).reshape(-1, 3)
+    C_ref  = V_ref + r_grid[:, None] * n_grid          # centre surface
+    opt.add_objective_term(ProximityCenters(), (C_ref, F_ref, prox_epsilon),
+                           w=w_prox_c, ce=True)
+
+    opt.unitize_variable("nd",  3, w=w_unit_n)
+    opt.unitize_variable("n_l", 3, w=w_unit_n)
+    opt.unitize_variable("l",   3, w=w_unit_n)
+
+    # E_reg (paper Sec. 5.2 (iv)): "fairness terms for quad meshes ... and
+    # dampening terms for the change of variables". Fairness is Chakana's
+    # set_fairness. The dampening half is control_variable, Table 3's
+    # w_reg_v = 0.04 / w_reg_n = 0.05 — but it DEFAULTS TO 0 here, deliberately.
+    #
+    # StepControl's residual is X - prev, and accept_step sets prev = X after
+    # every accepted step. With adaptive_mu=False every step is accepted, so
+    # that residual is identically zero at every evaluation (measured: its
+    # energy is exactly 0.0). A zero residual adds nothing to b = J^T r, so it
+    # cannot move the stationary point; J^T J still adds w*I, so all it does is
+    # shrink the step — redundant with LM's own mu. Measured on Tunel, 80
+    # iterations: |dist-r| 1.65e-05 undamped vs 2.29e-04 at the paper's
+    # weights, and even 300 damped iterations only reached 1.01e-04.
+    #
+    # Raise them if adaptive damping is ever enabled (there the residual is
+    # nonzero during rejected trials, which is what makes it proximal), or if a
+    # surface needs the extra stability.
+    opt.set_fairness("v", mesh.vertex_adjacency_list(), dim=3, w=w_fair)
+    if w_reg_v:
+        opt.control_variable("v", w_reg_v)
+    if w_reg_n:
+        opt.control_variable("nd",  w_reg_n)
+        opt.control_variable("n_l", w_reg_n)
     opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.postopt = opt
     return opt
