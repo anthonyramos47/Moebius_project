@@ -1295,12 +1295,13 @@ def save_results(state: MoebiusState) -> None:
         write_obj(os.path.join(state.save_path, "optimised_mesh.obj"),
                    V_opt, state.F_remesh)
 
-        from moebius.glyphs import sphere_centers_radii_from_params, spherical_panels_from_mesh
+        # (A, B, C) rather than centres and radii: converting first turns a
+        # plane into a centre and radius of ~1/(2A), indistinguishable from a
+        # very large sphere.
+        from moebius.glyphs import panels_from_spheres
         A, B, C = state.postopt.unpack("A", "B", "C")
-        B = B.reshape(-1, 3)
-        centers, radii = sphere_centers_radii_from_params(A, B, C)
-        pV, pF = spherical_panels_from_mesh(V_opt, state.F_remesh_quads,
-                                             centers, radii)
+        pV, pF = panels_from_spheres(V_opt, state.F_remesh_quads,
+                                      A, B.reshape(-1, 3), C)
         write_obj(os.path.join(state.save_path, "sphere_panels.obj"), pV, pF)
 
     _save_state(state, "state.pickle")

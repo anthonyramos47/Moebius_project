@@ -25,6 +25,7 @@ dependencies:
     - pandas        # hanan.optimization builds report DataFrames
     - splipy
     - libigl        # >=2.6: barycentric_coordinates (older name was *_tri)
+    - triangle      # quality 2D CDT behind the spherical panels
     - jax[cpu]      # hanan's jacobianMethod="jax" (SupportPlanarity, RegFaces)
     - ipykernel
     - ipywidgets    # notebook sampling-interval sliders
