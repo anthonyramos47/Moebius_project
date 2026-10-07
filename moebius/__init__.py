@@ -8,6 +8,7 @@ from .pipeline import (
     torsal_field_per_quad, export_frame_field, save_remesh_input,
     remesher_command, run_remesher,
     load_remeshed_surface, remesh_quality, sweep_gradient,
+    fair_remeshed_surface,
 )
 from .pipeline import setup_postopt_optimizer, run_postopt_optimizer
 from .pipeline import save_results, load_state

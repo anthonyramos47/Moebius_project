@@ -1,6 +1,7 @@
 """
 B-spline surface utilities for the Moebius / sphere-congruence pipeline.
-Replaces the old QS_project/utils/bsplines_functions.py — Polyscope removed,
+Replaces the old QS_project/utils/bsplines_functions.py (removed from the
+tree on 2026-10-07; recoverable from git history) — Polyscope removed,
 imports updated to the new hanan geometry package.
 """
 

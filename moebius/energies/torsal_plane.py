@@ -9,7 +9,8 @@ normal n_uw per edge,
 
 with the constraint ||n_uw|| = 1 (add it with Optimizer.unitize_variable).
 
-Ported from QS_project/energies/Tor_Planarity.py with two corrections:
+Ported from QS_project/energies/Tor_Planarity.py (now only in git history)
+with two corrections:
 
 * The residual divided by ||w-u|| but d/dw and d/du did not, so the Jacobian
   did not match its own residual. Here ||w-u|| is a FROZEN normaliser applied

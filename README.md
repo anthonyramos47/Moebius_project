@@ -1,33 +1,144 @@
-# hananLab
-Geometry Processing Frameworks
+# Moebius project — approximation by meshes with spherical faces
 
-In this repository, you can find different kinds of Frameworks that I created for geometric processing algorithms. Especially focusing on the visualization of meshes, and optimization algorithms. 
-This repository is just a wrap of different libraries and some added functionalities.  
+Approximates a reference B-spline surface by a quad mesh whose faces can be
+realised as **spherical panels** with a **planar support structure**: a sphere
+congruence is optimised so that its associated line congruence has real torsal
+directions, those directions drive a quad remeshing, and a final optimisation
+fits one sphere per face.
+
+This is an **improved implementation** of
+
+> A. S. Ramos Cisneros, A. Aikyn, M. Kilian, H. Pottmann, C. Müller,
+> *Approximation by Meshes with Spherical Faces*,
+> ACM Transactions on Graphics 43(6), Article 179 (SIGGRAPH Asia 2024).
+> [doi:10.1145/3687942](https://doi.org/10.1145/3687942)
+
+Section 5 of the paper is the reference for the pipeline, and Tables 1–3 give
+the published weights.
+
+## What is improved over the published implementation
+
+**Inequality constraints use a different formulation.** The paper writes each
+one-sided constraint with a dummy variable — `⟨l,n⟩² − cos²θ − μ² = 0` and
+`⟨n₁,n₂⟩² − cos²α + ν² = 0`. That has a stationary trap: the derivative with
+respect to the slack is `±2μ`, so a slack sitting at zero has a vanishing
+Jacobian column and can never leave zero. Measured on real runs, `μ` was pinned
+at exactly 0 on over 90% of grid points and `θ` on *every* face, which silently
+turned the torsal-angle inequality into the **equality** `angle = α`, dragging
+well-separated torsal planes back down to the threshold.
+
+Here the same constraints are **one-sided hinge residuals**, `max(0, ·)`, with
+analytic gradients and no slack variables at all. The residual has a kink at the
+constraint boundary but the energy `Σ r²` is C¹ there, so Levenberg–Marquardt is
+well behaved. On the `Tunel` reference surface this removed 761 unknowns and
+~400 singular directions from the system, and took the angle-threshold violation
+from 35% of points to 0%.
+
+The dummy-variable form is still available (`hinge=False`) for reproducing the
+paper exactly.
+
+**Bad frames are dropped rather than forced on the remesher.** A torsal
+direction is only meaningful where the torsal quadratic has a real solution; the
+optimisation leaves a handful of faces where it does not, and near the patch
+boundary the field can disagree sharply with its neighbours. Feeding such a
+frame to the remesher is worse than feeding it nothing — one rogue direction
+locally deflects the quads around it. The remesher interpolates the field across
+any face absent from its `--indices` list (libigl tutorial 506 style), so
+`export_frame_field(..., filter_outliers=True)` simply leaves them out: faces
+whose torsal directions were never real, frames disagreeing with their grid
+neighbours, near-degenerate frames, and optionally rings along the boundary.
+Each criterion is reported with a count, and on the reference surfaces this
+drops on the order of 1% of faces.
+
+**Control over the boundary.** The remeshed quad mesh is the thing being
+deformed, so its boundary drifts: the patch edge is where the line congruence is
+least constrained and where the fairness stencil is one-sided. Variables can now
+be held *exactly* fixed — a hard constraint, not a penalty — through
+`Optimizer.fix_variables` in the `hanan` library, and the pipeline exposes it as
+`fix_boundary` in both the fairing and post-optimisation stages. With it the
+boundary curve is preserved bit-for-bit while the interior is free to move.
+
+Other differences, each measured rather than assumed, are listed in
+`CHECKLIST.md`.
 
 ## Installation
 
-### Conda 
-Install [conda](https://docs.conda.io/projects/conda/en/stable/user-guide/install/download.html) in your computer 
+Needs [conda](https://docs.conda.io/projects/conda/en/stable/user-guide/install/download.html).
 
-### Install environment
+```bash
+git clone --recurse-submodules <this repo>     # Chakana_Geo must be present
+cd Moebius_project
+conda env create -f environment.yaml           # creates "Mproj", python 3.11
+conda activate Mproj
+```
 
-Go to the repository folder and you will find the file environment.yml. Go to the terminal and install the environment
+Run `conda env create` **from the repository root**: the spec ends with two
+editable installs of the `Chakana_Geo` submodule (`hanan`, the geometry and
+optimisation library, and `kayviz`, the viewer), and their relative paths
+resolve against the working directory.
 
-``` conda env create -f enviroment.yml ```
+Only `python` and `pip` come from conda; everything else is a prebuilt wheel, so
+nothing compiles and the environment builds in about ninety seconds.
 
-To activate the enviroment 
+### The remesher
 
-``` conda activate hananJ```
+**A built remesher is included**, at `bin/quadRemesher`, so a fresh clone runs
+the whole pipeline with nothing else to compile. It is picked up automatically —
+`resolve_remesher_bin()` checks `bin/` first, then a sibling `../QuadRemesher`
+checkout, then `$REMESHER_BIN` and `$PATH` — and `check_remesher()` verifies it
+understands the current flag-based CLI.
 
-### Running notebook
+| platform | status |
+|---|---|
+| **Linux x86-64** | provided, `bin/quadRemesher` |
+| **Windows** | to come |
+| **macOS** | to come |
 
-In the repository folder you will find hJupyter. The main notebook is **hananJup.ipynb** but you can create another notebook for your purposes. 
+The bundled binary is linked only against system libraries (libblas, libm,
+libc, libgcc, libstdc++), so it should run on any comparable Linux without
+extra setup. Windows and macOS builds will be added later; until then, build
+the remesher from source —
 
-The **geometry** folder contains files related to the half-edge data structure to handle mesh connectivities and **testFolder** where it is tested some of the new functionalities. 
+> **https://github.com/anthonyramos47/QuadRemesher**
 
-The **optimization** folder holds all related to linear solvers and optimizers. So far it has been implemented Levenberg-Marquart algorithm and Projected Guided is meant to be implemented soon. 
+— and point `state.remesher_bin` or `$REMESHER_BIN` at the result. That
+repository's README covers the build and the full command-line interface.
 
+## Running
 
-For Quad_Remesh in MAC install PyQT5 in case of problems with tkv of Mayavi
+```bash
+jupyter lab notebooks/moebius_pipeline.ipynb
+```
 
-*The name Hanan comes from the Kichwa cosmovision where Hanan-Pacha refers to the spiritual world*
+The notebook is the driver — `moebius/` is deliberately GUI-free and can also be
+scripted directly. Each stage begins with a block of named parameters and the
+reasoning for their values.
+
+| stage | what it does |
+|---|---|
+| 0–1 | read a B-spline from `data/bsplines/`, sample it, initialise the central sphere congruence `r = 1/H` |
+| 1b | optionally deform the surface so `\|H\|` stays above a threshold, keeping `r = 1/H` well conditioned |
+| 2 | move the radii so the line congruence is orthogonal to the sphere congruence and within θ of the normal |
+| 3 | optimise the torsal directions, recomputing them analytically every *N* steps |
+| 4 | export the frame field and remesh along it; outlier frames can be dropped and are interpolated by the remesher |
+| 4b | glide the remeshed mesh over the reference surface with fairness, giving the fair quad mesh *Q′* |
+| 5 | fit one sphere per face, with support planarity, torsal planes and proximity |
+| 6 | write the OBJs — surface, sphere centres, remeshed, optimised, spherical panels — and the state |
+
+`data/bsplines/` holds the reference surfaces (`Tunel.json` is the default).
+Outputs go to `notebooks/out/<surface>/<experiment>/`.
+
+## Layout
+
+- `moebius/` — the pipeline. `pipeline.py` holds the stages, `energies/` one
+  `ObjectiveTerm` per file, `utils/` B-spline and sphere helpers, `glyphs.py` the
+  spherical panels.
+- `Chakana_Geo/` — submodule: `hanan` (meshes, I/O, Levenberg–Marquardt
+  optimiser) and `kayviz` (browser-based viewer).
+- `notebooks/` — the pipeline notebook.
+- `data/bsplines/` — Rhino-exported reference surfaces.
+- `bin/quadRemesher` — the bundled quad remesher used by stage 4.
+- `CHECKLIST.md` — what is verified, what is still open.
+
+*The name Hanan comes from the Kichwa cosmovision, where Hanan-Pacha refers to
+the spiritual world.*

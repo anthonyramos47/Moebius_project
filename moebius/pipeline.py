@@ -54,6 +54,7 @@ from moebius.energies import (
     SphereFit, SphereUnit, SupportPlanarity,
     TorsalPlane, init_edge_normals, ProximityCenters,
 )
+from hanan.optimization import Corner
 from moebius.utils.spheres import (
     implicit_sphere_from_center_radius, center_radius_from_implicit,
 )
@@ -122,6 +123,8 @@ class MoebiusState:
     F_remesh: Optional[list] = None            # ragged: list of index lists
     F_remesh_quads: Optional[np.ndarray] = None  # (nf,4) iff every face is a quad
     l_remesh: Optional[np.ndarray] = None
+
+    fair_opt: Optional[Optimizer] = None   # the glide+fairness pass (Q')
 
     # Inequality formulation: True = hinge residuals (no mu/theta slacks)
     hinge: bool = True
@@ -479,7 +482,11 @@ def run_torsal_optimizer(state: MoebiusState, max_iter: int = 100,
 # triangulates the grid and gives both triangles of a quad that quad's
 # directions (--defined_on faces).
 
+# The repository ships a built binary in bin/, so a fresh clone can run stage 4
+# without building anything; the sibling-repo paths are kept for working from a
+# local QuadRemesher checkout.
 REMESHER_CANDIDATES = (
+    PROJECT_ROOT / "bin" / "quadRemesher",
     PROJECT_ROOT.parent / "QuadRemesher" / "bin" / "quadRemesher",
     PROJECT_ROOT.parent / "QuadRemesher" / "Quad_Remesher" / "build" / "quadRemesher",
 )
@@ -1075,6 +1082,111 @@ def sweep_gradient(state: MoebiusState, gradients, **kwargs) -> list:
 
 # ── Stage 5: post-optimisation ────────────────────────────────────────────────
 
+def fair_remeshed_surface(state: MoebiusState,
+                          max_iter: int = 30,
+                          w_prox: float = 5.0,
+                          w_glide: float = 5.0,
+                          w_fair: float = 1e-2,
+                          w_edge: float = 1e-1,
+                          w_corner: float = 0.0,
+                          fix_boundary: bool = True) -> Optimizer:
+    """Glide the remeshed quad mesh over the reference surface (paper Sec. 5.2).
+
+    The mesh that comes back from the remesher "may exhibit some zigzag
+    behaviour which we eliminate by letting the mesh glide over the reference
+    surface while enforcing fairness of the parameter lines. In this way we
+    obtain a fair quad mesh Q'." Only then does the paper foot-point Q' to get
+    its (u, v) and build the sphere congruence.
+
+    This step was missing: the spheres were initialised from the RAW remesher
+    output, so stage 5 had to absorb the zigzag while fitting spheres at the
+    same time, with a proximity weight two orders below the one used here.
+
+    Terms, matching the original QS_project/foot_point_bspline.py, which is
+    now only in git history (w_prox = 5 against
+    w_fair = 0.01 there: hold the mesh on the surface, let it slide
+    tangentially):
+
+    w_prox / w_glide  proximity to the reference surface, closest point and
+                      tangent plane (Chakana's proximity_reference)
+    w_fair            quad-mesh fairness on the parameter lines, 0.01 as in
+                      foot_point_bspline.py. Chakana damps this term to zero
+                      after `damp_iteration` steps by design — fairness run to
+                      convergence is mean-curvature flow and shrinks the mesh —
+                      so it acts as a short smoothing burst, not a term that
+                      minimises throughout. Do not extend its damping.
+    w_edge            keep each edge near the length the remesher gave it, so
+                      gliding cannot bunch the mesh up
+    w_corner          angle at each boundary vertex held at its initial value.
+                      Off by default because it is redundant when
+                      fix_boundary=True; raise it if you free the boundary.
+    fix_boundary      hold the boundary exactly. This is the mesh that gets
+                      deformed, so without it the patch edge drifts.
+
+    Updates state.V_remesh in place and returns the optimizer.
+    """
+    V = state.V_remesh
+    F = state.F_remesh_quads
+    if F is None:
+        raise RuntimeError("fairing needs an all-quad remeshed mesh")
+
+    mesh = Mesh()
+    mesh.make_mesh(V, F)
+    adj = mesh.vertex_adjacency_list()
+    ev1, ev2 = mesh.edge_vertices()
+    bnd = np.asarray(mesh.boundary_vertices()).ravel()
+
+    V_ref, F_ref_quad = sample_bspline_surface(state.bspline, state.u_pts, state.v_pts)
+    F_ref = np.array(triangulate_quads(F_ref_quad.tolist()), dtype=np.int32)
+
+    opt = Optimizer()
+    opt.add_variable("v", V.ravel().copy())
+
+    opt.proximity_reference("v", V_ref, F_ref, w_prox, w_glide)
+    # Chakana's fairness damps its own weight to zero after damp_iteration
+    # steps, and that is deliberate: Laplacian fairness minimised over a whole
+    # run is mean-curvature flow, so the mesh shrinks. Leave the default alone.
+    opt.set_fairness("v", adj, dim=3, w=w_fair)
+
+    # Target lengths are the ones the remesher produced: the cross field set
+    # them, and gliding should not undo that.
+    if w_edge:
+        L0 = np.linalg.norm(V[ev2] - V[ev1], axis=1)
+        opt.edge_length("v", (ev1, ev2), L0, w_edge)
+
+    if w_corner and len(bnd):
+        # Each boundary vertex has exactly two boundary neighbours; Corner
+        # holds the angle between them at its initial value (targetAngle=None).
+        bset = set(bnd.tolist())
+        corners, corner_adj = [], []
+        for i in bnd:
+            nb = [j for j in adj[i] if j in bset]
+            if len(nb) == 2:
+                corners.append(i); corner_adj.append(nb)
+        if corners:
+            opt.add_objective_term(Corner(), ("v", corners, corner_adj, None),
+                                   w=w_corner, ce=True)
+            print(f"  corner energy on {len(corners)} boundary vertices")
+
+    if fix_boundary and len(bnd):
+        opt.fix_variables("v", bnd, dim=3)
+
+    opt.initialize_optimizer(verbose=False, adaptive_mu=False)
+    e0 = None
+    opt.optimize(max_iter=max_iter)
+    e = np.asarray(opt.energy)
+
+    V_new = opt.unpack("v").reshape(-1, 3)
+    moved = np.linalg.norm(V_new - V, axis=1)
+    state.V_remesh = V_new
+    state.fair_opt = opt
+
+    print(f"Fairing (Q'): {len(e)} iters, energy {e[0]:.4e} -> {e[-1]:.4e}")
+    print(f"  vertices moved: median {np.median(moved):.3e}  max {moved.max():.3e}"
+          + (f"  (boundary held: {moved[bnd].max():.1e})" if fix_boundary and len(bnd) else ""))
+    return opt
+
+
 def init_face_spheres(state: MoebiusState):
     """Initial (centre, radius) per remeshed face from the sphere congruence.
 
@@ -1082,7 +1194,7 @@ def init_face_spheres(state: MoebiusState):
     interpolates the surface point, normal and radius r(u,v) there, forms the
     per-vertex centre c = f(u,v) + r*n, then averages over each face's four
     vertices — the construction in paper Sec. 5.2 and in the original
-    QS_project/foot_point_bspline.py.
+    the original QS_project/foot_point_bspline.py (now only in git history).
     """
     from scipy.interpolate import bisplev
     from moebius.utils.bsplines import interpolate_lc
@@ -1119,10 +1231,21 @@ def setup_postopt_optimizer(state: MoebiusState,
                              w_prox: float = 1e-2,
                              w_glide: float = 1.0,
                              w_prox_c: float = 1e-2,
-                             prox_epsilon: float = 0.1) -> Optimizer:
+                             prox_epsilon: float = 0.1,
+                             fix_boundary: bool = False) -> Optimizer:
     """Build the post-optimisation Optimizer (paper Sec. 5.2, Eq. 10).
 
     Defaults follow Table 3: w_torsal_plane = 0.01, w_unit = 10, w_reg = 0.05.
+
+    `fix_boundary` holds the boundary vertices of the remeshed quad mesh exactly
+    where the remesher put them (a hard constraint via Optimizer.fix_variables,
+    not a penalty). Off by default: it is a real trade-off, not a free win. On
+    Tunel over 80 iterations it kept the boundary bit-identical but cost 5.7x on
+    the sphere fit (median |dist - r| 1.56e-05 -> 8.93e-05), because boundary
+    vertices do need to move to let their own faces' spheres be fitted. Worth
+    paying when the boundary position matters more than the fit — matching a
+    neighbouring patch, say — or applied only for a closing handful of
+    iterations to stop late drift.
     """
     V = state.V_remesh
     F = state.F_remesh_quads
@@ -1257,6 +1380,12 @@ def setup_postopt_optimizer(state: MoebiusState,
     if w_reg_n:
         opt.control_variable("nd",  w_reg_n)
         opt.control_variable("n_l", w_reg_n)
+    if fix_boundary:
+        bnd = np.asarray(mesh.boundary_vertices()).ravel()
+        opt.fix_variables("v", bnd, dim=3)
+        print(f"Holding {len(bnd)} boundary vertices fixed "
+              f"({100 * len(bnd) / len(V):.0f}% of the mesh)")
+
     opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.postopt = opt
     return opt

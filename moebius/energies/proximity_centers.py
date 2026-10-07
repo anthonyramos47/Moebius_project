@@ -20,7 +20,8 @@ which is a perfectly ordinary thing to want here).
     E_T:  r = <B - 2 A v_f, n_f>         dr/dB = n_f    dr/dA = -2 <v_f, n_f>
     E_D:  r = eps (B - 2 A v_f)          dr/dB = eps    dr/dA = -2 eps v_f
 
-QS_project/energies/Proximity_C.py had the derivatives of the polynomial form
+QS_project/energies/Proximity_C.py (now only in git history) had the
+derivatives of the polynomial form
 but set the residual to (c - v_f)*eps, i.e. the two differed by a factor
 1/(2A). It also refreshed its reference normal inside compute(); here the
 closest point and its normal are frozen per step and refreshed in
