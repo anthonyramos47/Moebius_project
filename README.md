@@ -143,6 +143,13 @@ input. Check `H` before reaching for it.
 default, with `rot`, `tunel_inv`, `tunel_inv_1` and `surface_00002` also
 verified end to end. More examples will be added.
 
+The folder still needs a pass: it also carries older B-splines that have not
+been checked against the condition above, and some of them certainly violate
+it. Only the ones listed as verified are known to have a one-signed `H`. The
+intention is to reduce `data/bsplines/` to surfaces with `H != 0` throughout,
+so that anything in it can be run without first testing whether the method
+applies to it.
+
 ## Layout
 
 - `moebius/` — the pipeline. `pipeline.py` holds the stages, `energies/` one
