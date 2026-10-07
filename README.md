@@ -58,9 +58,6 @@ be held *exactly* fixed — a hard constraint, not a penalty — through
 `fix_boundary` in both the fairing and post-optimisation stages. With it the
 boundary curve is preserved bit-for-bit while the interior is free to move.
 
-Other differences, each measured rather than assumed, are listed in
-`CHECKLIST.md`.
-
 ## Installation
 
 Needs [conda](https://docs.conda.io/projects/conda/en/stable/user-guide/install/download.html).
@@ -125,8 +122,26 @@ reasoning for their values.
 | 5 | fit one sphere per face, with support planarity, torsal planes and proximity |
 | 6 | write the OBJs — surface, sphere centres, remeshed, optimised, spherical panels — and the state |
 
-`data/bsplines/` holds the reference surfaces (`Tunel.json` is the default).
 Outputs go to `notebooks/out/<surface>/<experiment>/`.
+
+### Which surfaces this works on
+
+**The reference surface must have a mean curvature that never vanishes, and
+never changes sign.** The pipeline starts from the central sphere congruence,
+whose radii are `r = 1/H`, so an `H` that passes through zero sends the radii
+through infinity and there is nothing to optimise. This is a limitation of the
+method itself, not of the implementation (paper, Sec. 6.3).
+
+Stage 1b offers an optimisation that deforms the surface's control points to
+push `|H|` above a threshold, and it helps where `H` merely comes close to zero.
+It will **not** rescue a surface that genuinely violates the condition — a
+shape with a real sign change in `H` cannot be nudged out of it, and the stage
+will either fail to converge or return a surface no longer resembling the
+input. Check `H` before reaching for it.
+
+`data/bsplines/` holds the surfaces this has been run on — `Tunel.json` is the
+default, with `rot`, `tunel_inv`, `tunel_inv_1` and `surface_00002` also
+verified end to end. More examples will be added.
 
 ## Layout
 
@@ -136,9 +151,13 @@ Outputs go to `notebooks/out/<surface>/<experiment>/`.
 - `Chakana_Geo/` — submodule: `hanan` (meshes, I/O, Levenberg–Marquardt
   optimiser) and `kayviz` (browser-based viewer).
 - `notebooks/` — the pipeline notebook.
-- `data/bsplines/` — Rhino-exported reference surfaces.
+- `data/bsplines/` — reference surfaces.
 - `bin/quadRemesher` — the bundled quad remesher used by stage 4.
-- `CHECKLIST.md` — what is verified, what is still open.
 
 *The name Hanan comes from the Kichwa cosmovision, where Hanan-Pacha refers to
 the spiritual world.*
+
+---
+
+This clean version of the code was cleaned and organized with the help of AI
+(Claude Opus 5.5).
