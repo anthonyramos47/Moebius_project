@@ -21,26 +21,54 @@ throughout. Capping sign_H·H also bounds the radii from below, keeping the
 congruence inside 1/H_max <= r <= 1/H_thresh rather than letting a crease
 produce arbitrarily small spheres.
 
-Both blocks are in one term rather than two because the Jacobian is finite
-differences: each control-point column costs a full curvature evaluation over
-the grid, so a second term would double the cost of the stage to apply a
-penalty that reuses exactly the same H.
+Both blocks are in one term rather than two because they reuse exactly the same
+H: a second term would evaluate the curvature field twice per iteration.
 
 Variables: "cp_surf"  — B-spline surface control points (nu_cp × nv_cp × 3, flat).
-Jacobian : finite differences (bspline evaluation uses splipy/numpy, not JAX).
+
+Jacobian
+--------
+`jax` by default, `FD` with use_jax=False.
+
+splipy's own evaluation is numpy and cannot be traced, which is why this term
+used finite differences: two residual evaluations per variable per iteration,
+each a full curvature evaluation over the grid — 2400 of them per iteration for
+a 20x20 control net.
+
+None of that is necessary, because every surface derivative is *linear* in the
+control points,
+
+    S^(a,b)(u_i, v_j) = sum_pq  Nu^(a)[i,p] . Nv^(b)[j,q] . P[p,q,:]
+
+and the basis derivative matrices Nu^(a), Nv^(b) depend only on the parameter
+grid and the knots, both fixed for the whole run. So they are evaluated once
+with splipy at setup, and H is then a closed-form expression in P that jax can
+differentiate and jit directly.
+
+Written this way `res` is also pure, which the ObjectiveTerm contract asks for:
+the FD version assigned into `bsp.controlpoints` on every call, mutating the
+surface the pipeline was holding.
 """
 
 import numpy as np
 from hanan.optimization.objective_term import ObjectiveTerm
 from moebius.utils.bsplines import bspline_curvatures
 
+try:
+    import jax.numpy as jnp
+    _JAX = True
+except ImportError:                 # keep the term usable without jax
+    jnp = np
+    _JAX = False
+
 
 class MeanCurvatureBspline(ObjectiveTerm):
 
-    def __init__(self):
+    def __init__(self, use_jax: bool = True):
         super().__init__()
         self.name           = "MeanCurvatureBspline"
-        self.jacobianMethod = "FD"
+        self._use_jax       = bool(use_jax and _JAX)
+        self.jacobianMethod = "jax" if self._use_jax else "FD"
 
     def initialize_objective(self, X, var_idx, bsp, u_pts, v_pts,
                               H_thresh: float = 0.05,
@@ -86,16 +114,69 @@ class MeanCurvatureBspline(ObjectiveTerm):
         n = len(u_pts) * len(v_pts)
         self.num_residuals = n if H_max is None else 2 * n
 
-    def res(self, X) -> np.ndarray:
-        cp = X[self._cp_idx].reshape(self._cp_shape)
-        self._bsp.controlpoints = cp
-        _, H, _ = bspline_curvatures(self._bsp, self._u_pts, self._v_pts)
-        sH = self._sign_H * H.ravel()
+        # Basis function derivative matrices, Nu[d][i, p] = d-th derivative of
+        # control point p's basis function at u_i. Fixed for the whole run,
+        # since only the control points move, so splipy is used once here and
+        # never again inside res().
+        if self._use_jax:
+            bu, bv = bsp.bases[0], bsp.bases[1]
+            self._Nu = [jnp.asarray(bu.evaluate(u_pts, d=d)) for d in (0, 1, 2)]
+            self._Nv = [jnp.asarray(bv.evaluate(v_pts, d=d)) for d in (0, 1, 2)]
+
+    # ── curvature as a traceable function of the control points ──────────────
+
+    def _mean_curvature(self, P):
+        """H on the (u, v) grid, from the control net P (nu_cp, nv_cp, 3).
+
+        Pure jnp, so jax can differentiate it. Mirrors bspline_curvatures:
+        the same first and second fundamental forms and the same sign of the
+        normal, n = unit(S_u x S_v).
+        """
+        Nu, Nv = self._Nu, self._Nv
+
+        def d(a, b):
+            # S^(a,b)[i, j, :] = sum_pq Nu[a][i,p] Nv[b][j,q] P[p,q,:]
+            return jnp.einsum("ip,jq,pqk->ijk", Nu[a], Nv[b], P)
+
+        su, sv   = d(1, 0), d(0, 1)
+        suu, svv = d(2, 0), d(0, 2)
+        suv      = d(1, 1)
+
+        raw_n = jnp.cross(su, sv, axis=2)
+        nrm   = jnp.linalg.norm(raw_n, axis=2, keepdims=True)
+        nvec  = raw_n / nrm
+
+        E = jnp.einsum("ijk,ijk->ij", su,  su)
+        F = jnp.einsum("ijk,ijk->ij", su,  sv)
+        G = jnp.einsum("ijk,ijk->ij", sv,  sv)
+        L = jnp.einsum("ijk,ijk->ij", suu, nvec)
+        M = jnp.einsum("ijk,ijk->ij", suv, nvec)
+        N = jnp.einsum("ijk,ijk->ij", svv, nvec)
+
+        denom = E * G - F * F
+        return (E * N + G * L - 2 * F * M) / (2 * denom)
+
+    def res(self, X):
+        if self._use_jax:
+            P = jnp.asarray(X)[self._cp_idx].reshape(self._cp_shape)
+            sH = self._sign_H * self._mean_curvature(P).ravel()
+            xp = jnp
+        else:
+            # FD path: splipy evaluation, so the surface has to carry the
+            # candidate control points. Restored afterwards to keep res pure.
+            cp_prev = self._bsp.controlpoints
+            self._bsp.controlpoints = np.asarray(X)[self._cp_idx].reshape(self._cp_shape)
+            try:
+                _, H, _ = bspline_curvatures(self._bsp, self._u_pts, self._v_pts)
+            finally:
+                self._bsp.controlpoints = cp_prev
+            sH = self._sign_H * H.ravel()
+            xp = np
 
         # Positive residual when  sign_H · H < thresh  (H too close to 0 or wrong sign)
-        floor = np.maximum(0.0, self._thresh - sH)
+        floor = xp.maximum(0.0, self._thresh - sH)
         if self._H_max is None:
             return floor
         # Positive residual where the surface is sharper than allowed.
-        ceiling = self._max_scale * np.maximum(0.0, sH - self._H_max)
-        return np.concatenate([floor, ceiling])
+        ceiling = self._max_scale * xp.maximum(0.0, sH - self._H_max)
+        return xp.concatenate([floor, ceiling])

@@ -50,6 +50,24 @@ neighbours, near-degenerate frames, and optionally rings along the boundary.
 Each criterion is reported with a count, and on the reference surfaces this
 drops on the order of 1% of faces.
 
+**The B-spline curvature term is differentiated by jax, not by finite
+differences.** splipy's evaluation is numpy and cannot be traced, so stage 1b
+used central differences: two residual evaluations per variable per iteration,
+each a full curvature evaluation over the grid — 2400 per iteration for a 20×20
+control net. None of that is needed, because every surface derivative is
+*linear* in the control points and the basis derivative matrices depend only on
+the parameter grid and the knots, both fixed for the run. They are now evaluated
+once with splipy at setup, after which `H` is a closed-form expression in the
+control points that jax differentiates and jits. Stage 1b on `Tunel` at 30²
+went from **139 s to 3.5 s**, and the Jacobian is exact rather than accurate to
+about 5e-6. `use_jax=False` keeps the old path.
+
+Finding that also fixed a bug affecting every jax-differentiated term in the
+project: nothing enabled jax's 64-bit mode, so they were all handing float32
+Jacobians to a float64 solve. On the reference surface the mean curvature came
+out 2.4e-4 wrong in relative terms, against 1e-13 once `jax_enable_x64` is set —
+which `moebius/__init__.py` now does.
+
 **Control over the boundary.** The remeshed quad mesh is the thing being
 deformed, so its boundary drifts: the patch edge is where the line congruence is
 least constrained and where the fairness stencil is one-sided. Variables can now
@@ -183,6 +201,37 @@ may well condition them, and a few one-signed ones were dropped because the
 shape is not interesting. So still check `H` on whatever you pick; section 2 of
 the explorer notebook does it for the whole folder at once.
 
+### Conditioning every surface at once
+
+```bash
+python scripts/optimize_bsplines.py                 # all of data/bsplines
+python scripts/optimize_bsplines.py --report        # read back the summary
+```
+
+Runs stage 1b over the whole folder, one process per surface, and writes the
+result to `data/bsplines_optimized/` (not tracked — it is derived, and the run
+takes about ninety seconds). Each surface's verdict and log are written as it
+finishes, so the run is resumable and safe to leave unattended; `--force` redoes
+everything. On the 90 surfaces here it takes the number whose `H` changes sign
+from **77 to 3**.
+
+Three defaults in it are not the pipeline's, each because the pipeline's
+measured worse over the whole set:
+
+- **surfaces that already meet the condition are copied, not optimised.** With
+  the floor already satisfied its residual is zero, so the Laplacian smoothing
+  becomes the only active term and drives the deformation by itself. On `Tunel`
+  that took `max |H|` from 4.06 to 18.14 and ended with three samples *below*
+  the threshold being enforced. `--no-skip-satisfied` to override.
+- **the curvature ceiling is on**, at the 99th percentile of each surface's own
+  initial `|H|` (`--no-h-max` to drop it). Without it `Roof` reaches
+  `max |H| = 4081` against 30.2 at the start, and `Roof_L` and `last_ex_1` are
+  similar — creases, not shapes.
+- **the ceiling is weighted at 0.01 of the floor.** At equal weight the two
+  hinges compete and the floor loses: sign changes left rose from 3 to 6 and
+  `Complex_test_S` ran away to `max |H| = 13348`. At 0.01 no surface gains
+  curvature at all and the sign-change result is unaffected.
+
 ### Choosing surfaces by eye
 
 ```bash
@@ -205,6 +254,7 @@ undoes. It records the two lists and deletes nothing.
 - `notebooks/` — the pipeline notebook.
 - `data/bsplines/` — reference surfaces.
 - `scripts/triage_bsplines.py` — keep/skip triage of the input surfaces.
+- `scripts/optimize_bsplines.py` — batch stage-1b over the whole folder.
 - `bin/quadRemesher` — the bundled quad remesher used by stage 4.
 
 *The name Hanan comes from the Kichwa cosmovision, where Hanan-Pacha refers to

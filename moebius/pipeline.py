@@ -202,7 +202,8 @@ def setup_bspline_optimizer(state: MoebiusState,
                              w_max: float = 1.0,
                              w_H: float = 1.0,
                              w_step: float = 0.1,
-                             w_smooth: float = 1e-2) -> Optimizer:
+                             w_smooth: float = 1e-2,
+                             use_jax: bool = True) -> Optimizer:
     """Optimise the surface B-spline control points to ensure H ≠ 0.
 
     Builds a grid adjacency over the control points and uses:
@@ -221,6 +222,11 @@ def setup_bspline_optimizer(state: MoebiusState,
     Note that `set_lap_smooth` damps its own weight to zero after 10
     iterations, by design, so it does not constrain the second half of a longer
     run; the ceiling is active throughout.
+
+    `use_jax=False` falls back to the finite-difference Jacobian, which is the
+    same term differentiated the slow way — about 34x slower per Jacobian on a
+    20x20 control net, and less accurate. It is there for reproducing earlier
+    runs and for environments without jax.
     """
     bsp = state.bspline
     u, v = state.u_pts, state.v_pts
@@ -230,7 +236,7 @@ def setup_bspline_optimizer(state: MoebiusState,
     opt = Optimizer()
     opt.add_variable("cp_surf", cp0)
 
-    H_term = MeanCurvatureBspline()
+    H_term = MeanCurvatureBspline(use_jax=use_jax)
     opt.add_objective_term(H_term, (bsp, u, v, H_thresh, H_max, w_max),
                            w=w_H, ce=True)
 
