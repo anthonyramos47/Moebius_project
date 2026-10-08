@@ -174,12 +174,14 @@ explorer notebook re-applies it, and is idempotent.
 default, with `rot`, `tunel_inv`, `tunel_inv_1` and `surface_00002` also
 verified end to end. More examples will be added.
 
-The folder still needs a pass: it also carries older B-splines that have not
-been checked against the condition above, and some of them certainly violate
-it. Only the ones listed as verified are known to have a one-signed `H`. The
-intention is to reduce `data/bsplines/` to surfaces with `H != 0` throughout,
-so that anything in it can be run without first testing whether the method
-applies to it.
+The folder has had a pass: it held 168 surfaces, each was looked at, and the 77
+that were not worth keeping were removed, leaving 91. The record of that is
+`data/bsplines_triage.json`. The criterion there was whether the shape is worth
+running, which is **not** the same as the `H != 0` condition above — a few
+surfaces with a sign change were kept because the shape is wanted and stage 1b
+may well condition them, and a few one-signed ones were dropped because the
+shape is not interesting. So still check `H` on whatever you pick; section 2 of
+the explorer notebook does it for the whole folder at once.
 
 ### Choosing surfaces by eye
 
