@@ -57,11 +57,25 @@ def read_bspline_json(path: str, normalize: bool = True,
 
 
 def save_bspline_to_json(bsp: sp.Surface, path: str) -> None:
-    """Save a splipy Surface to the same JSON format as read_bspline_json."""
-    cp = bsp.controlpoints.reshape(-1, 3)
+    """Save a splipy Surface in the JSON format read_bspline_json expects.
+
+    read_bspline_json ADDS a repeated knot at each end, because Rhino exports
+    without them. So the knots written here must have those ends stripped,
+    otherwise a reload adds two more, the basis implies two extra control
+    points per direction, and the control-point array no longer reshapes
+    (ValueError: cannot reshape array of size 1200 into shape (22,22,3)).
+    Saving must be the exact inverse of reading, or the round trip breaks.
+
+    The same goes for the control-point ordering: splipy's Surface constructor
+    reads a flat (N, 3) list v-major, while ``controlpoints`` is indexed
+    [u, v, :]. Flattening it directly transposes the control net on reload,
+    which reads back without error but gives a different surface (max |dV| was
+    2.0 on Tunel). Hence the transpose below.
+    """
+    cp = bsp.controlpoints.transpose(1, 0, 2).reshape(-1, 3)
     cp_homogeneous = np.hstack([cp, np.ones((len(cp), 1))])
-    ku = list(bsp.bases[0].knots)
-    kv = list(bsp.bases[1].knots)
+    ku = list(bsp.bases[0].knots)[1:-1]
+    kv = list(bsp.bases[1].knots)[1:-1]
     data = {
         "degreeU": bsp.order(0) - 1,
         "degreeV": bsp.order(1) - 1,

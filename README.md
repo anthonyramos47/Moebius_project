@@ -133,11 +133,21 @@ through infinity and there is nothing to optimise. This is a limitation of the
 method itself, not of the implementation (paper, Sec. 6.3).
 
 Stage 1b offers an optimisation that deforms the surface's control points to
-push `|H|` above a threshold, and it helps where `H` merely comes close to zero.
-It will **not** rescue a surface that genuinely violates the condition — a
-shape with a real sign change in `H` cannot be nudged out of it, and the stage
-will either fail to converge or return a surface no longer resembling the
-input. Check `H` before reaching for it.
+push `|H|` above a threshold. It obviously helps where `H` merely comes close to
+zero, but it can also remove an outright sign change, as long as the region on
+the wrong side is small: on `surface_00002`, whose sampled `H` spans
+`[-6.84, +6.05]`, it drove the 12 offending samples across and left `H` entirely
+negative (`|H|min` 3.7e-03 → 5.0e-02) while moving the surface by a median of
+1.1e-06 and a maximum of 9.3e-03. What decides the outcome is how much of the
+surface has to move, not whether the sign formally changes — a shape with a
+large region of the opposite sign cannot be nudged out of it, and the stage will
+either fail to converge or return something no longer resembling the input.
+Either way, check `H` before and after.
+
+`notebooks/bspline_explorer.ipynb` does exactly that: it reports `H`/`K` ranges
+and sign changes for one surface or for the whole folder, lists the surfaces
+that are directly usable, and runs stage 1b on the rest so a conditioned copy
+can be saved back out.
 
 `data/bsplines/` holds the surfaces this has been run on — `Tunel.json` is the
 default, with `rot`, `tunel_inv`, `tunel_inv_1` and `surface_00002` also
