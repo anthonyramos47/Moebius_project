@@ -219,6 +219,21 @@ def run_one(job: dict) -> dict:
                 np.asarray(back.controlpoints) - np.asarray(state.bspline.controlpoints)
             ).max())
 
+        # Grade the saved surface on a DIFFERENT, finer grid than it was
+        # optimised on. The hinge constrains |H| only at its own sample points
+        # and the surface is free to dip between them, so a verdict taken on
+        # the optimisation grid is the training error and badly overstates the
+        # result: after a 30x30 run, the surfaces still changing sign counted
+        # 3 at 30x30, 35 at 35x35, 51 at 40x40 and 55 at 90x90.
+        if job["audit_samples"]:
+            ua = np.linspace(0, 1, job["audit_samples"])
+            _, Ha, _ = bspline_curvatures(state.bspline, ua, ua)
+            ha = np.asarray(Ha).ravel()
+            rec["audit"] = _stats(Ha, thresh)
+            rec["audit"]["samples"] = int(job["audit_samples"])
+            rec["audit"]["below_tol"] = int(
+                (np.abs(ha) < thresh * (1.0 - job["accept_tol"])).sum())
+
         # The hinge converges *to* the threshold from below, so a converged
         # surface sits a hair under it and a strict |H| < thresh test calls
         # that a failure. Measured: surface_00002 converges at |H|min =
@@ -230,7 +245,8 @@ def run_one(job: dict) -> dict:
         rec["absH_min_over_thresh"] = float(a2.min() / thresh)
         tol = thresh * (1.0 - job["accept_tol"])
         rec["below_tol"] = int((a2 < tol).sum())
-        rec["ok"] = bool(not s["sign_change"] and rec["below_tol"] == 0
+        judge = rec.get("audit") or dict(s, below_tol=rec["below_tol"])
+        rec["ok"] = bool(not judge["sign_change"] and judge["below_tol"] == 0
                          and rec["roundtrip_max_dcp"] < 1e-10)
         rec["status"] = ("already_ok" if (rec["ok"] and rec.get("already_ok"))
                          else "ok" if rec["ok"] else "incomplete")
@@ -275,12 +291,13 @@ def write_summary(path: Path, meta: dict, records: dict) -> None:
 def line(r: dict) -> str:
     if r["status"] in ("error", "timeout"):
         return f"  {r['status'].upper():10s} {r['name']:22s} {r.get('error','')[:60]}"
-    b, s = r["before"], r["saved"]
+    b = r["before"]
+    s = r.get("audit") or r["saved"]
     flag = {"ok": "ok  ", "already_ok": "as-is", "incomplete": "INC "}.get(r["status"], "????")
     return (f"  {flag} {r['name']:22s} "
             f"|H|min {b['absH_min']:.2e}->{s['absH_min']:.2e} "
             f"({r.get('absH_min_over_thresh', float('nan')):7.4f}x thr)  "
-            f"short {r.get('below_tol', -1):4d} "
+            f"short {s.get('below_tol', r.get('below_tol', -1)):5d} "
             f"flip {str(b['sign_change'])[0]}->{str(s['sign_change'])[0]}  "
             f"max|H| {b['absH_max']:8.2f}->{s['absH_max']:<8.2f} "
             f"moved {r['moved_max']:.1e}  {r['iterations']:3d}it {r['seconds']:6.1f}s")
@@ -326,6 +343,10 @@ def main() -> int:
                          "off by default")
     ap.add_argument("--factor", type=float, default=2.0,
                     help="longest bounding-box dimension after normalisation")
+    ap.add_argument("--audit-samples", type=int, default=150,
+                    help="grade the saved surface on this grid, which must be "
+                         "finer than --samples (default 150; 0 to grade on the "
+                         "optimisation grid, which flatters the result)")
     ap.add_argument("--accept-tol", type=float, default=1e-3,
                     help="relative margin by which |H| may fall short of "
                          "H_thresh and still count as met (default 1e-3). The "
@@ -384,7 +405,9 @@ def main() -> int:
 
     print(f"[opt] {len(names)} surfaces in {args.in_dir}")
     print(f"[opt] {len(todo)} to run, {len(names) - len(todo)} already done")
-    print(f"[opt] grid {args.samples}x{args.samples}, max_iter {args.max_iter}, "
+    print(f"[opt] grid {args.samples}x{args.samples}, "
+          f"audited on {args.audit_samples}x{args.audit_samples}, "
+          f"max_iter {args.max_iter}, "
           f"H_thresh {args.h_thresh}, w_smooth {args.w_smooth:g}, "
           f"H_max {'off' if args.no_h_max else f'p{args.h_max_percentile:g}'}, "
           f"jacobian {'FD' if args.no_jax else 'jax'}")
@@ -410,7 +433,7 @@ def main() -> int:
                   w_max=args.w_max, w_H=args.w_h, w_step=args.w_step,
                   w_smooth=args.w_smooth, factor=args.factor,
                   timeout=args.timeout, use_jax=not args.no_jax,
-                  accept_tol=args.accept_tol,
+                  accept_tol=args.accept_tol, audit_samples=args.audit_samples,
                   skip_satisfied=not args.no_skip_satisfied)
     meta = {"generated": time.strftime("%Y-%m-%d %H:%M:%S"),
             "n_surfaces": len(names), "settings": common}

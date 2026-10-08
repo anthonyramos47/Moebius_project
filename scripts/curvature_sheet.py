@@ -114,7 +114,13 @@ def main() -> int:
                     help="also show data/bsplines_optimized beside each input")
     ap.add_argument("--compare-dir", type=Path,
                     default=ROOT / "data" / "bsplines_optimized")
-    ap.add_argument("--samples", type=int, default=40)
+    ap.add_argument("--samples", type=int, default=60,
+                    help="audit grid (default 60). The verdict depends on this: "
+                         "the optimiser enforces |H| only at ITS OWN sample "
+                         "points, so judging its output on that same grid "
+                         "flatters it. Counting surfaces that still change "
+                         "sign: 3 at 30x30, 35 at 35x35, 51 at 40x40, 55 at "
+                         "90x90. It has converged by 60.")
     ap.add_argument("--zero-band", type=float, default=0.0,
                     help="draw |H| below this multiple of the surface's MEDIAN "
                          "|H| in a third colour (default 0, off)")
@@ -124,7 +130,8 @@ def main() -> int:
     ap.add_argument("--cols", type=int, default=9)
     args = ap.parse_args()
 
-    names = sorted(p.stem for p in args.dir.glob("*.json"))
+    # summary.json is the batch script's report, not a surface
+    names = sorted(p.stem for p in args.dir.glob("*.json") if p.name != "summary.json")
     if not names:
         print(f"no json files in {args.dir}")
         return 1
@@ -207,10 +214,7 @@ def main() -> int:
   {extra}
 </article>""")
 
-    doc = f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mean Curvature Sign</title>
+    head_bits = f"""<title>Mean Curvature Sign</title>
 <style>
   :root {{
     --bg:#fbfbfc; --fg:#1b1d21; --muted:#6b7280; --line:#e4e6ea; --card:#fff;
@@ -258,13 +262,17 @@ def main() -> int:
   .good {{ color:var(--good) }} .bad {{ color:var(--bad) }}
   .count {{ color:var(--muted); font-size:13px }}
   @media (max-width:560px) {{ .grid {{ grid-template-columns:1fr }} }}
-</style></head><body>
-<header><div class="wrap">
+</style>"""
+
+    body_bits = f"""<header><div class="wrap">
   <h1>Mean curvature sign &mdash; {html.escape(args.dir.name)}</h1>
   <p class="lede">Colour carries the <strong>sign of H</strong> and nothing else, so a
   single sharp region cannot saturate the scale and flatten the rest. The pipeline
   needs H never to vanish or change sign, because the sphere radii are r = 1/H, so
-  a surface in one colour is usable and any surface showing both is not.</p>
+  a surface in one colour is usable and any surface showing both is not.
+  Sampled on a {args.samples}&times;{args.samples} grid, deliberately finer than the
+  30&times;30 the optimiser runs on: it enforces |H| only at its own sample points, and
+  judged on that same grid its output looks far better than it is.</p>
   <div class="key">
     <b><i class="sw" style="background:{NEG}"></i>H &lt; 0</b>
     {f'<b><i class="sw" style="background:{ZERO}"></i>|H| below {args.zero_band:g}x the median &mdash; r = 1/H largest here</b>' if args.zero_band > 0 else ''}
@@ -305,11 +313,21 @@ def main() -> int:
   for (const k in btns) btns[k].addEventListener('click', () => {{ mode = k; apply(); }});
   q.addEventListener('input', apply);
   apply();
-</script>
-</body></html>"""
+</script>"""
+
+    # Standalone file, for opening from disk.
+    doc = ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
+           '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+           + head_bits + "</head><body>\n" + body_bits + "\n</body></html>")
     page = args.out_dir / f"curvature_{args.dir.name}.html"
     page.write_text(doc)
     print(f"html page    : {page}  ({len(doc)/1e6:.1f} MB)")
+
+    # Same page without the document skeleton, which the Artifact publisher
+    # supplies itself; publishing the standalone file would nest a second one.
+    art = args.out_dir / f"artifact_{args.dir.name}.html"
+    art.write_text(head_bits + "\n" + body_bits + "\n")
+    print(f"artifact page: {art}")
     return 0
 
 
