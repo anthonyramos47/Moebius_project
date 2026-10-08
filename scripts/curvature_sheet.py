@@ -59,6 +59,21 @@ def load(path: Path, samples: int):
     return P[..., 0], P[..., 1], P[..., 2], np.asarray(H)
 
 
+def verdict(path: Path, samples: int):
+    """H stats on a grid far finer than the render grid.
+
+    The render grid only has to look right; the verdict has to be true, and it
+    is grid-dependent -- the optimiser holds |H| up at its own sample points
+    and the surface dips between them. Counting sign changes in one 30x30 run:
+    3 at 30x30, 51 at 40x40, 55 at 90x90. So judge on a grid nothing was
+    optimised on.
+    """
+    bsp = read_bspline_json(str(path))
+    u = np.linspace(0, 1, samples)
+    _, H, _ = bspline_curvatures(bsp, u, u)
+    return stats(np.asarray(H))
+
+
 def draw(ax, X, Y, Z, H, zero_band: float, shade: bool = True):
     """Surface coloured by sign(H) only."""
     a = np.abs(H)
@@ -91,7 +106,7 @@ def draw(ax, X, Y, Z, H, zero_band: float, shade: bool = True):
 def stats(H):
     h = H.ravel(); a = np.abs(h)
     return dict(hmin=float(h.min()), hmax=float(h.max()), amin=float(a.min()),
-                flip=bool(h.min() * h.max() < 0),
+                amax=float(a.max()), flip=bool(h.min() * h.max() < 0),
                 frac_neg=float((h < 0).mean()))
 
 
@@ -114,6 +129,10 @@ def main() -> int:
                     help="also show data/bsplines_optimized beside each input")
     ap.add_argument("--compare-dir", type=Path,
                     default=ROOT / "data" / "bsplines_optimized")
+    ap.add_argument("--verdict-samples", type=int, default=150,
+                    help="grid used to decide one-signed vs sign change "
+                         "(default 150). Separate from --samples, which only "
+                         "controls how the surface is drawn.")
     ap.add_argument("--samples", type=int, default=60,
                     help="audit grid (default 60). The verdict depends on this: "
                          "the optimiser enforces |H| only at ITS OWN sample "
@@ -145,15 +164,25 @@ def main() -> int:
         except Exception as e:
             skipped.append((n, f"{type(e).__name__}: {e}"))
             continue
-        rec = {"name": n, "index": i, "data": d, "stats": stats(d[3]), "opt": None}
+        rec = {"name": n, "index": i, "data": d,
+               "stats": verdict(args.dir / f"{n}.json", args.verdict_samples),
+               "opt": None, "outcome": "input"}
         if args.compare:
             q = args.compare_dir / f"{n}.json"
             if q.exists():
                 try:
                     d2 = load(q, args.samples)
-                    rec["opt"] = {"data": d2, "stats": stats(d2[3])}
+                    rec["opt"] = {"data": d2,
+                                  "stats": verdict(q, args.verdict_samples)}
                 except Exception:
                     pass
+        if rec["opt"]:
+            was, now = rec["stats"], rec["opt"]["stats"]
+            grew = now["amax"] > 1.5 * max(was["amax"], 1e-30)
+            if grew:                      rec["outcome"] = "diverged"
+            elif was["flip"] and not now["flip"]: rec["outcome"] = "fixed"
+            elif was["flip"] and now["flip"]:     rec["outcome"] = "unfixed"
+            elif not was["flip"]:                 rec["outcome"] = "already"
         rows.append(rec)
         print(f"  [{i:3d}] {n:24s} H [{rec['stats']['hmin']:+9.3f}, "
               f"{rec['stats']['hmax']:+9.3f}]  "
@@ -187,6 +216,18 @@ def main() -> int:
     print(f"\ncontact sheet: {sheet}")
 
     # ── html ─────────────────────────────────────────────────────────────────
+    ORDER = [("fixed",    "Fixed",
+              "H changed sign before and does not now."),
+             ("unfixed",  "Still changes sign",
+              "The optimisation ran but H still crosses zero, so r = 1/H still blows up."),
+             ("diverged", "Diverged",
+              "max |H| grew by more than half again; the run made the surface sharper, not better."),
+             ("already",  "Already one-signed",
+              "Nothing to fix. These are normalised and copied, not optimised."),
+             ("input",    "Input only",
+              "No conditioned version on disk to compare against.")]
+    counts = {k: sum(1 for r in rows if r["outcome"] == k) for k, _, _ in ORDER}
+
     cards = []
     for r in rows:
         s = r["stats"]
@@ -203,7 +244,7 @@ def main() -> int:
                      f'<div class="row"><span>H</span><code>[{s2["hmin"]:+.3f}, '
                      f'{s2["hmax"]:+.3f}]</code></div>')
         cards.append(f"""<article class="card" data-flip="{int(s['flip'])}"
-     data-name="{html.escape(r['name']).lower()}">
+     data-outcome="{r['outcome']}" data-name="{html.escape(r['name']).lower()}">
   <div class="imgs">{imgs}</div>
   <h2><span class="idx">{r['index']}</span> {html.escape(r['name'])}</h2>
   <div class="row"><span>input</span><b class="{'bad' if s['flip'] else 'good'}">
@@ -213,6 +254,35 @@ def main() -> int:
   <div class="row"><span>H &lt; 0 on</span><code>{100*s['frac_neg']:.1f}% of samples</code></div>
   {extra}
 </article>""")
+
+    by_outcome = {k: [] for k, _, _ in ORDER}
+    for r, c in zip(rows, cards):
+        by_outcome[r["outcome"]].append(c)
+
+    if args.compare:
+        before_flip = sum(r["stats"]["flip"] for r in rows)
+        after_flip  = sum((r["opt"] or r)["stats"]["flip"] for r in rows)
+        scoreboard = f"""<section class="score">
+  <div class="big"><b>{before_flip}</b><span>inputs change sign</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="big"><b>{after_flip}</b><span>still do after conditioning</span></div>
+  <div class="big ok"><b>{counts['fixed']}</b><span>fixed</span></div>
+  <div class="big bad"><b>{counts['diverged']}</b><span>diverged</span></div>
+  <p class="note">Judged on a {args.verdict_samples}&times;{args.verdict_samples} grid,
+  not the one the optimiser ran on. Each pair below is input on the left, conditioned
+  on the right.</p>
+</section>"""
+    else:
+        scoreboard = ""
+
+    sections = ""
+    for key, heading, blurb in ORDER:
+        if not by_outcome[key]:
+            continue
+        sections += (f'<section class="group"><h2 class="gh">{heading}'
+                     f'<span class="n">{len(by_outcome[key])}</span></h2>'
+                     f'<p class="gb">{blurb}</p>'
+                     f'<div class="grid">{"".join(by_outcome[key])}</div></section>')
 
     head_bits = f"""<title>Mean Curvature Sign</title>
 <style>
@@ -261,6 +331,20 @@ def main() -> int:
   .row code {{ color:var(--fg); font-size:12px }}
   .good {{ color:var(--good) }} .bad {{ color:var(--bad) }}
   .count {{ color:var(--muted); font-size:13px }}
+  .score {{ display:flex; gap:26px; align-items:baseline; flex-wrap:wrap;
+    padding:22px 0 4px; border-bottom:1px solid var(--line); margin-bottom:6px }}
+  .score .big {{ display:flex; flex-direction:column; gap:2px }}
+  .score .big b {{ font-size:34px; line-height:1; font-variant-numeric:tabular-nums }}
+  .score .big span {{ font-size:12.5px; color:var(--muted) }}
+  .score .ok b {{ color:var(--good) }} .score .bad b {{ color:var(--bad) }}
+  .score .arrow {{ font-size:26px; color:var(--muted) }}
+  .score .note {{ flex:1 1 320px; min-width:0; margin:0; font-size:12.5px;
+    color:var(--muted); max-width:52ch }}
+  .group {{ padding-top:22px }}
+  .gh {{ display:flex; align-items:baseline; gap:9px; font-size:17px; margin:0 }}
+  .gh .n {{ font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums }}
+  .gb {{ margin:4px 0 0; font-size:13px; color:var(--muted); max-width:70ch }}
+  .group .grid {{ padding-top:12px; padding-bottom:8px }}
   @media (max-width:560px) {{ .grid {{ grid-template-columns:1fr }} }}
 </style>"""
 
@@ -286,9 +370,10 @@ def main() -> int:
     <span class="count" id="count"></span>
   </div>
 </div></header>
-<main class="wrap"><div class="grid" id="grid">
-{''.join(cards)}
-</div></main>
+<main class="wrap">
+{scoreboard}
+{sections}
+</main>
 <script>
   const cards = [...document.querySelectorAll('.card')];
   const q = document.getElementById('q'), count = document.getElementById('count');
@@ -307,6 +392,8 @@ def main() -> int:
       c.hidden = !vis;
       if (vis) shown++;
     }}
+    for (const g of document.querySelectorAll('.group'))
+      g.hidden = ![...g.querySelectorAll('.card')].some(c => !c.hidden);
     count.textContent = shown + ' of ' + cards.length + ' shown';
     for (const k in btns) btns[k].setAttribute('aria-pressed', String(k === mode));
   }}
