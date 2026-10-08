@@ -114,7 +114,7 @@ reasoning for their values.
 | stage | what it does |
 |---|---|
 | 0–1 | read a B-spline from `data/bsplines/`, sample it, initialise the central sphere congruence `r = 1/H` |
-| 1b | optionally deform the surface so `\|H\|` stays above a threshold, keeping `r = 1/H` well conditioned |
+| 1b | optionally deform the surface so `\|H\|` stays inside `[H_thresh, H_max]`, keeping `r = 1/H` well conditioned without creasing |
 | 2 | move the radii so the line congruence is orthogonal to the sphere congruence and within θ of the normal |
 | 3 | optimise the torsal directions, recomputing them analytically every *N* steps |
 | 4 | export the frame field and remesh along it; outlier frames can be dropped and are interpolated by the remesher |
@@ -144,10 +144,31 @@ large region of the opposite sign cannot be nudged out of it, and the stage will
 either fail to converge or return something no longer resembling the input.
 Either way, check `H` before and after.
 
+The stage takes a **ceiling** on the curvature as well as a floor, `H_max`.
+Without one, the cheapest way to satisfy the floor at a near-flat point is a
+local dent: it raises `|H|` exactly where it is needed and changes nothing
+else, and the result reads as a crease. The floor alone has no preference for a
+broad deformation over a sharp one, and `set_lap_smooth` — the only other thing
+resisting it — damps its own weight to zero after ten iterations, so it does not
+constrain the second half of a longer run. The ceiling is a hinge inside the
+energy term, so it is active throughout, and capping `|H|` also bounds the
+radii from below, keeping the congruence inside `1/H_max <= r <= 1/H_thresh`
+instead of letting a crease produce arbitrarily small spheres. It is an absolute
+curvature, so the explorer notebook prints the surface's own `|H|` percentiles
+and a suggested value; `None` disables it.
+
 `notebooks/bspline_explorer.ipynb` does exactly that: it reports `H`/`K` ranges
 and sign changes for one surface or for the whole folder, lists the surfaces
 that are directly usable, and runs stage 1b on the rest so a conditioned copy
 can be saved back out.
+
+Control points in `data/bsplines/` are stored **normalised** — centred on the
+origin with the longest bounding-box dimension equal to 2, via Chakana's
+`normalize_vertices`. The loader applies that anyway, so this changes no
+results; it means the stored data matches what the pipeline uses, that reading
+with `normalize=False` now gives the same surface, and that a curvature
+threshold means the same thing from one surface to the next. Section 5 of the
+explorer notebook re-applies it, and is idempotent.
 
 `data/bsplines/` holds the surfaces this has been run on — `Tunel.json` is the
 default, with `rot`, `tunel_inv`, `tunel_inv_1` and `surface_00002` also

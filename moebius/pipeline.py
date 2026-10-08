@@ -198,14 +198,29 @@ def compute_init(state: MoebiusState) -> None:
 
 def setup_bspline_optimizer(state: MoebiusState,
                              H_thresh: float = 0.05,
+                             H_max: float | None = None,
+                             w_max: float = 1.0,
                              w_H: float = 1.0,
-                             w_step: float = 0.1) -> Optimizer:
+                             w_step: float = 0.1,
+                             w_smooth: float = 1e-2) -> Optimizer:
     """Optimise the surface B-spline control points to ensure H ≠ 0.
 
     Builds a grid adjacency over the control points and uses:
-      - MeanCurvatureBspline  — push |H| above H_thresh
+      - MeanCurvatureBspline  — hold |H| in [H_thresh, H_max]
       - step_control          — limit CP displacement per iteration
       - set_lap_smooth        — keep the deformation smooth
+
+    `H_max` caps the curvature from above, which is what stops the stage from
+    answering the H_thresh floor with a crease: a local dent is the cheapest
+    way to raise |H| at a near-flat point, and the floor on its own has no
+    preference for a broad deformation over a sharp one. It is an absolute
+    curvature on the normalised surface — read the initial max |H| off the
+    surface and allow a small multiple of it. None disables the ceiling, which
+    is the behaviour this stage had before.
+
+    Note that `set_lap_smooth` damps its own weight to zero after 10
+    iterations, by design, so it does not constrain the second half of a longer
+    run; the ceiling is active throughout.
     """
     bsp = state.bspline
     u, v = state.u_pts, state.v_pts
@@ -216,11 +231,12 @@ def setup_bspline_optimizer(state: MoebiusState,
     opt.add_variable("cp_surf", cp0)
 
     H_term = MeanCurvatureBspline()
-    opt.add_objective_term(H_term, (bsp, u, v, H_thresh), w=w_H, ce=True)
+    opt.add_objective_term(H_term, (bsp, u, v, H_thresh, H_max, w_max),
+                           w=w_H, ce=True)
 
     opt.control_variable("cp_surf", w_step)
     opt.set_lap_smooth("cp_surf", np.arange(nu_cp * nv_cp),
-                       _cp_adjacency(nu_cp, nv_cp), dim=3, w=1e-2)
+                       _cp_adjacency(nu_cp, nv_cp), dim=3, w=w_smooth)
 
     opt.initialize_optimizer(verbose=True, adaptive_mu=False)
     state.bspline_opt = opt
