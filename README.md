@@ -181,6 +181,18 @@ intention is to reduce `data/bsplines/` to surfaces with `H != 0` throughout,
 so that anything in it can be run without first testing whether the method
 applies to it.
 
+### Choosing surfaces by eye
+
+```bash
+python scripts/triage_bsplines.py
+```
+
+Shows one B-spline at a time with its curvature fields and a **Keep** / **Skip**
+pair of buttons in the viewer panel, writing each verdict to
+`data/bsplines_triage.json` as it is made, so the session can be interrupted and
+resumed. `--report` prints the lists, `--all` revisits decided surfaces, `Back`
+undoes. It records the two lists and deletes nothing.
+
 ## Layout
 
 - `moebius/` — the pipeline. `pipeline.py` holds the stages, `energies/` one
@@ -190,6 +202,7 @@ applies to it.
   optimiser) and `kayviz` (browser-based viewer).
 - `notebooks/` — the pipeline notebook.
 - `data/bsplines/` — reference surfaces.
+- `scripts/triage_bsplines.py` — keep/skip triage of the input surfaces.
 - `bin/quadRemesher` — the bundled quad remesher used by stage 4.
 
 *The name Hanan comes from the Kichwa cosmovision, where Hanan-Pacha refers to
