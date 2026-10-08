@@ -232,6 +232,22 @@ measured worse over the whole set:
   `Complex_test_S` ran away to `max |H| = 13348`. At 0.01 no surface gains
   curvature at all and the sign-change result is unaffected.
 
+### Seeing where H changes sign
+
+```bash
+python scripts/curvature_sheet.py            # data/bsplines
+python scripts/curvature_sheet.py --compare  # input beside its conditioned version
+```
+
+Renders every surface coloured by the **sign** of `H` and nothing else — blue
+negative, red positive — as one contact-sheet PNG and one self-contained HTML
+page in `out/curvature/`. A magnitude scale is no use for this: one sharp region
+saturates it and flattens the rest to the midpoint, so a sign change becomes
+invisible. A surface in a single colour is usable; any surface showing both is
+not. `--zero-band` adds a third colour near `H = 0`, measured against the median
+`|H|` rather than the max, since on `CM_Strip` — which spikes to 1120 — 2% of
+the max covers the whole surface.
+
 ### Choosing surfaces by eye
 
 ```bash
@@ -255,6 +271,7 @@ undoes. It records the two lists and deletes nothing.
 - `data/bsplines/` — reference surfaces.
 - `scripts/triage_bsplines.py` — keep/skip triage of the input surfaces.
 - `scripts/optimize_bsplines.py` — batch stage-1b over the whole folder.
+- `scripts/curvature_sheet.py` — contact sheet / HTML of the curvature sign.
 - `bin/quadRemesher` — the bundled quad remesher used by stage 4.
 
 *The name Hanan comes from the Kichwa cosmovision, where Hanan-Pacha refers to

@@ -12,3 +12,6 @@ notebooks/out/
 # reproducible in ~90 s, so it is not tracked. Remove this line if you
 # want the conditioned surfaces committed.
 data/bsplines_optimized/
+
+# Rendered by scripts/curvature_sheet.py; regenerate rather than track.
+out/
