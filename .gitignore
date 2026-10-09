@@ -1,4 +1,4 @@
-**/.DS_store
+**/.DS_Store
 notebooks/out/
 *.egg-info/
 **/__pycache__/
