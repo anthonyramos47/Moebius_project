@@ -1,13 +1,17 @@
 **/.DS_store
+notebooks/out/
+*.egg-info/
 **/__pycache__/
 **/__outputs__/
 **/__mathematica__/
 **/__approximation__/
 *.ini
 *.idea
-*/.ipynb_checkpoints/
-*/.vscode/
-*/.pytest_cache/
 
+# Output of scripts/optimize_bsplines.py: derived from data/bsplines and
+# reproducible in ~90 s, so it is not tracked. Remove this line if you
+# want the conditioned surfaces committed.
+data/bsplines_optimized/
 
-
+# Rendered by scripts/curvature_sheet.py; regenerate rather than track.
+out/

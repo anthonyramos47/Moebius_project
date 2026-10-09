@@ -1,0 +1,10 @@
+{
+  "pythonVersion": "3.11",
+  "venvPath": "~/anaconda3/envs",
+  "venv": "Mproj",
+  "include": ["moebius", "notebooks"],
+  "extraPaths": [
+    "Chakana_Geo/hanan/src",
+    "Chakana_Geo/kayviz/src"
+  ]
+}

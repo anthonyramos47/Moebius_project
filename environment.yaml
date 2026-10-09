@@ -1,0 +1,33 @@
+# Mproj — the only supported env for this project.
+#
+#   git submodule update --init --recursive     # Chakana_Geo must be present
+#   conda env create -f environment.yaml        # run from the PROJECT ROOT
+#   conda activate Mproj
+#
+# Only python and pip come from conda; everything else is a pip wheel. That is
+# deliberate: conda 23.1.0 has no libmamba, and its classic solver takes 20+
+# minutes on a full dependency set (and >20 min when python is pinned to 3.10,
+# since current conda-forge builds target 3.11+). Two conda packages resolve in
+# ~27s, and pip installs the rest from prebuilt wheels in ~60s.
+#
+# python 3.11 matches the sibling Lproj env, which proves these wheels exist
+# for it (splipy, libigl, jaxlib all ship cp311 builds — nothing compiles).
+name: Mproj
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - numpy
+    - scipy
+    - matplotlib
+    - pandas        # hanan.optimization builds report DataFrames
+    - splipy
+    - libigl        # >=2.6: barycentric_coordinates (older name was *_tri)
+    - triangle      # quality 2D CDT behind the spherical panels
+    - jax[cpu]      # hanan's jacobianMethod="jax" (SupportPlanarity, RegFaces)
+    - ipykernel
+    - ipywidgets    # notebook sampling-interval sliders
+    - -e ./Chakana_Geo/hanan
+    - -e ./Chakana_Geo/kayviz   # pulls fastapi/uvicorn/requests/pydantic
