@@ -188,18 +188,26 @@ with `normalize=False` now gives the same surface, and that a curvature
 threshold means the same thing from one surface to the next. Section 5 of the
 explorer notebook re-applies it, and is idempotent.
 
-`data/bsplines/` holds the surfaces this has been run on — `Tunel.json` is the
-default, with `rot`, `tunel_inv`, `tunel_inv_1` and `surface_00002` also
-verified end to end. More examples will be added.
+`data/bsplines/` holds **86 surfaces that have already been through stage 1b**,
+not raw exports: each one is the conditioned output of
+`scripts/optimize_bsplines.py` at a 100×100 grid, normalised to a bounding box
+of 2. `Tunel.json` is the default.
 
-The folder has had a pass: it held 168 surfaces, each was looked at, and the 77
-that were not worth keeping were removed, leaving 91. The record of that is
-`data/bsplines_triage.json`. The criterion there was whether the shape is worth
-running, which is **not** the same as the `H != 0` condition above — a few
-surfaces with a sign change were kept because the shape is wanted and stage 1b
-may well condition them, and a few one-signed ones were dropped because the
-shape is not interesting. So still check `H` on whatever you pick; section 2 of
-the explorer notebook does it for the whole folder at once.
+Audited on a 150×150 grid — finer than the one they were conditioned on, which
+matters, see below — **71 of the 86 have a one-signed `H` and are ready to
+run**. The other 15 still cross zero and are kept because the shapes are wanted;
+check `H` before using one. Two of them, `Test_Ex1` and `Complex_test_S`,
+diverged rather than converged and carry `max |H|` of 1.8e6 and 8.7e4; they are
+in the folder for completeness and are not usable as they stand.
+
+How the folder was built, in order: 168 raw exports were screened and triaged by
+eye down to 90 (`data/bsplines_triage.json` records which went which way), every
+control net was normalised, stage 1b was run over all of them, and four surfaces
+whose sign change survived were dropped. The two notebooks and scripts that did
+this — `notebooks/bspline_explorer.ipynb`, `scripts/triage_bsplines.py`,
+`scripts/curvature_sheet.py` and `scripts/optimize_bsplines.py` — are **dataset
+preparation**, not part of the pipeline. Nothing in `moebius/` depends on them,
+and the main algorithm starts from whatever is in `data/bsplines/`.
 
 ### Conditioning every surface at once
 
