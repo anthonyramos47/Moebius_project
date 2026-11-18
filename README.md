@@ -8,7 +8,7 @@ fits one sphere per face.
 
 This is an **improved implementation** of
 
-> A. S. Ramos Cisneros, A. Aikyn, M. Kilian, H. Pottmann, C. Müller,
+> A. Ramos-Cisneros, A. Aikyn, M. Kilian, H. Pottmann, C. Müller,
 > *Approximation by Meshes with Spherical Faces*,
 > ACM Transactions on Graphics 43(6), Article 179 (SIGGRAPH Asia 2024).
 > [doi:10.1145/3687942](https://doi.org/10.1145/3687942)
