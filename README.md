@@ -97,9 +97,9 @@ nothing compiles and the environment builds in about ninety seconds.
 
 ### The remesher
 
-**A built remesher is included**, at `bin/quadRemesher`, so a fresh clone runs
+**Built remeshers are included** in `bin/`, so a fresh clone runs
 the whole pipeline with nothing else to compile. It is picked up automatically —
-`resolve_remesher_bin()` checks `bin/` first, then a sibling `../QuadRemesher`
+`resolve_remesher_bin()` checks `bin/` first (the binary for the current platform), then a sibling `../QuadRemesher`
 checkout, then `$REMESHER_BIN` and `$PATH` — and `check_remesher()` verifies it
 understands the current flag-based CLI.
 
@@ -107,12 +107,13 @@ understands the current flag-based CLI.
 |---|---|
 | **Linux x86-64** | provided, `bin/quadRemesher` |
 | **Windows** | to come |
-| **macOS** | to come |
+| **macOS** (Apple silicon + Intel, 11+) | provided, `bin/quadRemesherMac` |
 
-The bundled binary is linked only against system libraries (libblas, libm,
-libc, libgcc, libstdc++), so it should run on any comparable Linux without
-extra setup. Windows and macOS builds will be added later; until then, build
-the remesher from source —
+The Linux binary is linked only against system libraries (libblas, libm,
+libc, libgcc, libstdc++), and the macOS one only against system frameworks
+(Accelerate, OpenGL, Cocoa) with OpenMesh linked statically, so both run
+without extra setup. A Windows build will be added later; until then, build the
+remesher from source —
 
 > **https://github.com/anthonyramos47/QuadRemesher**
 
@@ -141,6 +142,17 @@ reasoning for their values.
 | 6 | write the OBJs — surface, sphere centres, remeshed, optimised, spherical panels — and the state |
 
 Outputs go to `notebooks/out/<surface>/<experiment>/`.
+
+### S-conjugacy
+
+```bash
+jupyter lab notebooks/sconjugacy.ipynb
+```
+
+A second pipeline, `moebius/sconjugacy.py`: spheres on the faces of a quad mesh
+whose edges follow S-conjugate directions of the sphere congruence `r = λ/H`.
+It reuses the remeshing and fairing of the Moebius pipeline, then fits one
+sphere per face without the support structure.
 
 ### Which surfaces this works on
 
@@ -273,14 +285,16 @@ undoes. It records the two lists and deletes nothing.
 - `moebius/` — the pipeline. `pipeline.py` holds the stages, `energies/` one
   `ObjectiveTerm` per file, `utils/` B-spline and sphere helpers, `glyphs.py` the
   spherical panels.
+- `moebius/sconjugacy.py` — the S-conjugacy pipeline.
 - `Chakana_Geo/` — submodule: `hanan` (meshes, I/O, Levenberg–Marquardt
   optimiser) and `kayviz` (browser-based viewer).
-- `notebooks/` — the pipeline notebook.
+- `notebooks/` — the Moebius and S-conjugacy notebooks.
 - `data/bsplines/` — reference surfaces.
 - `scripts/triage_bsplines.py` — keep/skip triage of the input surfaces.
 - `scripts/optimize_bsplines.py` — batch stage-1b over the whole folder.
 - `scripts/curvature_sheet.py` — contact sheet / HTML of the curvature sign.
-- `bin/quadRemesher` — the bundled quad remesher used by stage 4.
+- `bin/quadRemesher`, `bin/quadRemesherMac` — the bundled quad remesher used by
+  stage 4 (Linux x86-64, macOS universal).
 
 *The name Hanan comes from the Kichwa cosmovision, where Hanan-Pacha refers to
 the spiritual world.*

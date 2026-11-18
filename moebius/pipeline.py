@@ -23,6 +23,7 @@ import os
 import pickle
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -504,11 +505,13 @@ def run_torsal_optimizer(state: MoebiusState, max_iter: int = 100,
 # triangulates the grid and gives both triangles of a quad that quad's
 # directions (--defined_on faces).
 
-# The repository ships a built binary in bin/, so a fresh clone can run stage 4
-# without building anything; the sibling-repo paths are kept for working from a
-# local QuadRemesher checkout.
+# The repository ships built binaries in bin/ (quadRemesher for Linux x86-64,
+# quadRemesherMac for macOS, universal), so a fresh clone can run stage 4 without
+# building anything; the sibling-repo paths are kept for working from a local
+# QuadRemesher checkout.
+_BUNDLED_REMESHER = "quadRemesherMac" if sys.platform == "darwin" else "quadRemesher"
 REMESHER_CANDIDATES = (
-    PROJECT_ROOT / "bin" / "quadRemesher",
+    PROJECT_ROOT / "bin" / _BUNDLED_REMESHER,
     PROJECT_ROOT.parent / "QuadRemesher" / "bin" / "quadRemesher",
     PROJECT_ROOT.parent / "QuadRemesher" / "Quad_Remesher" / "build" / "quadRemesher",
 )
